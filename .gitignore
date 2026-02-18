@@ -1,0 +1,24 @@
+
+venv/
+
+
+.env
+
+# Python cache dosyaları
+__pycache__/
+*.pyc
+
+# Yüklenen PDF'ler 
+static/uploads/
+
+# IDE dosyaları
+.vscode/
+
+
+
+
+instance/
+
+.DS_Store
+static/uploads/*
+!static/uploads/.gitkeep
