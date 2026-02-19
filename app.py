@@ -200,6 +200,21 @@ def delete_pitch(pitch_id):
     return redirect(url_for('admin_dashboard'))
 
 
+
+# --- TARAYICI ÖNBELLEK KONTROLÜ (Güvenlik İçin) ---
+@app.after_request
+def add_header(response):
+    """
+    Tarayıcıya sayfaları önbelleğe almaması gerektiğini söyler.
+    Böylece çıkış yaptıktan sonra geri tuşuna basıldığında sayfa tekrar yüklenmeye
+    çalışılır ve @login_required engeline takılarak login sayfasına atılır.
+    """
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
 # --- UYGULAMAYI BAŞLAT ---
 if __name__ == '__main__':
     app.run(debug=True)
