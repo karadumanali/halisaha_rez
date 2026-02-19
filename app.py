@@ -1,7 +1,10 @@
 import os
 import uuid
-from flask import Flask
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
+from werkzeug.security import check_password_hash
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import db, Admin, Pitch, Reservation
 from dotenv import load_dotenv
 
@@ -9,59 +12,100 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# --- GÜVENLİK VE VERİTABANI KONFİGÜRASYONLARI ---
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'gelistirme-icin-gecici-anahtar')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://localhost/halisaha')
+# --- KONFİGÜRASYONLAR ---
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# --- DOSYA YÜKLEME GÜVENLİĞİ (Anti-DoS ve Anti-RCE) ---
-# 1. Boyut Sınırı: Maksimum 5 MB. (Sunucu diskini doldurma saldırılarına karşı)
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  
-
+# Dosya Yükleme Güvenliği
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Maksimum 5 MB
 UPLOAD_FOLDER = 'static/uploads/receipts'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# 2. Whitelist (Beyaz Liste) Yaklaşımı: Sadece bu uzantılara izin veriyoruz.
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
 db.init_app(app)
 
-# Yükleme klasörü yoksa otomatik oluştur
+# Klasör yoksa oluştur
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-# --- GÜVENLİK YARDIMCI FONKSİYONLARI ---
+# --- LOGIN MANAGER KURULUMU (Admin İçin) ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'admin_login'
 
+@login_manager.user_loader
+def load_user(user_id):
+    return Admin.query.get(int(user_id))
+
+# --- GÜVENLİK YARDIMCI FONKSİYONLARI ---
 def allowed_file(filename):
-    """Dosya uzantısının beyaz listede olup olmadığını kontrol eder."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def save_secure_receipt(file):
-    """
-    Kullanıcıdan gelen dosyayı RCE ve Path Traversal zafiyetlerinden 
-    arındırarak sunucuya kaydeder.
-    """
     if not file or not allowed_file(file.filename):
         return None
-        
-    # Aşama 1: Dosya adındaki tehlikeli karakterleri (../, ./ vs) temizle
     original_filename = secure_filename(file.filename)
-    
-    # Aşama 2: Kriptografik İsımlendirme (Zorunlu)
-    # Orijinal dosya adını TAMAMEN siliyoruz. Yerine tahmin edilemez bir UUID veriyoruz.
-    # Neden? Çünkü saldırgan "dekont.php.jpg" gibi çift uzantılı dosyalarla filtreyi aşmaya çalışabilir.
     ext = original_filename.rsplit('.', 1)[1].lower()
-    safe_filename = f"{uuid.uuid4().hex}.{ext}"
-    
-    # Güvenli yolu oluştur ve kaydet
+    safe_filename = f"{uuid.uuid4().hex}.{ext}" # Zararlı dosya ismini yok et, UUID ver
     save_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_filename)
     file.save(save_path)
-    
     return safe_filename
 
-# Uygulama başlarken tabloları oluştur
-with app.app_context():
-    db.create_all()
+# ==========================================
+#               WEB ROTALARI
+# ==========================================
 
+# 1. ANA SAYFA (Müşteri Ekranı)
+@app.route('/')
+def index():
+    # Veritabanındaki tüm sahaları çekip ön yüze göndereceğiz
+    pitches = Pitch.query.all()
+    return render_template('index.html', pitches=pitches)
+
+# 2. REZERVASYON YAPMA İŞLEMİ (Müşteri Formu Gönderdiğinde)
+@app.route('/reserve', methods=['POST'])
+def reserve():
+    pitch_id = request.form.get('pitch_id')
+    date_str = request.form.get('date') # Format: YYYY-MM-DD
+    time_slot = request.form.get('time_slot')
+    customer_name = request.form.get('customer_name')
+    customer_phone = request.form.get('customer_phone')
+    receipt_file = request.files.get('receipt')
+
+    # a. Çakışma Kontrolü (Aynı saha, aynı tarih ve saate başka onaylı/bekleyen var mı?)
+    date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+    existing_reservation = Reservation.query.filter_by(
+        pitch_id=pitch_id, 
+        date=date_obj, 
+        time_slot=time_slot
+    ).filter(Reservation.status.in_(['Pending', 'Approved'])).first()
+
+    if existing_reservation:
+        flash('Bu saat dilimi maalesef dolu veya onay bekliyor!', 'danger')
+        return redirect(url_for('index'))
+
+    # b. Dekontu Güvenle Kaydet
+    saved_filename = save_secure_receipt(receipt_file)
+    if not saved_filename:
+        flash('Geçersiz dosya formatı veya dosya yüklenmedi!', 'danger')
+        return redirect(url_for('index'))
+
+    # c. Veritabanına Yaz (Durum varsayılan olarak 'Pending' olur)
+    new_res = Reservation(
+        pitch_id=pitch_id,
+        date=date_obj,
+        time_slot=time_slot,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        receipt_filename=saved_filename
+    )
+    db.session.add(new_res)
+    db.session.commit()
+
+    flash('Rezervasyon talebiniz alındı! Yönetici onayından sonra kesinleşecektir.', 'success')
+    return redirect(url_for('index'))
+
+# --- UYGULAMAYI BAŞLAT ---
 if __name__ == '__main__':
     app.run(debug=True)
