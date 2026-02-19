@@ -179,6 +179,27 @@ def change_status(res_id, action):
     return redirect(url_for('admin_dashboard'))
 
 
+
+
+
+# 6. Halı Saha Silme Rotası
+@app.route('/admin/delete_pitch/<int:pitch_id>')
+@login_required
+def delete_pitch(pitch_id):
+    pitch = Pitch.query.get_or_404(pitch_id)
+    
+    try:
+        db.session.delete(pitch)
+        db.session.commit()
+        flash(f'"{pitch.name}" başarıyla silindi.', 'success')
+    except Exception as e:
+        # Eğer bu sahaya ait rezervasyonlar varsa veritabanı silmeye izin vermez (Bütünlük koruması)
+        db.session.rollback()
+        flash('Bu sahaya ait rezervasyonlar var! Önce o rezervasyonları temizlemelisiniz.', 'danger')
+        
+    return redirect(url_for('admin_dashboard'))
+
+
 # --- UYGULAMAYI BAŞLAT ---
 if __name__ == '__main__':
     app.run(debug=True)

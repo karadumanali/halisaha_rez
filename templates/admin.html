@@ -40,9 +40,35 @@
                 {% for pitch in pitches %}
                     <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent border-secondary">
                         <span class="fw-bold">{{ pitch.name }}</span>
-                        <span class="badge bg-success rounded-pill fs-6">{{ pitch.price }} ₺</span>
+                        
+                        <div>
+                            <span class="badge bg-success rounded-pill fs-6 me-2">{{ pitch.price }} ₺</span>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ pitch.id }}" title="Sahayı Sil">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
                     </li>
-                {% else %}
+
+                    <div class="modal fade" id="deleteModal{{ pitch.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow-lg">
+                                <div class="modal-header bg-danger text-white">
+                                    <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>Güvenlik Uyarısı</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                                </div>
+                                <div class="modal-body text-center p-4">
+                                    <i class="fas fa-trash-alt fa-3x text-danger mb-3"></i>
+                                    <p class="fs-5 mb-1"><strong>{{ pitch.name }}</strong> isimli sahayı sistemden silmek üzeresiniz.</p>
+                                    <p class="text-muted small">Bu işlem geri alınamaz. Devam etmek istediğinize emin misiniz?</p>
+                                </div>
+                                <div class="modal-footer bg-light justify-content-center">
+                                    <button type="button" class="btn btn-secondary px-4 fw-bold" data-bs-dismiss="modal">İptal</button>
+                                    <a href="/admin/delete_pitch/{{ pitch.id }}" class="btn btn-danger px-4 fw-bold shadow-sm">Evet, Sahayı Sil</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
                     <li class="list-group-item text-muted text-center py-3 bg-transparent">Henüz sistemde saha yok.</li>
                 {% endfor %}
             </ul>

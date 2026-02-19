@@ -1,6 +1,42 @@
 {% extends "layout.html" %}
 
 {% block body %}
+<style>
+    /* Kilitli Buton Görünümü */
+    #loginBtn:disabled {
+        opacity: 0.4 !important;
+        cursor: not-allowed !important;
+        background-color: #6c757d !important;
+        border-color: #6c757d !important;
+        pointer-events: none;
+    }
+
+    /* Edge ve IE'deki "Şifreyi Göster" (Göz) ikonunu tamamen gizle */
+    input::-ms-reveal,
+    input::-ms-clear {
+        display: none !important;
+    }
+    
+    /* Chrome ve Edge'in inatçı "Şifre Kaydetme/Yönetici" ANAHTAR ikonunu yok et */
+    input::-webkit-credentials-auto-fill-button {
+        visibility: hidden !important;
+        display: none !important;
+        pointer-events: none !important;
+        height: 0;
+        width: 0;
+        margin: 0;
+    }
+
+    /* Tarayıcı otomatik doldurduğunda kutunun içinin çirkin sarı/mavi olmasını engelle */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover, 
+    input:-webkit-autofill:focus, 
+    input:-webkit-autofill:active {
+        -webkit-box-shadow: 0 0 0 30px white inset !important;
+        transition: background-color 5000s ease-in-out 0s;
+    }
+</style>
+
 <div class="row justify-content-center mt-5">
     <div class="col-md-4">
         <div class="card shadow-lg border-0 bg-body-tertiary">
@@ -11,18 +47,38 @@
                 <form action="/login" method="POST">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Kullanıcı Adı</label>
-                        <input type="text" name="username" class="form-control border-secondary" required placeholder="username">
+                        <input type="text" id="usernameInp" name="username" class="form-control border-secondary" required minlength="4" placeholder="Username" autocomplete="off">
                     </div>
                     <div class="mb-4">
                         <label class="form-label fw-bold">Parola</label>
-                        <input type="password" name="password" class="form-control border-secondary" required placeholder="Password">
+                        <input type="password" id="passwordInp" name="password" class="form-control border-secondary" required minlength="6" placeholder="Password" autocomplete="new-password">
                     </div>
-                    <button type="submit" class="btn btn-dark w-100 fw-bold shadow-sm">
-                        <i class="fas fa-sign-in-alt me-2"></i>Log in
+                    
+                    <button type="submit" id="loginBtn" class="btn btn-dark w-100 fw-bold shadow-sm" disabled>
+                        <i class="fas fa-sign-in-alt me-2"></i>Sisteme Giriş Yap
                     </button>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const userInp = document.getElementById('usernameInp');
+        const passInp = document.getElementById('passwordInp');
+        const btn = document.getElementById('loginBtn');
+
+        function checkInputs() {
+            if (userInp.value.trim().length >= 4 && passInp.value.trim().length >= 6) {
+                btn.disabled = false;
+            } else {
+                btn.disabled = true;
+            }
+        }
+
+        userInp.addEventListener('input', checkInputs);
+        passInp.addEventListener('input', checkInputs);
+    });
+</script>
 {% endblock %}
