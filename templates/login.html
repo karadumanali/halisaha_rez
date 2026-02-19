@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+{% block body %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card shadow-lg border-0 bg-body-tertiary">
+            <div class="card-header bg-dark text-white text-center py-3">
+                <h4 class="mb-0"><i class="fas fa-user-shield me-2"></i>Yönetici Girişi</h4>
+            </div>
+            <div class="card-body p-4">
+                <form action="/login" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Kullanıcı Adı</label>
+                        <input type="text" name="username" class="form-control border-secondary" required placeholder="username">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Parola</label>
+                        <input type="password" name="password" class="form-control border-secondary" required placeholder="Password">
+                    </div>
+                    <button type="submit" class="btn btn-dark w-100 fw-bold shadow-sm">
+                        <i class="fas fa-sign-in-alt me-2"></i>Log in
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
