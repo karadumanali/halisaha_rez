@@ -1,0 +1,76 @@
+{% extends "layout.html" %}
+
+{% block body %}
+<div class="row mb-4">
+    <div class="col-12 text-center">
+        <h2 class="fw-bold">Sahalarımız ve Rezervasyon</h2>
+        <p class="text-muted">Lütfen oynamak istediğiniz sahayı seçip dekontunuzu yükleyerek talebinizi iletin.</p>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    {% if pitches|length == 0 %}
+        <div class="col-md-6 text-center py-5">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle fa-2x mb-3"></i><br>
+                Sistemde henüz kayıtlı bir halı saha bulunmuyor. Yönetici panele saha eklemelidir.
+            </div>
+        </div>
+    {% else %}
+        {% for pitch in pitches %}
+        <div class="col-md-5 mb-4">
+            <div class="card shadow-lg border-0 h-100">
+                <div class="card-header bg-success text-white text-center py-3">
+                    <h4 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>{{ pitch.name }}</h4>
+                </div>
+                <div class="card-body bg-white p-4">
+                    <h5 class="text-center text-success mb-4 fw-bold">Saatlik Ücret: {{ pitch.price }} TL</h5>
+                    
+                    <form action="/reserve" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="pitch_id" value="{{ pitch.id }}">
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold"><i class="fas fa-user me-2"></i>Adınız Soyadınız</label>
+                            <input type="text" class="form-control" name="customer_name" required maxlength="100">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold"><i class="fas fa-phone me-2"></i>Telefon Numaranız</label>
+                            <input type="tel" class="form-control" name="customer_phone" required maxlength="15" placeholder="05XX XXX XX XX">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold"><i class="far fa-calendar-alt me-2"></i>Tarih</label>
+                                <input type="date" class="form-control" name="date" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold"><i class="far fa-clock me-2"></i>Saat Aralığı</label>
+                                <select class="form-select" name="time_slot" required>
+                                    <option value="">Seçiniz...</option>
+                                    <option value="18:00 - 19:00">18:00 - 19:00</option>
+                                    <option value="19:00 - 20:00">19:00 - 20:00</option>
+                                    <option value="20:00 - 21:00">20:00 - 21:00</option>
+                                    <option value="21:00 - 22:00">21:00 - 22:00</option>
+                                    <option value="22:00 - 23:00">22:00 - 23:00</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold"><i class="fas fa-receipt me-2"></i>Ödeme Dekontu (PDF, JPG, PNG)</label>
+                            <input class="form-control border-success" type="file" name="receipt" accept=".pdf, .png, .jpg, .jpeg" required>
+                            <div class="form-text text-muted small">Max 5MB. İlgili ücrete ait dekontu yükleyiniz.</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100 py-2 fw-bold fs-5 shadow-sm">
+                            <i class="fas fa-check-circle me-2"></i>Rezervasyon Talebi Gönder
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}
