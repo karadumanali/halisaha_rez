@@ -106,6 +106,79 @@ def reserve():
     flash('Rezervasyon talebiniz alındı! Yönetici onayından sonra kesinleşecektir.', 'success')
     return redirect(url_for('index'))
 
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        admin = Admin.query.filter_by(username=username).first()
+        
+        # Güvenlik: Kullanıcı var mı ve şifre hash'i eşleşiyor mu?
+        if admin and check_password_hash(admin.password_hash, password):
+            login_user(admin)
+            flash('Yönetici paneline hoş geldiniz.', 'success')
+            return redirect(url_for('admin_dashboard'))
+        else:
+            # OSINT Önlemi: Kötü niyetli kişilere "Kullanıcı adı yanlış" veya "Şifre yanlış" 
+            # diyerek bilgi sızdırmıyoruz. İkisini de reddediyoruz.
+            flash('Kullanıcı adı veya şifre hatalı!', 'danger')
+            
+    return render_template('login.html')
+
+# 2. Admin Çıkış İşlemi
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('Güvenli çıkış yapıldı.', 'info')
+    return redirect(url_for('index'))
+
+# 3. Yönetici Paneli Ana Sayfası (Dekontları ve Sahaları Gördüğümüz Yer)
+@app.route('/admin')
+@login_required
+def admin_dashboard():
+    # Sistemdeki tüm sahaları çek
+    pitches = Pitch.query.all()
+    # Tüm rezervasyonları en yeniden en eskiye (created_at) göre sıralayarak çek
+    reservations = Reservation.query.order_by(Reservation.created_at.desc()).all()
+    
+    return render_template('admin.html', pitches=pitches, reservations=reservations)
+
+# 4. Yeni Halı Saha Ekleme Rotası
+@app.route('/admin/add_pitch', methods=['POST'])
+@login_required
+def add_pitch():
+    name = request.form.get('name')
+    price = request.form.get('price')
+    
+    yeni_saha = Pitch(name=name, price=int(price))
+    db.session.add(yeni_saha)
+    db.session.commit()
+    
+    flash(f'"{name}" başarıyla sisteme eklendi!', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+# 5. Rezervasyon Onaylama / Reddetme Rotası (Sistemin Yöneticisi Konuşuyor)
+@app.route('/admin/status/<res_id>/<action>')
+@login_required
+def change_status(res_id, action):
+    # UUID ile güvenli arama (IDOR korumalı)
+    reservation = Reservation.query.get_or_404(res_id)
+    
+    if action == 'approve':
+        reservation.status = 'Approved'
+        flash('Rezervasyon ONAYLANDI. Artık o saat dilimi sistemde dolu görünecek.', 'success')
+    elif action == 'reject':
+        reservation.status = 'Rejected'
+        flash('Rezervasyon REDDEDİLDİ. O saat dilimi tekrar boşa çıktı.', 'danger')
+        
+    db.session.commit()
+    return redirect(url_for('admin_dashboard'))
+
+
 # --- UYGULAMAYI BAŞLAT ---
 if __name__ == '__main__':
     app.run(debug=True)
