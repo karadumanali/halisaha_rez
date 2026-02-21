@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
@@ -16,6 +16,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SESSION_PERMANENT'] = False #tarayici kapattiği an hesabi unut
 
 # Dosya Yükleme Güvenliği
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Maksimum 5 MB
@@ -133,8 +134,9 @@ def admin_login():
 @login_required
 def logout():
     logout_user()
-    flash('Güvenli çıkış yapıldı.', 'info')
-    return redirect(url_for('index'))
+    session.clear() # Tüm çerez izlerini sunucudan da sil
+    flash('Güvenli çıkış yapıldı. Oturum tamamen kapatıldı.', 'info')
+    return redirect(url_for('admin_login')) # Çıkış yapınca ana sayfaya değil, login'e atsın
 
 # 3. Yönetici Paneli Ana Sayfası (Dekontları ve Sahaları Gördüğümüz Yer)
 @app.route('/admin')
@@ -201,18 +203,17 @@ def delete_pitch(pitch_id):
 
 
 
-# --- TARAYICI ÖNBELLEK KONTROLÜ (Güvenlik İçin) ---
+# --- GÜVENLİK: GERİ TUŞU ZAFİYETİ (ANTI-CACHE) ---
 @app.after_request
-def add_header(response):
-    """
-    Tarayıcıya sayfaları önbelleğe almaması gerektiğini söyler.
-    Böylece çıkış yaptıktan sonra geri tuşuna basıldığında sayfa tekrar yüklenmeye
-    çalışılır ve @login_required engeline takılarak login sayfasına atılır.
-    """
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+def anti_cache(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     return response
+
+# --- UYGULAMAYI BAŞLAT ---
+if __name__ == '__main__':
+    app.run(debug=True)
 
 
 # --- UYGULAMAYI BAŞLAT ---
