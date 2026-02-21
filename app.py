@@ -202,20 +202,19 @@ def delete_pitch(pitch_id):
     return redirect(url_for('admin_dashboard'))
 
 
-
-# --- GÜVENLİK: GERİ TUŞU ZAFİYETİ (ANTI-CACHE) ---
+# --- GÜVENLİK: GERİ TUŞU ZAFİYETİ (DÜZELTİLDİ) ---
 @app.after_request
 def anti_cache(response):
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
+    # Sadece HTML sayfalarında cache engelle ki login olurken çerezlerimiz silinmesin!
+    if response.status_code == 200 and response.content_type and response.content_type.startswith('text/html'):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     return response
 
+
 # --- UYGULAMAYI BAŞLAT ---
 if __name__ == '__main__':
     app.run(debug=True)
 
 
-# --- UYGULAMAYI BAŞLAT ---
-if __name__ == '__main__':
-    app.run(debug=True)
