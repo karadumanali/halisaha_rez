@@ -45,6 +45,7 @@
             </div>
             <div class="card-body p-4">
                 <form action="/login" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Kullanıcı Adı</label>
                         <input type="text" id="usernameInp" name="username" class="form-control border-secondary" required minlength="4" placeholder="Username" autocomplete="off">

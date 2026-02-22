@@ -19,6 +19,7 @@
             </div>
             <div class="card-body">
                 <form action="/admin/add_pitch" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div class="mb-3">
                         <label class="form-label text-muted small fw-bold">Saha Adı</label>
                         <input type="text" class="form-control border-success" name="name" placeholder="Örn: Açık Saha 1" required>
@@ -60,10 +61,12 @@
                                     <i class="fas fa-trash-alt fa-3x text-danger mb-3"></i>
                                     <p class="fs-5 mb-1"><strong>{{ pitch.name }}</strong> isimli sahayı sistemden silmek üzeresiniz.</p>
                                     <p class="text-muted small">Bu işlem geri alınamaz. Devam etmek istediğinize emin misiniz?</p>
-                                </div>
                                 <div class="modal-footer bg-light justify-content-center">
                                     <button type="button" class="btn btn-secondary px-4 fw-bold" data-bs-dismiss="modal">İptal</button>
-                                    <a href="/admin/delete_pitch/{{ pitch.id }}" class="btn btn-danger px-4 fw-bold shadow-sm">Evet, Sahayı Sil</a>
+                                    <form action="/admin/delete_pitch/{{ pitch.id }}" method="POST" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="btn btn-danger px-4 fw-bold shadow-sm">Evet, Sahayı Sil</button>
+                                    </form>
                                 </div>
                             </div>
                         </div>
@@ -121,8 +124,14 @@
                             <td>
                                 {% if res.status == 'Pending' %}
                                     <div class="btn-group shadow-sm" role="group">
-                                        <a href="/admin/status/{{ res.id }}/approve" class="btn btn-sm btn-success" title="Onayla"><i class="fas fa-check"></i></a>
-                                        <a href="/admin/status/{{ res.id }}/reject" class="btn btn-sm btn-danger" title="Reddet"><i class="fas fa-times"></i></a>
+                                        <form action="/admin/status/{{ res.id }}/approve" method="POST" class="d-inline mb-0">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            <button type="submit" class="btn btn-sm btn-success" title="Onayla" style="border-radius: 4px 0 0 4px;"><i class="fas fa-check"></i></button>
+                                        </form>
+                                        <form action="/admin/status/{{ res.id }}/reject" method="POST" class="d-inline mb-0">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Reddet" style="border-radius: 0 4px 4px 0;"><i class="fas fa-times"></i></button>
+                                        </form>
                                     </div>
                                 {% else %}
                                     <span class="text-muted small fw-bold">İşlem Bitti</span>

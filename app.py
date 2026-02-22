@@ -8,6 +8,8 @@ from flask_login import LoginManager, login_user, login_required, logout_user, c
 from models import db, Admin, Pitch, Reservation
 from dotenv import load_dotenv
 
+from flask_wtf.csrf import CSRFProtect
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -25,6 +27,8 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
 db.init_app(app)
+
+csrf = CSRFProtect(app) #csrf icin
 
 # Klasör yoksa oluştur
 if not os.path.exists(UPLOAD_FOLDER):
@@ -164,7 +168,7 @@ def add_pitch():
     return redirect(url_for('admin_dashboard'))
 
 # 5. Rezervasyon Onaylama / Reddetme Rotası (Sistemin Yöneticisi Konuşuyor)
-@app.route('/admin/status/<res_id>/<action>')
+@app.route('/admin/status/<res_id>/<action>', methods=['POST'])
 @login_required
 def change_status(res_id, action):
     # UUID ile güvenli arama (IDOR korumalı)
@@ -185,7 +189,7 @@ def change_status(res_id, action):
 
 
 # 6. Halı Saha Silme Rotası
-@app.route('/admin/delete_pitch/<int:pitch_id>')
+@app.route('/admin/delete_pitch/<int:pitch_id>', methods=['POST'])
 @login_required
 def delete_pitch(pitch_id):
     pitch = Pitch.query.get_or_404(pitch_id)
