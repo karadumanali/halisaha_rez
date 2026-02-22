@@ -61,6 +61,7 @@
                                     <i class="fas fa-trash-alt fa-3x text-danger mb-3"></i>
                                     <p class="fs-5 mb-1"><strong>{{ pitch.name }}</strong> isimli sahayı sistemden silmek üzeresiniz.</p>
                                     <p class="text-muted small">Bu işlem geri alınamaz. Devam etmek istediğinize emin misiniz?</p>
+                                </div>
                                 <div class="modal-footer bg-light justify-content-center">
                                     <button type="button" class="btn btn-secondary px-4 fw-bold" data-bs-dismiss="modal">İptal</button>
                                     <form action="/admin/delete_pitch/{{ pitch.id }}" method="POST" class="d-inline">
