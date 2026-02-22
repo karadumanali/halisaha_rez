@@ -14,6 +14,8 @@ from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+import magic  #zararli dosya engellemek icin
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -60,13 +62,30 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def save_secure_receipt(file):
-    if not file or not allowed_file(file.filename):
+    if not file:
         return None
+
+    # 1. Önce dosyanın ilk birkaç baytını okuyup gerçek türünü öğrenelim
+    file_content = file.read(2048) # İlk 2048 baytı okumak yeterlidir
+    file.seek(0) # Okuduktan sonra imleci tekrar başa sarıyoruz ki dosyayı diske eksiksiz kaydedebilelim
+
+    # python-magic ile GERÇEK dosya türünü (MIME Type) bul
+    mime_type = magic.from_buffer(file_content, mime=True)
+
+    # İzin verdiğimiz GERÇEK dosya türleri (Siber güvenlik el kitabındaki "Whitelist" mantığı)
+    ALLOWED_MIME_TYPES = {'application/pdf', 'image/jpeg', 'image/png'}
+
+    # 2. Hem MIME türü beyaz listede mi, hem de uzantısı doğru mu kontrol et
+    if mime_type not in ALLOWED_MIME_TYPES or not allowed_file(file.filename):
+        return None # Sahte veya desteklenmeyen bir dosya, hemen reddet!
+
+    # 3. Güvenli isim oluştur ve kaydet (Mevcut UUID mantığın burada devreye giriyor)
     original_filename = secure_filename(file.filename)
     ext = original_filename.rsplit('.', 1)[1].lower()
-    safe_filename = f"{uuid.uuid4().hex}.{ext}" # Zararlı dosya ismini yok et, UUID ver
+    safe_filename = f"{uuid.uuid4().hex}.{ext}" 
     save_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_filename)
     file.save(save_path)
+    
     return safe_filename
 
 # ==========================================
@@ -231,8 +250,15 @@ def anti_cache(response):
     return response
 
 
+
 # --- UYGULAMAYI BAŞLAT ---
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Debug modunu .env dosyasından güvenle alıyoruz. 
+    # Eğer .env dosyasında belirtilmemişse varsayılan olarak False (Güvenli) kabul eder.
+    is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
+    
+    # Canlı ortamda asla Flask'ın kendi sunucusu (app.run) tek başına kullanılmamalıdır,
+    # ancak testler için debug modunu kontrollü hale getirdik.
+    app.run(debug=is_debug)
 
 
