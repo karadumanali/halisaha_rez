@@ -43,7 +43,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-bold"><i class="far fa-calendar-alt me-2"></i>Tarih</label>
-                                <input type="date" class="form-control" name="date" required>
+                                <input type="date" class="form-control" name="date" min="{{ today_date }}" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-bold"><i class="far fa-clock me-2"></i>Saat Aralığı</label>
@@ -74,4 +74,16 @@
         {% endfor %}
     {% endif %}
 </div>
+
+<script>
+    // Sayfa yüklendiğinde tüm tarih inputlarını bugüne göre kısıtla
+    document.addEventListener('DOMContentLoaded', function() {
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        const today = new Date().toISOString().split('T')[0];
+        dateInputs.forEach(input => {
+            input.setAttribute('min', today);
+        });
+    });
+</script>
+
 {% endblock %}

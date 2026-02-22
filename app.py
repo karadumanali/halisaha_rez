@@ -95,9 +95,10 @@ def save_secure_receipt(file):
 # 1. ANA SAYFA (Müşteri Ekranı)
 @app.route('/')
 def index():
-    # Veritabanındaki tüm sahaları çekip ön yüze göndereceğiz
     pitches = Pitch.query.all()
-    return render_template('index.html', pitches=pitches)
+    # Sadece bugünün tarihini al ve saat farkı riskini ortadan kaldır
+    today_date = datetime.now().date().isoformat() 
+    return render_template('index.html', pitches=pitches, today_date=today_date)
 
 # 2. REZERVASYON YAPMA İŞLEMİ (Müşteri Formu Gönderdiğinde)
 @app.route('/reserve', methods=['POST'])
@@ -112,6 +113,12 @@ def reserve():
 
     # a. Çakışma Kontrolü (Aynı saha, aynı tarih ve saate başka onaylı/bekleyen var mı?)
     date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+
+    #Geçmiş tarihe rezervasyon yapılmasını arkadan da engelle
+    if date_obj < datetime.today().date():
+        flash('Geçmiş bir tarihe rezervasyon yapamazsınız!', 'danger')
+        return redirect(url_for('index'))
+    
     existing_reservation = Reservation.query.filter_by(
         pitch_id=pitch_id, 
         date=date_obj, 
@@ -218,6 +225,21 @@ def change_status(res_id, action):
     return redirect(url_for('admin_dashboard'))
 
 
+# 7. Halı Saha Fiyat Güncelleme Rotası
+@app.route('/admin/update_pitch/<int:pitch_id>', methods=['POST'])
+@login_required
+def update_pitch(pitch_id):
+    pitch = Pitch.query.get_or_404(pitch_id)
+    new_price = request.form.get('new_price')
+    
+    if new_price and new_price.isdigit():
+        pitch.price = int(new_price)
+        db.session.commit()
+        flash(f'"{pitch.name}" sahasının ücreti {pitch.price} ₺ olarak güncellendi.', 'success')
+    else:
+        flash('Geçersiz bir ücret girdiniz.', 'danger')
+        
+    return redirect(url_for('admin_dashboard'))
 
 
 

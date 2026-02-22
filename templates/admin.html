@@ -44,6 +44,11 @@
                         
                         <div>
                             <span class="badge bg-success rounded-pill fs-6 me-2">{{ pitch.price }} ₺</span>
+                            
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#updateModal{{ pitch.id }}" title="Fiyatı Güncelle">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            
                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ pitch.id }}" title="Sahayı Sil">
                                 <i class="fas fa-trash-alt"></i>
                             </button>
@@ -72,7 +77,33 @@
                             </div>
                         </div>
                     </div>
-                    {% else %}
+
+                    <div class="modal fade" id="updateModal{{ pitch.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow-lg">
+                                <div class="modal-header bg-primary text-white">
+                                    <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Fiyat Güncelle</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                                </div>
+                                <form action="/admin/update_pitch/{{ pitch.id }}" method="POST">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <div class="modal-body p-4">
+                                        <p class="fs-5 mb-3"><strong>{{ pitch.name }}</strong> isimli sahanın yeni saatlik ücretini giriniz.</p>
+                                        <div class="input-group mb-3">
+                                            <span class="input-group-text bg-light fw-bold">₺</span>
+                                            <input type="number" class="form-control" name="new_price" value="{{ pitch.price }}" required min="0">
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer bg-light justify-content-center">
+                                        <button type="button" class="btn btn-secondary px-4 fw-bold" data-bs-dismiss="modal">İptal</button>
+                                        <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">Fiyatı Güncelle</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                {% else %}
                     <li class="list-group-item text-muted text-center py-3 bg-transparent">Henüz sistemde saha yok.</li>
                 {% endfor %}
             </ul>
