@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 
 from flask_wtf.csrf import CSRFProtect
 
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -29,6 +33,14 @@ ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 db.init_app(app)
 
 csrf = CSRFProtect(app) #csrf icin
+
+# ---RATE LIMITING ---
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    storage_uri="memory://", # Sınırlandırma verilerini geçici bellekte tutar
+    default_limits=["500 per day", "100 per hour"] # Tüm site için genel bir üst sınır
+)
 
 # Klasör yoksa oluştur
 if not os.path.exists(UPLOAD_FOLDER):
@@ -70,6 +82,7 @@ def index():
 
 # 2. REZERVASYON YAPMA İŞLEMİ (Müşteri Formu Gönderdiğinde)
 @app.route('/reserve', methods=['POST'])
+@limiter.limit("3 per minute") # Aynı IP'den dakikada en fazla 3 rezervasyon yapılabilir
 def reserve():
     pitch_id = request.form.get('pitch_id')
     date_str = request.form.get('date') # Format: YYYY-MM-DD
@@ -114,6 +127,7 @@ def reserve():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute") # Brute-force şifre kırma saldırılarını engeller
 def admin_login():
     if request.method == 'POST':
         username = request.form.get('username')
