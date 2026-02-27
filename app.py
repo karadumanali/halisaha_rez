@@ -1,5 +1,18 @@
 import os
+import smtplib
+from email.message import EmailMessage
+from PIL import Image
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Python 3.13'te Windows'un yanındaki DLL'leri okuyabilmesi için bu şart!
+if hasattr(os, 'add_dll_directory'):
+    os.add_dll_directory(base_dir)
+
+# Sistemin DLL'leri ve magic.mgc veritabanını bulması için ortam değişkenlerini zorluyoruz
+os.environ['PATH'] = base_dir + os.pathsep + os.environ['PATH']
+os.environ['MAGIC'] = os.path.join(base_dir, 'magic.mgc')
 import uuid
+import re  # <--- BUNU EKLE (Düzenli ifadeler için) örneğin telefon numarasının formatı
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from werkzeug.utils import secure_filename
@@ -65,32 +78,102 @@ def save_secure_receipt(file):
     if not file:
         return None
 
-    # 1. Önce dosyanın ilk birkaç baytını okuyup gerçek türünü öğrenelim
-    file_content = file.read(2048) # İlk 2048 baytı okumak yeterlidir
-    file.seek(0) # Okuduktan sonra imleci tekrar başa sarıyoruz ki dosyayı diske eksiksiz kaydedebilelim
+    # 1. Önce dosyanın ilk birkaç baytını okuyup GERÇEK türünü öğrenelim
+    file_content = file.read(2048) 
+    file.seek(0) 
 
-    # python-magic ile GERÇEK dosya türünü (MIME Type) bul
+    # python-magic ile doğrulama
     mime_type = magic.from_buffer(file_content, mime=True)
 
-    # İzin verdiğimiz GERÇEK dosya türleri (Siber güvenlik el kitabındaki "Whitelist" mantığı)
-    ALLOWED_MIME_TYPES = {'application/pdf', 'image/jpeg', 'image/png'}
+    ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png'}
+    ALLOWED_PDF = {'application/pdf'}
 
-    # 2. Hem MIME türü beyaz listede mi, hem de uzantısı doğru mu kontrol et
-    if mime_type not in ALLOWED_MIME_TYPES or not allowed_file(file.filename):
-        return None # Sahte veya desteklenmeyen bir dosya, hemen reddet!
+    # Eğer gelen dosya izin verilen listelerde değilse veya uzantısı sahteyse anında reddet!
+    if mime_type not in (ALLOWED_IMAGE_TYPES | ALLOWED_PDF) or not allowed_file(file.filename):
+        return None 
 
-    # 3. Güvenli isim oluştur ve kaydet (Mevcut UUID mantığın burada devreye giriyor)
+    # 2. Güvenli ve tahmin edilemez dosya adı oluşturma
     original_filename = secure_filename(file.filename)
     ext = original_filename.rsplit('.', 1)[1].lower()
     safe_filename = f"{uuid.uuid4().hex}.{ext}" 
     save_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_filename)
-    file.save(save_path)
+
+    # ==========================================
+    # GÜVENLİK FİLTRESİ 1: GÖRÜNTÜ STERİLİZASYONU
+    # ==========================================
+    if mime_type in ALLOWED_IMAGE_TYPES:
+        try:
+            # Resmi arka planda açıyoruz
+            with Image.open(file) as img:
+                # A. Formatı standartlaştır (Gizli katmanları ve şeffaflık açıklarını kapatır)
+                if img.mode in ("RGBA", "P") and ext in ['jpg', 'jpeg']:
+                    img = img.convert("RGB")
+                elif img.mode != "RGB" and ext not in ['png']:
+                    img = img.convert("RGB")
+
+                # B. Pixel Bomb Koruması (En-boy oranını bozmadan max 1920x1920 yapar)
+                img.thumbnail((1920, 1920))
+
+                # C. Kaydetme İşlemi (optimize=True ile EXIF silinir, resim yeniden çizilir)
+                img.save(save_path, optimize=True, quality=85)
+                
+        except Exception as e:
+            # Eğer resim bozuksa, açılamıyorsa veya pikselleri manipüle edilmişse kaydetmeyi reddet
+            return None
+
+    # ==========================================
+    # GÜVENLİK FİLTRESİ 2: PDF İŞLEMİ
+    # ==========================================
+    elif mime_type in ALLOWED_PDF:
+        # PDF'ler görüntü olmadığı için yeniden çizilemez. 
+        # Ancak magic ile DNA'sını doğruladığımız ve 5MB sınırımız olduğu için güvenle kaydediyoruz.
+        file.save(save_path)
     
     return safe_filename
 
 # ==========================================
 #               WEB ROTALARI
 # ==========================================
+# --- GÜVENLİ MAİL BİLDİRİM SİSTEMİ ---
+def send_admin_notification(customer_name, date, time_slot):
+    sender_email = os.getenv('MAIL_USERNAME')
+    sender_password = os.getenv('MAIL_PASSWORD')
+    admin_email = os.getenv('ADMIN_EMAIL')
+
+    if not sender_email or not sender_password:
+        return # Eğer .env ayarlanmamışsa sistem çökmesin, sessizce iptal etsin
+
+    msg = EmailMessage()
+    msg['Subject'] = '🔔 Yeni Rezervasyon Talebi Geldi!'
+    msg['From'] = sender_email
+    msg['To'] = admin_email
+    
+    # Düz metin (Plain text) kullanıyoruz ki HTML Injection zafiyeti oluşmasın
+    msg.set_content(f"""
+Merhaba Yönetici,
+
+Sisteme yeni bir onay bekleyen rezervasyon düştü!
+
+👤 Müşteri: {customer_name}
+📅 Tarih: {date}
+⏰ Saat: {time_slot}
+
+Lütfen en kısa sürede yönetici paneline girerek dekontu kontrol edip onaylayın veya reddedin.
+
+İyi çalışmalar!
+(Bu otomatik bir güvenlik bilgilendirme mesajıdır)
+    """)
+
+    try:
+        # GÜVENLİK: Bağlantıyı TLS ile şifreliyoruz (MitM saldırılarına karşı)
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls() 
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+    except Exception as e:
+        # Eğer internet koparsa veya Google maili engellerse, müşterinin rezervasyonu yarım kalmasın!
+        # Hata yakalama (try-except) ile hatayı yutuyoruz.
+        print(f"Mail gönderme hatası (Sistem çalışmaya devam ediyor): {e}")
 
 # 1. ANA SAYFA (Müşteri Ekranı)
 @app.route('/')
@@ -102,23 +185,53 @@ def index():
 
 # 2. REZERVASYON YAPMA İŞLEMİ (Müşteri Formu Gönderdiğinde)
 @app.route('/reserve', methods=['POST'])
-@limiter.limit("3 per minute") # Aynı IP'den dakikada en fazla 3 rezervasyon yapılabilir
+@limiter.limit("3 per minute")
 def reserve():
     pitch_id = request.form.get('pitch_id')
     date_str = request.form.get('date') # Format: YYYY-MM-DD
     time_slot = request.form.get('time_slot')
     customer_name = request.form.get('customer_name')
-    customer_phone = request.form.get('customer_phone')
+    
+    # 1. GÜVENLİK: TELEFON NUMARASI TEMİZLEME VE FORMAT KONTROLÜ
+    raw_phone = request.form.get('customer_phone', '')
+    # Kullanıcının girdiği boşlukları temizle (Örn: "0555 555 55 55" -> "05555555555")
+    clean_phone = raw_phone.replace(" ", "") 
+    
+    # Sadece 05 ile başlayan ve tam 11 haneli rakamları kabul eden katı Regex filtresi
+    if not re.match(r"^05\d{9}$", clean_phone):
+        flash('Güvenlik ihlali veya geçersiz format! Telefon numarası 05XX XXX XX XX formatında 11 haneli olmalıdır.', 'danger')
+        return redirect(url_for('index'))
+
+    # 2. GÜVENLİK: ZAMAN MANİPÜLASYONU VE GEÇMİŞ SAAT KONTROLÜ
+    try:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+        current_date = datetime.now().date()
+        current_time = datetime.now().time()
+
+        # a) Tarih geçmiş mi?
+        if date_obj < current_date:
+            flash('Geçmiş bir tarihe rezervasyon yapılamaz!', 'danger')
+            return redirect(url_for('index'))
+
+        # b) Tarih bugünse, saat geçmiş mi?
+        if date_obj == current_date:
+            # Gelen veriyi güvenle parçala (Örn: "18:00 - 19:00" -> "18:00")
+            start_time_str = time_slot.split(' - ')[0].strip()
+            start_time_obj = datetime.strptime(start_time_str, '%H:%M').time()
+            
+            if start_time_obj <= current_time:
+                flash('Seçtiğiniz saat dilimi geçmiştir, lütfen ileri bir saat seçiniz!', 'danger')
+                return redirect(url_for('index'))
+                
+    except (ValueError, IndexError, AttributeError):
+        # Eğer birisi Postman ile "time_slot" kısmına "hack_saati" gibi saçma bir veri yollarsa
+        # sistemin 500 hatası verip çökmesini engelleriz.
+        flash('Geçersiz tarih veya saat verisi tespit edildi!', 'danger')
+        return redirect(url_for('index'))
+
     receipt_file = request.files.get('receipt')
 
-    # a. Çakışma Kontrolü (Aynı saha, aynı tarih ve saate başka onaylı/bekleyen var mı?)
-    date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
-
-    #Geçmiş tarihe rezervasyon yapılmasını arkadan da engelle
-    if date_obj < datetime.today().date():
-        flash('Geçmiş bir tarihe rezervasyon yapamazsınız!', 'danger')
-        return redirect(url_for('index'))
-    
+    # c. Çakışma Kontrolü (Aynı saha, aynı tarih ve saate başka onaylı/bekleyen var mı?)
     existing_reservation = Reservation.query.filter_by(
         pitch_id=pitch_id, 
         date=date_obj, 
@@ -129,27 +242,27 @@ def reserve():
         flash('Bu saat dilimi maalesef dolu veya onay bekliyor!', 'danger')
         return redirect(url_for('index'))
 
-    # b. Dekontu Güvenle Kaydet
+    # d. Dekontu Güvenle Kaydet
     saved_filename = save_secure_receipt(receipt_file)
     if not saved_filename:
         flash('Geçersiz dosya formatı veya dosya yüklenmedi!', 'danger')
         return redirect(url_for('index'))
 
-    # c. Veritabanına Yaz (Durum varsayılan olarak 'Pending' olur)
+    # e. Veritabanına Yaz 
     new_res = Reservation(
         pitch_id=pitch_id,
         date=date_obj,
         time_slot=time_slot,
         customer_name=customer_name,
-        customer_phone=customer_phone,
+        customer_phone=clean_phone, # Temizlenmiş ve onaylanmış numarayı kaydediyoruz
         receipt_filename=saved_filename
     )
     db.session.add(new_res)
     db.session.commit()
-
+# YENİ EKLENEN SATIR: Veritabanına kayıt KESİNLEŞTİKTEN sonra mail at
+    send_admin_notification(customer_name, date_obj, time_slot)
     flash('Rezervasyon talebiniz alındı! Yönetici onayından sonra kesinleşecektir.', 'success')
     return redirect(url_for('index'))
-
 
 
 @app.route('/login', methods=['GET', 'POST'])
