@@ -201,6 +201,13 @@ def reserve():
     if not re.match(r"^05\d{9}$", clean_phone):
         flash('Güvenlik ihlali veya geçersiz format! Telefon numarası 05XX XXX XX XX formatında 11 haneli olmalıdır.', 'danger')
         return redirect(url_for('index'))
+    # GÜVENLİK FİLTRESİ: Katı E-Posta Regex Kontrolü
+    customer_email = request.form.get('customer_email', '').strip()
+    email_regex = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+    if not re.match(email_regex, customer_email):
+        flash('Güvenlik ihlali: Geçersiz e-posta formatı!', 'danger')
+        return redirect(url_for('index'))
+    # ==========================================
 
     # 2. GÜVENLİK: ZAMAN MANİPÜLASYONU VE GEÇMİŞ SAAT KONTROLÜ
     try:
@@ -255,6 +262,7 @@ def reserve():
         time_slot=time_slot,
         customer_name=customer_name,
         customer_phone=clean_phone, # Temizlenmiş ve onaylanmış numarayı kaydediyoruz
+        customer_email=customer_email,
         receipt_filename=saved_filename
     )
     db.session.add(new_res)
@@ -263,6 +271,41 @@ def reserve():
     send_admin_notification(customer_name, date_obj, time_slot)
     flash('Rezervasyon talebiniz alındı! Yönetici onayından sonra kesinleşecektir.', 'success')
     return redirect(url_for('index'))
+def send_customer_approval_email(customer_email, customer_name, pitch_name, date, time_slot):
+    sender_email = os.getenv('MAIL_USERNAME')
+    sender_password = os.getenv('MAIL_PASSWORD')
+
+    if not sender_email or not sender_password:
+        return
+
+    msg = EmailMessage()
+    msg['Subject'] = '✅ Halı Saha Rezervasyonunuz Onaylandı!'
+    msg['From'] = sender_email
+    msg['To'] = customer_email
+    
+    # Düz metin (Plain Text) kullanılarak HTML Injection zafiyeti engellendi
+    msg.set_content(f"""
+Merhaba {customer_name},
+
+Harika bir haberimiz var! Rezervasyon talebiniz yöneticimiz tarafından onaylanmıştır.
+
+🏟️ Saha: {pitch_name}
+📅 Tarih: {date.strftime('%d.%m.%Y')}
+⏰ Saat: {time_slot}
+
+Ödemeniz alınmış ve sahanız adınıza ayırtılmıştır. Bizi tercih ettiğiniz için teşekkür ederiz. 
+Maçta başarılar dileriz!
+
+(Bu otomatik bir bilgilendirme mesajıdır, lütfen cevaplamayınız.)
+    """)
+
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+    except Exception as e:
+        print(f"Müşteriye mail gönderme hatası: {e}")
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -329,14 +372,22 @@ def change_status(res_id, action):
     
     if action == 'approve':
         reservation.status = 'Approved'
-        flash('Rezervasyon ONAYLANDI. Artık o saat dilimi sistemde dolu görünecek.', 'success')
+        # YENİ: Müşteriye onay maili at!
+        send_customer_approval_email(
+            reservation.customer_email, 
+            reservation.customer_name, 
+            reservation.pitch.name, 
+            reservation.date, 
+            reservation.time_slot
+        )
+        flash('Rezervasyon ONAYLANDI ve müşteriye e-posta ile bildirildi.', 'success')
+        
     elif action == 'reject':
         reservation.status = 'Rejected'
         flash('Rezervasyon REDDEDİLDİ. O saat dilimi tekrar boşa çıktı.', 'danger')
         
     db.session.commit()
     return redirect(url_for('admin_dashboard'))
-
 
 # 7. Halı Saha Fiyat Güncelleme Rotası
 @app.route('/admin/update_pitch/<int:pitch_id>', methods=['POST'])

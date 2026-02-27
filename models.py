@@ -47,7 +47,8 @@ class Reservation(db.Model):
     # Veri bütünlüğü için kısıtlamalar
     customer_name = db.Column(db.String(100), nullable=False)
     customer_phone = db.Column(db.String(15), nullable=False) # İletişim için şart
-    
+    # YENİ EKLENEN SATIR: Müşteri E-Posta adresi
+    customer_email = db.Column(db.String(120), nullable=False)
     # Dekont dosyasının sunucudaki güvenli adı (Path Traversal engellenecek)
     receipt_filename = db.Column(db.String(255), nullable=False)
     
