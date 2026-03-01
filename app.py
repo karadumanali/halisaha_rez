@@ -18,7 +18,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from models import db, Admin, Pitch, Reservation
+from models import db, Admin, Pitch, Reservation, PitchImage
 from dotenv import load_dotenv
 
 from flask_wtf.csrf import CSRFProtect
@@ -42,6 +42,15 @@ app.config['SESSION_PERMANENT'] = False #tarayici kapattiği an hesabi unut
 # Dosya Yükleme Güvenliği
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Maksimum 5 MB
 UPLOAD_FOLDER = 'static/uploads/receipts'
+
+# Saha Resimleri İçin Güvenli Klasör
+PITCH_IMAGES_FOLDER = 'static/uploads/pitches'
+app.config['PITCH_IMAGES_FOLDER'] = PITCH_IMAGES_FOLDER
+
+# Klasör yoksa oluştur 
+if not os.path.exists(PITCH_IMAGES_FOLDER):
+    os.makedirs(PITCH_IMAGES_FOLDER)
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
@@ -131,9 +140,42 @@ def save_secure_receipt(file):
     
     return safe_filename
 
-# ==========================================
-#               WEB ROTALARI
-# ==========================================
+
+def save_secure_pitch_image(file):
+    if not file:
+        return None
+
+    # 1. Magic ile DNA Kontrolü
+    file_content = file.read(2048)
+    file.seek(0)
+    mime_type = magic.from_buffer(file_content, mime=True)
+    ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png'}
+
+    if mime_type not in ALLOWED_IMAGE_TYPES or not allowed_file(file.filename):
+        return None
+
+    # 2. Güvenli İsim Oluşturma
+    original_filename = secure_filename(file.filename)
+    ext = original_filename.rsplit('.', 1)[1].lower()
+    safe_filename = f"pitch_{uuid.uuid4().hex}.{ext}"
+    save_path = os.path.join(app.config['PITCH_IMAGES_FOLDER'], safe_filename)
+
+    # 3. Görüntü Sterilizasyonu ve Boyutlandırma
+    try:
+        with Image.open(file) as img:
+            if img.mode in ("RGBA", "P") and ext in ['jpg', 'jpeg']:
+                img = img.convert("RGB")
+            elif img.mode != "RGB" and ext not in ['png']:
+                img = img.convert("RGB")
+
+            # Sahalar net görünsün ama sunucuyu şişirmesin diye 1920x1080 max limit
+            img.thumbnail((1920, 1080))
+            img.save(save_path, optimize=True, quality=85)
+    except Exception as e:
+        return None
+
+    return safe_filename
+
 # --- GÜVENLİ MAİL BİLDİRİM SİSTEMİ ---
 def send_admin_notification(customer_name, date, time_slot):
     sender_email = os.getenv('MAIL_USERNAME')
@@ -405,7 +447,43 @@ def update_pitch(pitch_id):
         
     return redirect(url_for('admin_dashboard'))
 
+# --- SAHA RESMİ EKLEME ---
+@app.route('/admin/pitch/<int:pitch_id>/add_image', methods=['POST'])
+@login_required
+def add_pitch_image(pitch_id):
+    pitch = Pitch.query.get_or_404(pitch_id)
+    image_file = request.files.get('image')
 
+    saved_filename = save_secure_pitch_image(image_file)
+    if not saved_filename:
+        flash('Güvenlik İhlali veya Geçersiz Format! Resim yüklenemedi.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    # Veritabanına kaydet
+    new_image = PitchImage(pitch_id=pitch_id, image_filename=saved_filename)
+    db.session.add(new_image)
+    db.session.commit()
+
+    flash(f'"{pitch.name}" sahasına yeni resim başarıyla eklendi.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+# --- SAHA RESMİ SİLME ---
+@app.route('/admin/pitch_image/<int:image_id>/delete', methods=['POST'])
+@login_required
+def delete_pitch_image(image_id):
+    image = PitchImage.query.get_or_404(image_id)
+    
+    # 1. Dosyayı sunucudan (fiziksel olarak) sil
+    file_path = os.path.join(app.config['PITCH_IMAGES_FOLDER'], image.image_filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    # 2. Veritabanından sil
+    db.session.delete(image)
+    db.session.commit()
+
+    flash('Resim sistemden tamamen silindi.', 'success')
+    return redirect(url_for('admin_dashboard'))
 
 # 6. Halı Saha Silme Rotası
 @app.route('/admin/delete_pitch/<int:pitch_id>', methods=['POST'])

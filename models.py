@@ -29,8 +29,24 @@ class Pitch(db.Model):
     # Bir sahanın birden fazla rezervasyonu olabilir
     reservations = db.relationship('Reservation', backref='pitch', lazy=True)
 
+    # Sahaya ait resimleri bağladığımız yer 
+    images = db.relationship('PitchImage', backref='pitch', cascade='all, delete-orphan', lazy=True)
+
     def __repr__(self):
         return f'<Pitch {self.name}>'
+
+
+# SAHA RESİMLERİ
+class PitchImage(db.Model):
+    __tablename__ = 'pitch_images'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    # Hangi sahaya ait olduğu (Yabancı Anahtar)
+    pitch_id = db.Column(db.Integer, db.ForeignKey('pitches.id'), nullable=False)
+    
+    # Resmin sunucudaki güvenli adı
+    image_filename = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # 3. REZERVASYON TABLOSU (Sistemin Kalbi ve En Güvenli Olması Gereken Yer)
 class Reservation(db.Model):

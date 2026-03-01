@@ -45,6 +45,10 @@
                         <div>
                             <span class="badge bg-success rounded-pill fs-6 me-2">{{ pitch.price }} ₺</span>
                             
+                            <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#imageModal{{ pitch.id }}" title="Resimleri Yönet">
+                                <i class="fas fa-images"></i>
+                            </button>
+
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#updateModal{{ pitch.id }}" title="Fiyatı Güncelle">
                                 <i class="fas fa-edit"></i>
                             </button>
@@ -54,6 +58,59 @@
                             </button>
                         </div>
                     </li>
+
+                    <div class="modal fade" id="imageModal{{ pitch.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                            <div class="modal-content border-0 shadow-lg">
+                                
+                                <div class="modal-header bg-info text-white">
+                                    <h5 class="modal-title fw-bold"><i class="fas fa-images me-2"></i>{{ pitch.name }} - Resim Galerisi</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                                </div>
+                                
+                                <div class="modal-body p-4 bg-light">
+                                    <div class="card border-0 shadow-sm mb-4">
+                                        <div class="card-body bg-white rounded">
+                                            <h6 class="fw-bold text-secondary mb-3"><i class="fas fa-upload me-2"></i>Yeni Resim Yükle</h6>
+                                            <form action="/admin/pitch/{{ pitch.id }}/add_image" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <input type="file" name="image" class="form-control form-control-sm" accept=".jpg, .jpeg, .png" required>
+                                                <button type="submit" class="btn btn-success btn-sm px-4 fw-bold shadow-sm">Yükle</button>
+                                            </form>
+                                        </div>
+                                    </div>
+
+                                    <h6 class="fw-bold text-secondary mb-3"><i class="fas fa-th me-2"></i>Kayıtlı Resimler <span class="badge bg-secondary">{{ pitch.images|length }}</span></h6>
+                                    
+                                    <div class="row g-3">
+                                        {% for image in pitch.images %}
+                                        <div class="col-md-4 col-sm-6">
+                                            <div class="card h-100 border-0 shadow-sm overflow-hidden position-relative group-hover">
+                                                <img src="{{ url_for('static', filename='uploads/pitches/' + image.image_filename) }}" class="card-img-top w-100" style="height: 160px; object-fit: cover;" alt="Saha Resmi">
+                                                <form action="/admin/pitch_image/{{ image.id }}/delete" method="POST" class="position-absolute top-0 end-0 m-2">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                    <button type="submit" class="btn btn-sm btn-danger shadow" title="Resmi Sil" onclick="return confirm('Bu resmi silmek istediğinize emin misiniz?');">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <div class="col-12 text-center text-muted py-4 bg-white rounded shadow-sm">
+                                            <i class="fas fa-camera-retro fs-1 text-light mb-3"></i>
+                                            <p class="mb-0">Bu saha için henüz bir resim yüklenmemiş.</p>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    
+                                </div>
+                                
+                                <div class="modal-footer justify-content-center border-0 bg-white">
+                                    <button type="button" class="btn btn-secondary px-5 fw-bold" data-bs-dismiss="modal">Kapat</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="modal fade" id="deleteModal{{ pitch.id }}" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-centered">
