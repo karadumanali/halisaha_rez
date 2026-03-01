@@ -514,6 +514,46 @@ def anti_cache(response):
     return response
 
 
+# --- SİTE LOGOSU GÜNCELLEME ROTASI ---
+@app.route('/admin/update_logo', methods=['POST'])
+@login_required
+def update_logo():
+    logo_file = request.files.get('logo')
+    if not logo_file:
+        flash('Lütfen bir resim seçin.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    # 1. Magic ile DNA Kontrolü
+    file_content = logo_file.read(2048)
+    logo_file.seek(0)
+    mime_type = magic.from_buffer(file_content, mime=True)
+    ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png'}
+
+    if mime_type not in ALLOWED_IMAGE_TYPES or not allowed_file(logo_file.filename):
+        flash('Güvenlik ihlali veya geçersiz dosya formatı!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    # 2. Logoyu sabit isimle (site_logo.png) kaydetme yolu
+    # (Resimleri yüklediğimiz genel klasörü kullanıyoruz)
+    save_path = os.path.join(app.config['UPLOAD_FOLDER'], 'site_logo.png')
+
+    # 3. Görüntü Sterilizasyonu ve Logo Boyutlandırma
+    try:
+        with Image.open(logo_file) as img:
+            # Şeffaflık (arka planı olmayan) logolar için RGBA'ya çevir
+            img = img.convert("RGBA")
+            # Logo çok büyük olmasın, navbar'a sığacak standartlara getir
+            img.thumbnail((200, 200))
+            # Üzerine yazarak kaydet
+            img.save(save_path, format="PNG", optimize=True)
+    except Exception as e:
+        flash('Resim işlenirken veya kaydedilirken hata oluştu.', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    flash('Site logosu başarıyla güncellendi!', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
 
 # --- UYGULAMAYI BAŞLAT ---
 if __name__ == '__main__':
