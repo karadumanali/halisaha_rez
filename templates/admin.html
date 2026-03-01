@@ -156,15 +156,59 @@
                             <td>
                                 {% if res.status == 'Pending' %}
                                     <div class="btn-group shadow-sm" role="group">
-                                        <form action="/admin/status/{{ res.id }}/approve" method="POST" class="d-inline mb-0">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <button type="submit" class="btn btn-sm btn-success" title="Onayla" style="border-radius: 4px 0 0 4px;"><i class="fas fa-check"></i></button>
-                                        </form>
-                                        <form action="/admin/status/{{ res.id }}/reject" method="POST" class="d-inline mb-0">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                            <button type="submit" class="btn btn-sm btn-danger" title="Reddet" style="border-radius: 0 4px 4px 0;"><i class="fas fa-times"></i></button>
-                                        </form>
+                                        <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#approveModal{{ res.id }}" title="Onayla" style="border-radius: 4px 0 0 4px;">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        
+                                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ res.id }}" title="Reddet" style="border-radius: 0 4px 4px 0;">
+                                            <i class="fas fa-times"></i>
+                                        </button>
                                     </div>
+
+                                    <div class="modal fade" id="approveModal{{ res.id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content border-0 shadow-lg">
+                                                <div class="modal-header bg-success text-white">
+                                                    <h5 class="modal-title fw-bold"><i class="fas fa-check-circle me-2"></i>İşlem Onayı</h5>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                                                </div>
+                                                <div class="modal-body text-center p-4" style="white-space: normal; word-wrap: break-word;">
+                                                    <p class="fs-5 mb-2"><strong>{{ res.customer_name }}</strong> adlı müşterinin rezervasyonunu ONAYLAMAK üzeresiniz.</p>
+                                                    <p class="text-muted small">Bu işlem sonucunda müşteriye onay e-postası gönderilecektir. Emin misiniz?</p>
+                                                </div>
+                                                <div class="modal-footer bg-light justify-content-center">
+                                                    <button type="button" class="btn btn-secondary px-4 fw-bold" data-bs-dismiss="modal">İptal</button>
+                                                    <form action="/admin/status/{{ res.id }}/approve" method="POST" class="d-inline">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                        <button type="submit" class="btn btn-success px-4 fw-bold shadow-sm">Evet, Onayla</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="modal fade" id="rejectModal{{ res.id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content border-0 shadow-lg">
+                                                <div class="modal-header bg-danger text-white">
+                                                    <h5 class="modal-title fw-bold"><i class="fas fa-times-circle me-2"></i>İşlem Reddi</h5>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                                                </div>
+                                                <div class="modal-body text-center p-4" style="white-space: normal; word-wrap: break-word;">
+                                                    <p class="fs-5 mb-2"><strong>{{ res.customer_name }}</strong> adlı müşterinin rezervasyonunu REDDETMEK üzeresiniz.</p>
+                                                    <p class="text-muted small">Bu saat dilimi sistemde tekrar boşa çıkacaktır. İşlemi onaylıyor musunuz?</p>
+                                                </div>
+                                                <div class="modal-footer bg-light justify-content-center">
+                                                    <button type="button" class="btn btn-secondary px-4 fw-bold" data-bs-dismiss="modal">İptal</button>
+                                                    <form action="/admin/status/{{ res.id }}/reject" method="POST" class="d-inline">
+                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                        <button type="submit" class="btn btn-danger px-4 fw-bold shadow-sm">Evet, Reddet</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                 {% else %}
                                     <span class="text-muted small fw-bold">İşlem Bitti</span>
                                 {% endif %}
