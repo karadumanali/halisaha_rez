@@ -187,20 +187,21 @@ def busy_slots():
     try:
         date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
     except Exception:
-        return jsonify({'busy': [], 'blocked': {}})
+        return jsonify({'busy': {}, 'blocked': {}})
 
-    # Rezervasyon dolu slotlar
-    busy = Reservation.query.filter_by(
+    # Rezervasyon dolu slotlar (Durumu ile birlikte: 'Pending' veya 'Approved')
+    busy_records = Reservation.query.filter_by(
         pitch_id=pitch_id, date=date_obj
-    ).filter(Reservation.status.in_(['Pending', 'Approved'])
-    ).with_entities(Reservation.time_slot).all()
-    busy_list = [r.time_slot for r in busy]
+    ).filter(Reservation.status.in_(['Pending', 'Approved'])).all()
+    
+    # Artık liste değil, { '20:00 - 21:00': 'Pending', '21:00 - 22:00': 'Approved' } şeklinde dönecek
+    busy_dict = {r.time_slot: r.status for r in busy_records}
 
     # Manuel kilitli slotlar (sebep mesajıyla birlikte)
     blocked = BlockedSlot.query.filter_by(pitch_id=pitch_id, date=date_obj).all()
     blocked_dict = {b.time_slot: b.reason for b in blocked}
 
-    return jsonify({'busy': busy_list, 'blocked': blocked_dict})
+    return jsonify({'busy': busy_dict, 'blocked': blocked_dict})
 
 
 @app.route('/reserve', methods=['POST'])

@@ -173,6 +173,7 @@ input[type="date"].form-control {
 /* Sadece Kilitli, Dolu ve Müsait rozetleri olacak */
 .slot-badge.badge-locked        { background: #e2e8f0; color: #475569; }
 .slot-badge.badge-busy          { background: #fee2e2; color: #b91c1c; }
+.slot-badge.badge-pending       { background: #fef9c3; color: #854d0e; }
 .slot-badge.badge-available     { background: var(--teal-pale); color: var(--teal-dk); }
 .slot-badge.badge-selected      { background: var(--teal); color: var(--white); }
 
@@ -457,7 +458,7 @@ input[type="date"].form-control {
 
 <script>
 var state = { step:1, pitchId:null, pitchName:null, date:null, slot:null };
-var busySlots = [];
+var busySlots = {}; // ARTIK ARRAY DEĞİL SÖZLÜK (OBJECT) KULLANIYORUZ
 var blockedSlots = {}; // { 'slot': 'sebep' }
 var SLOTS = ['16:00 - 17:00','17:00 - 18:00','18:00 - 19:00','19:00 - 20:00','20:00 - 21:00','21:00 - 22:00','22:00 - 23:00'];
 
@@ -492,12 +493,12 @@ function checkStep1() {
 
 function fetchBusy() {
     fetch('/busy_slots?pitch_id='+state.pitchId+'&date='+state.date)
-        .then(function(r){return r.ok?r.json():{busy:[],blocked:{}};})
+        .then(function(r){return r.ok?r.json():{busy:{},blocked:{}};})
         .then(function(d){
-            busySlots    = d.busy    || [];
+            busySlots    = d.busy    || {};
             blockedSlots = d.blocked || {};
         })
-        .catch(function(){busySlots=[];blockedSlots={};});
+        .catch(function(){busySlots={};blockedSlots={};});
 }
 
 function renderSlots() {
@@ -512,9 +513,15 @@ function renderSlots() {
     SLOTS.forEach(function(slot){
         var startHour=parseInt(slot.split(':')[0]);
         var isPast=isToday&&startHour<=now.getHours();
-        var isBusy=busySlots.indexOf(slot)!==-1;
+        
+        // DURUM KONTROLÜ BURADA YAPILIYOR
+        var slotStatus = busySlots[slot]; // 'Pending', 'Approved' veya tanımsız
+        var isApproved = (slotStatus === 'Approved');
+        var isPending  = (slotStatus === 'Pending');
         var blockReason=blockedSlots[slot]||null;
-        var locked=isPast||isBusy||blockReason!==null;
+        
+        // Saat geçmişse, onaylanmışsa, bekliyorsa veya admin kilitlediyse seçime kapat.
+        var locked = isPast || isApproved || isPending || blockReason !== null;
         
         var div=document.createElement('div');
         div.className='slot-item '+(locked?'locked':'available');
@@ -525,20 +532,23 @@ function renderSlots() {
             div.onclick=function(){selectSlot(div,slot);};
             div.onkeydown=function(e){if(e.key==='Enter'||e.key===' ')selectSlot(div,slot);};
         } else if (blockReason !== null) {
-            // SADECE KİLİTLİ (ADMİN TARAFINDAN) İSE TIKLANDIĞINDA UYARI VER
+            // Admin Kilitlediyse Uyarı Ver
             div.onclick = function() {
                 alert('Bu saat dilimi şu sebeple kilitlidir:\n\n👉 ' + blockReason);
             };
         }
 
-        // Tasarım Değişikliği: Kilitli ve Dolu için sade rozetler
+        // TASARIM - HANGİ ROZET GÖZÜKECEK?
         var badgeClass, badgeText;
         if (blockReason) {
             badgeClass = 'badge-locked';
             badgeText = '<i class="fas fa-lock"></i> Kilitli';
-        } else if (isBusy) {
+        } else if (isApproved) {
             badgeClass = 'badge-busy';
             badgeText = '<i class="fas fa-times-circle"></i> Dolu';
+        } else if (isPending) {
+            badgeClass = 'badge-pending';
+            badgeText = '<i class="fas fa-hourglass-half"></i> Onay Bekliyor';
         } else if (isPast) {
             badgeClass = 'badge-locked';
             badgeText = '<i class="fas fa-history"></i> Süresi Geçti';
