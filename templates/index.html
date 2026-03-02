@@ -1,159 +1,625 @@
-{% extends "layout.html" %} 
-
+{% extends "layout.html" %}
 {% block body %}
-<div class="row mb-5 mt-3">
-  <div class="col-12 text-center">
-    <h1 class="fw-bolder text-dark mb-3">Sahalarımız ve Rezervasyon</h1>
-    <p class="text-secondary fs-5">
-      Mükemmel zeminde maç keyfi için sahanızı seçin, tarihinizi belirleyin ve yerinizi anında ayırtın.
-    </p>
-  </div>
-</div>
-
-<div class="row justify-content-center g-4">
-  {% if pitches|length == 0 %}
-  <div class="col-md-6 text-center py-5">
-    <div class="alert alert-warning shadow-sm border-0 rounded-4 p-4">
-      <i class="fas fa-exclamation-triangle fa-3x mb-3 text-warning"></i><br />
-      <h5 class="fw-bold">Sistemde Saha Bulunamadı</h5>
-      <p class="mb-0 text-muted">Şu an için kayıtlı bir halı saha bulunmuyor. Lütfen daha sonra tekrar deneyiniz.</p>
-    </div>
-  </div>
-  {% else %} 
-  
-  {% for pitch in pitches %}
-  <div class="col-lg-5 col-md-6">
-    <div class="card shadow-lg border-0 h-100 rounded-4 overflow-hidden">
-      
-      {% if pitch.images %}
-        <div id="carouselPitch{{ pitch.id }}" class="carousel slide" data-bs-ride="carousel">
-          <div class="carousel-indicators">
-            {% for image in pitch.images %}
-              <button type="button" data-bs-target="#carouselPitch{{ pitch.id }}" data-bs-slide-to="{{ loop.index0 }}" {% if loop.first %}class="active"{% endif %} aria-label="Slide {{ loop.index }}"></button>
-            {% endfor %}
-          </div>
-          <div class="carousel-inner">
-            {% for image in pitch.images %}
-              <div class="carousel-item {% if loop.first %}active{% endif %}">
-                <img src="{{ url_for('static', filename='uploads/pitches/' + image.image_filename) }}" class="d-block w-100" style="height: 280px; object-fit: cover;" alt="{{ pitch.name }} Resmi">
-              </div>
-            {% endfor %}
-          </div>
-          {% if pitch.images|length > 1 %}
-            <button class="carousel-control-prev" type="button" data-bs-target="#carouselPitch{{ pitch.id }}" data-bs-slide="prev">
-              <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-              <span class="visually-hidden">Önceki</span>
-            </button>
-            <button class="carousel-control-next" type="button" data-bs-target="#carouselPitch{{ pitch.id }}" data-bs-slide="next">
-              <span class="carousel-control-next-icon" aria-hidden="true"></span>
-              <span class="visually-hidden">Sonraki</span>
-            </button>
-          {% endif %}
-        </div>
-      {% else %}
-        <div class="bg-light d-flex flex-column justify-content-center align-items-center" style="height: 280px;">
-          <i class="fas fa-camera fa-3x text-secondary opacity-25 mb-2"></i>
-          <span class="text-secondary opacity-50 fw-bold">Görsel Eklenmemiş</span>
-        </div>
-      {% endif %}
-
-      <div class="card-body bg-white p-4 p-sm-5">
-        
-        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-          <h3 class="mb-0 fw-bold text-dark"><i class="fas fa-map-marker-alt text-success me-2"></i>{{ pitch.name }}</h3>
-          <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill fs-5 px-3 py-2">
-            {{ pitch.price }} ₺ <small class="fw-normal fs-6">/ Saat</small>
-          </span>
-        </div>
-
-        <form action="/reserve" method="POST" enctype="multipart/form-data">
-          <input type="hidden" name="pitch_id" value="{{ pitch.id }}" />
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-
-          <h6 class="text-muted fw-bold mb-3 text-uppercase" style="letter-spacing: 1px; font-size: 0.85rem;"><i class="fas fa-id-card me-2"></i>1. İletişim Bilgileri</h6>
-          <div class="bg-light p-3 rounded-3 mb-4 border border-light-subtle">
-            <div class="mb-3">
-              <label class="form-label fw-semibold text-dark">Adınız Soyadınız</label>
-              <input type="text" class="form-control bg-white" name="customer_name" required maxlength="100" placeholder="Örn: Ahmet Yılmaz" />
-            </div>
-
-            <div class="row">
-              <div class="col-md-6 mb-3 mb-md-0">
-                <label class="form-label fw-semibold text-dark">Telefon Numaranız</label>
-                <input type="tel" class="form-control bg-white" name="customer_phone" required maxlength="15" placeholder="05XX XXX XX XX" />
-              </div>
-              <div class="col-md-6">
-                <label class="form-label fw-semibold text-dark">E-Posta Adresiniz</label>
-                <input type="email" class="form-control bg-white" name="customer_email" required maxlength="120" placeholder="ornek@mail.com" />
-              </div>
-            </div>
-          </div>
-
-          <h6 class="text-muted fw-bold mb-3 text-uppercase" style="letter-spacing: 1px; font-size: 0.85rem;"><i class="fas fa-calendar-check me-2"></i>2. Rezervasyon Detayları</h6>
-          <div class="bg-light p-3 rounded-3 mb-4 border border-light-subtle">
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label class="form-label fw-semibold text-dark">Tarih</label>
-                <input type="date" class="form-control bg-white" name="date" min="{{ today_date }}" required />
-              </div>
-              <div class="col-md-6 mb-3">
-                <label class="form-label fw-semibold text-dark">Saat Aralığı</label>
-                <select class="form-select bg-white" name="time_slot" required>
-                  <option value="" selected disabled>Seçiniz...</option>
-                  <option value="18:00 - 19:00">18:00 - 19:00</option>
-                  <option value="19:00 - 20:00">19:00 - 20:00</option>
-                  <option value="20:00 - 21:00">20:00 - 21:00</option>
-                  <option value="21:00 - 22:00">21:00 - 22:00</option>
-                  <option value="22:00 - 23:00">22:00 - 23:00</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="mb-2">
-              <label class="form-label fw-semibold text-dark mb-1">Ödeme Dekontu</label>
-              <input class="form-control border-success bg-white" type="file" name="receipt" accept=".pdf, .png, .jpg, .jpeg" required />
-              <div class="form-text text-muted small mt-1">
-                <i class="fas fa-info-circle me-1"></i>Max 5MB. Kabul edilen formatlar: PDF, JPG, PNG.
-              </div>
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn-success w-100 py-3 fw-bold fs-5 shadow rounded-3 btn-hover-grow">
-            Rezervasyon Talebini Gönder <i class="fas fa-paper-plane ms-2"></i>
-          </button>
-        </form>
-
-      </div>
-    </div>
-  </div>
-  {% endfor %} 
-  
-  {% endif %}
-</div>
-
 <style>
-  .btn-hover-grow {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-  .btn-hover-grow:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
-  }
-  .form-control:focus, .form-select:focus {
-    border-color: #198754;
-    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
-  }
+/* ═══════════════════════════════════════════
+   INDEX — 3 Adımlı Wizard  |  Canlı Renkler
+═══════════════════════════════════════════ */
+
+.page-hero {
+    text-align: center;
+    padding: 10px 0 30px;
+}
+.page-hero h1 {
+    font-size: clamp(2rem, 6vw, 2.6rem);
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin-bottom: 10px;
+}
+.page-hero p {
+    font-size: 1.05rem;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+/* ── Stepper ── */
+.stepper {
+    display: flex; align-items: flex-start;
+    justify-content: center;
+    margin-bottom: 26px; padding: 0 8px;
+}
+.step-item {
+    display: flex; flex-direction: column;
+    align-items: center;
+    flex: 1; max-width: 120px; position: relative;
+}
+.step-item:not(:last-child)::after {
+    content: '';
+    position: absolute; top: 22px;
+    left: calc(50% + 23px); right: calc(-50% + 23px);
+    height: 2.5px; background: var(--gray-300);
+    transition: background 0.4s; z-index: 0;
+}
+.step-item.done:not(:last-child)::after,
+.step-item.active:not(:last-child)::after { background: var(--teal); }
+
+.step-circle {
+    width: 46px; height: 46px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    border: 2.5px solid var(--gray-300);
+    background: var(--white); color: var(--gray-400);
+    transition: all 0.3s; position: relative; z-index: 1; flex-shrink: 0;
+}
+.step-item.active .step-circle {
+    background: var(--teal); border-color: var(--teal); color: var(--white);
+    box-shadow: 0 0 0 5px rgba(14,168,116,0.20);
+}
+.step-item.done .step-circle {
+    background: var(--teal); border-color: var(--teal); color: var(--white);
+}
+.step-label {
+    font-size: 0.78rem; font-weight: 700;
+    color: var(--gray-400); margin-top: 8px;
+    text-align: center; line-height: 1.3; transition: color 0.3s;
+}
+.step-item.active .step-label { color: var(--teal); }
+.step-item.done  .step-label  { color: var(--teal-dk); }
+
+/* ── Wizard kart ── */
+.wizard-card { overflow: hidden; }
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+
+/* Panel başlığı */
+.panel-head {
+    padding: 26px 26px 0;
+    border-bottom: none;
+}
+.panel-head h2 {
+    font-size: 1.35rem; font-weight: 800;
+    color: var(--ink); margin-bottom: 5px; letter-spacing: -0.02em;
+}
+.panel-head p { font-size: 0.92rem; color: var(--gray-400); margin: 0; }
+
+.panel-body { padding: 22px 26px; }
+
+/* ── Özet kutusu ── */
+.summary-box {
+    background: var(--teal-pale);
+    border: 1.5px solid var(--mint-mid);
+    border-radius: var(--r-sm);
+    padding: 14px 18px; margin-bottom: 22px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px;
+}
+.summary-item { font-size: 0.92rem; }
+.summary-item .s-label { font-weight: 700; color: var(--teal-dk); margin-right: 4px; }
+.summary-item .s-val   { color: var(--ink); font-weight: 600; }
+
+/* ── Bölüm etiketi ── */
+.date-label {
+    font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--teal-dk);
+    margin: 22px 0 10px; display: flex; align-items: center; gap: 7px;
+}
+.date-label i { color: var(--teal); font-size: 0.8rem; }
+
+/* Date input */
+input[type="date"].form-control {
+    font-size: 1rem !important;
+    padding: 13px 14px !important;
+    cursor: pointer;
+}
+
+/* ── Saha kartları ── */
+.pitch-list { display: flex; flex-direction: column; gap: 10px; }
+.pitch-option {
+    border: 2px solid var(--gray-200); border-radius: var(--r-sm);
+    padding: 16px 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: all 0.18s; background: var(--white);
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.pitch-option:hover   { border-color: var(--teal); background: var(--teal-pale); transform: translateY(-1px); box-shadow: var(--sh-sm); }
+.pitch-option.selected {
+    border-color: var(--teal); background: var(--teal-pale);
+    box-shadow: 0 0 0 3px rgba(14,168,116,0.18), var(--sh-sm);
+    transform: translateY(-1px);
+}
+.pitch-option-name  { font-weight: 700; font-size: 1rem; color: var(--ink); }
+.pitch-option-price {
+    background: var(--teal); color: var(--white);
+    font-size: 0.85rem; font-weight: 800;
+    padding: 5px 14px; border-radius: 20px;
+}
+.pitch-option.selected .pitch-option-price { background: var(--teal-dk); }
+
+/* ── Saat dilimleri ── */
+.slot-list { display: flex; flex-direction: column; gap: 9px; }
+.slot-item {
+    border: 2px solid var(--gray-200); border-radius: var(--r-sm);
+    padding: 15px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; transition: all 0.18s; background: var(--white);
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+/* Müsait olanlar için tasarım */
+.slot-item.available:hover {
+    border-color: var(--teal); background: var(--teal-pale);
+    transform: translateY(-1px); box-shadow: var(--sh-sm);
+}
+.slot-item.available.selected {
+    border-color: var(--teal); background: var(--teal-pale);
+    box-shadow: 0 0 0 3px rgba(14,168,116,0.18), var(--sh-sm);
+    transform: translateY(-1px);
+}
+/* Kilitli/Dolu olanlar için yeni zarif tasarım */
+.slot-item.locked {
+    background: #f8fafc; border: 1.5px dashed #cbd5e1; cursor: pointer; 
+}
+.slot-item.locked:hover {
+    background: #f1f5f9; border-color: #94a3b8;
+}
+
+.slot-time { font-weight: 700; font-size: 1rem; color: var(--ink); }
+.slot-item.locked .slot-time { color: #64748b; }
+
+.slot-badge {
+    font-size: 0.8rem; font-weight: 800;
+    padding: 5px 14px; border-radius: 20px;
+    display: flex; align-items: center; gap: 5px;
+}
+/* Sadece Kilitli, Dolu ve Müsait rozetleri olacak */
+.slot-badge.badge-locked        { background: #e2e8f0; color: #475569; }
+.slot-badge.badge-busy          { background: #fee2e2; color: #b91c1c; }
+.slot-badge.badge-available     { background: var(--teal-pale); color: var(--teal-dk); }
+.slot-badge.badge-selected      { background: var(--teal); color: var(--white); }
+
+/* ── IBAN kutusu ── */
+.iban-box {
+    background: var(--gray-50); border: 2px solid var(--gray-200);
+    border-radius: var(--r-sm); padding: 16px 18px; margin-bottom: 14px;
+}
+.iban-box .iban-label {
+    font-size: 0.72rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--gray-400); margin-bottom: 8px;
+}
+.iban-box .iban-val {
+    font-size: 1.05rem; font-weight: 700;
+    color: var(--ink); font-family: monospace; word-break: break-all;
+    letter-spacing: 0.05em;
+}
+
+.iban-notice {
+    background: var(--warning-bg); border: 1.5px solid var(--warning-bd);
+    border-radius: var(--r-sm); padding: 12px 16px; margin-bottom: 22px;
+    font-size: 0.88rem; color: var(--warning-tx);
+    display: flex; align-items: flex-start; gap: 9px;
+}
+.iban-notice i { flex-shrink: 0; margin-top: 2px; }
+
+/* Bölüm başlığı */
+.section-head {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 1.05rem; font-weight: 800; color: var(--ink);
+    margin: 24px 0 14px; letter-spacing: -0.01em;
+}
+.section-head i { color: var(--teal); }
+.section-head:first-of-type { margin-top: 0; }
+
+/* Form label */
+.form-label { font-size: 0.95rem !important; font-weight: 700 !important; }
+.form-control { font-size: 0.97rem !important; padding: 13px 14px !important; }
+
+/* ── Upload ── */
+.upload-zone {
+    border: 2.5px dashed var(--teal); border-radius: var(--r-sm);
+    padding: 32px 16px; text-align: center;
+    cursor: pointer; transition: all 0.2s; background: var(--white);
+    position: relative; -webkit-tap-highlight-color: transparent;
+}
+.upload-zone:hover, .upload-zone.dragover {
+    background: var(--teal-pale); border-color: var(--teal-dk);
+    transform: translateY(-1px); box-shadow: var(--sh-sm);
+}
+.upload-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.upload-icon { color: var(--teal); font-size: 2.4rem; margin-bottom: 12px; opacity: 0.7; }
+.upload-main { font-size: 1rem; font-weight: 700; color: var(--ink); margin-bottom: 5px; }
+.upload-sub  { font-size: 0.85rem; color: var(--gray-400); }
+.upload-name { margin-top: 12px; font-size: 0.9rem; color: var(--teal-dk); font-weight: 700; display: none; }
+
+.file-error {
+    background: var(--danger-bg); border: 1.5px solid #fed7d7;
+    border-radius: var(--r-sm); padding: 10px 14px;
+    font-size: 0.88rem; color: var(--danger-tx);
+    margin-top: 8px; display: none; align-items: center; gap: 6px;
+}
+
+/* Telefon mesajı */
+.phone-msg { font-size: 0.85rem; margin-top: 5px; display: none; }
+.phone-msg.show { display: block; }
+.phone-msg.ok  { color: var(--teal-dk); font-weight: 600; }
+.phone-msg.err { color: var(--danger); font-weight: 600; }
+
+/* ── Panel footer ── */
+.panel-footer {
+    padding: 18px 26px; border-top: 1.5px solid var(--gray-200);
+    display: flex; gap: 12px; background: var(--gray-50);
+}
+.btn-back {
+    flex: 1; min-height: 52px;
+    background: var(--white); color: var(--gray-700);
+    border: 1.5px solid var(--gray-300); border-radius: var(--r-sm);
+    font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    font-family: var(--font);
+}
+.btn-back:hover { background: var(--gray-100); border-color: var(--gray-400); }
+
+.btn-next {
+    flex: 2; min-height: 52px;
+    background: var(--teal); color: var(--white);
+    border: none; border-radius: var(--r-sm);
+    font-size: 0.97rem; font-weight: 800; cursor: pointer; transition: all 0.18s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: var(--font);
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.btn-next:hover:not(:disabled) {
+    background: var(--teal-dk); transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(14,168,116,0.35);
+}
+.btn-next:active:not(:disabled) { transform: translateY(0); }
+.btn-next:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Boş durum */
+.empty-state { text-align: center; padding: 60px 20px; color: var(--gray-400); }
+.empty-state i { font-size: 3rem; color: var(--gray-300); margin-bottom: 16px; display: block; }
+.empty-state p { font-size: 1rem; }
+
+/* Responsive */
+@media (max-width: 480px) {
+    .panel-head  { padding: 20px 18px 0; }
+    .panel-body  { padding: 18px 18px; }
+    .panel-footer{ padding: 14px 18px; }
+    .summary-box { grid-template-columns: 1fr; }
+    .page-hero h1 { font-size: 1.8rem; }
+}
+@media (min-width: 600px) {
+    .pitch-list { flex-direction: row; flex-wrap: wrap; }
+    .pitch-option { flex: 1; min-width: 180px; }
+}
 </style>
 
-<script>
-  // Sayfa yüklendiğinde tüm tarih inputlarını bugüne göre kısıtla
-  document.addEventListener("DOMContentLoaded", function () {
-    const dateInputs = document.querySelectorAll('input[type="date"]');
-    const today = new Date().toISOString().split("T")[0];
-    dateInputs.forEach((input) => {
-      input.setAttribute("min", today);
-    });
-  });
-</script>
+<div class="page-hero">
+    <h1>AYBÜ Halı Saha<br>Rezervasyonu</h1>
+    <p>Kolayca halı saha rezervasyonu yapın</p>
+</div>
 
+{% if pitches|length == 0 %}
+<div class="card">
+    <div class="empty-state">
+        <i class="fas fa-futbol"></i>
+        <p>Sistemde henüz saha tanımlanmamış.<br>Yönetici panelinden saha eklenmelidir.</p>
+    </div>
+</div>
+
+{% else %}
+
+<div class="stepper" id="stepper" role="navigation" aria-label="Rezervasyon adımları">
+    <div class="step-item active" id="stepItem1">
+        <div class="step-circle"><i class="fas fa-calendar-alt"></i></div>
+        <div class="step-label">Tarih &amp;<br>Saha</div>
+    </div>
+    <div class="step-item" id="stepItem2">
+        <div class="step-circle"><i class="fas fa-clock"></i></div>
+        <div class="step-label">Saat<br>Seçimi</div>
+    </div>
+    <div class="step-item" id="stepItem3">
+        <div class="step-circle"><i class="fas fa-credit-card"></i></div>
+        <div class="step-label">Ödeme &amp;<br>Dekont</div>
+    </div>
+</div>
+
+<div class="card wizard-card">
+
+    <div class="step-panel active" id="panel1">
+        <div class="panel-head">
+            <h2>Tarih &amp; Saha Seçimi</h2>
+            <p>Rezervasyon yapmak istediğiniz tarihi ve sahayı seçin</p>
+        </div>
+        <div class="panel-body">
+            <div class="date-label"><i class="fas fa-calendar-alt"></i> Tarih</div>
+            <input type="date" id="selDate" class="form-control"
+                   min="{{ today_date }}" required aria-label="Rezervasyon tarihi">
+
+            <div class="date-label" style="margin-top:22px;">
+                <i class="fas fa-futbol"></i> Saha Seçin
+            </div>
+            <div class="pitch-list" role="radiogroup" aria-label="Saha seçimi">
+                {% for pitch in pitches %}
+                <div class="pitch-option"
+                     role="radio" aria-checked="false" tabindex="0"
+                     data-pitch-id="{{ pitch.id }}"
+                     data-pitch-name="{{ pitch.name }}"
+                     data-pitch-price="{{ pitch.price }}"
+                     onclick="selectPitch(this)"
+                     onkeydown="if(event.key==='Enter'||event.key===' ')selectPitch(this)">
+                    <div class="pitch-option-name">{{ pitch.name }}</div>
+                    <div class="pitch-option-price">{{ pitch.price }} ₺/sa</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="panel-footer">
+            <button class="btn-next" id="btn1Next" disabled onclick="goStep(2)">
+                Devam Et <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="step-panel" id="panel2">
+        <div class="panel-head">
+            <h2>Saat Dilimi Seçimi</h2>
+            <p>Oynamak istediğiniz saat dilimini seçin</p>
+        </div>
+        <div class="panel-body">
+            <div class="summary-box">
+                <div class="summary-item"><span class="s-label">Tarih:</span><span class="s-val" id="sumDate">—</span></div>
+                <div class="summary-item"><span class="s-label">Saha:</span><span class="s-val" id="sumPitch">—</span></div>
+            </div>
+            <div class="date-label"><i class="fas fa-clock"></i> Müsait Saat Dilimleri</div>
+            <div class="slot-list" id="slotList" role="radiogroup" aria-label="Saat seçimi"></div>
+        </div>
+        <div class="panel-footer">
+            <button class="btn-back" onclick="goStep(1)"><i class="fas fa-chevron-left"></i> Geri</button>
+            <button class="btn-next" id="btn2Next" disabled onclick="goStep(3)">
+                Devam Et <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="step-panel" id="panel3">
+        <div class="panel-head">
+            <h2>Ödeme &amp; Dekont</h2>
+            <p>Bilgilerinizi girin ve ödeme dekontunu yükleyin</p>
+        </div>
+        <div class="panel-body">
+            <form id="reserveForm" action="/reserve" method="POST"
+                  enctype="multipart/form-data" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="pitch_id"  id="hPitchId">
+                <input type="hidden" name="date"       id="hDate">
+                <input type="hidden" name="time_slot"  id="hSlot">
+
+                <div class="iban-box">
+                    <div class="iban-label">Ödeme IBAN</div>
+                    <div class="iban-val">TR33 0006 1005 1978 6457 8413 26</div>
+                </div>
+                <div class="iban-notice">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span><strong>Önemli:</strong> Ödemeyi yukarıdaki IBAN'a yaptıktan sonra dekontunuzu PDF veya resim olarak yükleyin.</span>
+                </div>
+
+                <div class="section-head"><i class="fas fa-user"></i> Kişi Bilgileri</div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="fName">Ad Soyad *</label>
+                    <input type="text" id="fName" name="customer_name"
+                           class="form-control" required maxlength="100"
+                           placeholder="Adınızı ve soyadınızı girin" autocomplete="name">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="fPhone">Telefon *</label>
+                    <input type="tel" id="fPhone" name="customer_phone"
+                           class="form-control" required maxlength="15"
+                           placeholder="05XX XXX XX XX" autocomplete="tel" inputmode="tel">
+                    <div class="phone-msg" id="phoneMsg"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="fEmail">E-Posta *</label>
+                    <input type="email" id="fEmail" name="customer_email"
+                           class="form-control" required maxlength="120"
+                           placeholder="ornek@mail.com" autocomplete="email" inputmode="email">
+                    <div class="form-text">Rezervasyon onayı bu adrese gönderilecektir.</div>
+                </div>
+
+                <div class="section-head"><i class="fas fa-upload"></i> Dekont Yükleme</div>
+
+                <div class="upload-zone" id="uploadZone">
+                    <input type="file" name="receipt" id="fReceipt"
+                           accept=".pdf,.jpg,.jpeg,.png" required
+                           aria-label="Dekont dosyası seç" onchange="handleFile(this)">
+                    <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                    <div class="upload-main">Dekont dosyanızı yükleyin</div>
+                    <div class="upload-sub">PDF veya resim — maks. 5 MB</div>
+                    <div class="upload-name" id="uploadName"></div>
+                </div>
+                <div class="file-error" id="fileErr">
+                    <i class="fas fa-exclamation-triangle"></i><span id="fileErrMsg"></span>
+                </div>
+            </form>
+        </div>
+        <div class="panel-footer">
+            <button class="btn-back" onclick="goStep(2)"><i class="fas fa-chevron-left"></i> Geri</button>
+            <button class="btn-next" id="btn3Submit" disabled onclick="submitReservation()">
+                Rezervasyonu Tamamla <i class="fas fa-check-circle"></i>
+            </button>
+        </div>
+    </div>
+
+</div>
+{% endif %}
+
+<script>
+var state = { step:1, pitchId:null, pitchName:null, date:null, slot:null };
+var busySlots = [];
+var blockedSlots = {}; // { 'slot': 'sebep' }
+var SLOTS = ['16:00 - 17:00','17:00 - 18:00','18:00 - 19:00','19:00 - 20:00','20:00 - 21:00','21:00 - 22:00','22:00 - 23:00'];
+
+function goStep(n) {
+    document.querySelectorAll('.step-panel').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('panel'+n).classList.add('active');
+    [1,2,3].forEach(function(i){
+        var el=document.getElementById('stepItem'+i);
+        el.classList.remove('active','done');
+        if(i<n) el.classList.add('done');
+        if(i===n) el.classList.add('active');
+    });
+    state.step=n;
+    if(n===2) renderSlots();
+    if(n===3) fillHidden();
+    window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function selectPitch(el) {
+    document.querySelectorAll('.pitch-option').forEach(function(p){ p.classList.remove('selected'); p.setAttribute('aria-checked','false'); });
+    el.classList.add('selected'); el.setAttribute('aria-checked','true');
+    state.pitchId=el.dataset.pitchId; state.pitchName=el.dataset.pitchName;
+    checkStep1();
+}
+
+function checkStep1() {
+    var date=document.getElementById('selDate').value;
+    var ok=date&&state.pitchId;
+    document.getElementById('btn1Next').disabled=!ok;
+    if(ok){state.date=date;fetchBusy();}
+}
+
+function fetchBusy() {
+    fetch('/busy_slots?pitch_id='+state.pitchId+'&date='+state.date)
+        .then(function(r){return r.ok?r.json():{busy:[],blocked:{}};})
+        .then(function(d){
+            busySlots    = d.busy    || [];
+            blockedSlots = d.blocked || {};
+        })
+        .catch(function(){busySlots=[];blockedSlots={};});
+}
+
+function renderSlots() {
+    document.getElementById('sumDate').textContent=formatDate(state.date);
+    document.getElementById('sumPitch').textContent=state.pitchName;
+    var list=document.getElementById('slotList');
+    list.innerHTML=''; state.slot=null;
+    document.getElementById('btn2Next').disabled=true;
+    var now=new Date(), selDate=new Date(state.date+'T00:00:00');
+    var isToday=selDate.toDateString()===now.toDateString();
+    
+    SLOTS.forEach(function(slot){
+        var startHour=parseInt(slot.split(':')[0]);
+        var isPast=isToday&&startHour<=now.getHours();
+        var isBusy=busySlots.indexOf(slot)!==-1;
+        var blockReason=blockedSlots[slot]||null;
+        var locked=isPast||isBusy||blockReason!==null;
+        
+        var div=document.createElement('div');
+        div.className='slot-item '+(locked?'locked':'available');
+        
+        if(!locked){
+            // Müsait ise standart tıklama
+            div.setAttribute('role','radio'); div.setAttribute('aria-checked','false'); div.setAttribute('tabindex','0');
+            div.onclick=function(){selectSlot(div,slot);};
+            div.onkeydown=function(e){if(e.key==='Enter'||e.key===' ')selectSlot(div,slot);};
+        } else if (blockReason !== null) {
+            // SADECE KİLİTLİ (ADMİN TARAFINDAN) İSE TIKLANDIĞINDA UYARI VER
+            div.onclick = function() {
+                alert('Bu saat dilimi şu sebeple kilitlidir:\n\n👉 ' + blockReason);
+            };
+        }
+
+        // Tasarım Değişikliği: Kilitli ve Dolu için sade rozetler
+        var badgeClass, badgeText;
+        if (blockReason) {
+            badgeClass = 'badge-locked';
+            badgeText = '<i class="fas fa-lock"></i> Kilitli';
+        } else if (isBusy) {
+            badgeClass = 'badge-busy';
+            badgeText = '<i class="fas fa-times-circle"></i> Dolu';
+        } else if (isPast) {
+            badgeClass = 'badge-locked';
+            badgeText = '<i class="fas fa-history"></i> Süresi Geçti';
+        } else {
+            badgeClass = 'badge-available';
+            badgeText = '<i class="fas fa-check"></i> Müsait';
+        }
+
+        div.innerHTML='<span class="slot-time">'+slot+'</span>'+
+            '<span class="slot-badge '+badgeClass+'">'+badgeText+'</span>';
+        list.appendChild(div);
+    });
+}
+
+function selectSlot(el,slot) {
+    document.querySelectorAll('.slot-item.available').forEach(function(s){
+        s.classList.remove('selected'); s.setAttribute('aria-checked','false');
+        s.querySelector('.slot-badge').className='slot-badge badge-available';
+        s.querySelector('.slot-badge').innerHTML='<i class="fas fa-check"></i> Müsait';
+    });
+    el.classList.add('selected'); el.setAttribute('aria-checked','true');
+    el.querySelector('.slot-badge').className='slot-badge badge-selected';
+    el.querySelector('.slot-badge').innerHTML='<i class="fas fa-check-circle"></i> Seçildi';
+    state.slot=slot;
+    document.getElementById('btn2Next').disabled=false;
+}
+
+function fillHidden() {
+    document.getElementById('hPitchId').value=state.pitchId;
+    document.getElementById('hDate').value=state.date;
+    document.getElementById('hSlot').value=state.slot;
+}
+
+function handleFile(inp) {
+    var errBox=document.getElementById('fileErr'),errMsg=document.getElementById('fileErrMsg'),nameBox=document.getElementById('uploadName');
+    errBox.style.display='none'; nameBox.style.display='none';
+    if(!inp.files||!inp.files[0]){checkStep3();return;}
+    var f=inp.files[0];
+    if(f.size>5*1024*1024){errMsg.textContent='Dosya 5 MB sınırını aşıyor.';errBox.style.display='flex';inp.value='';checkStep3();return;}
+    if(['application/pdf','image/jpeg','image/png'].indexOf(f.type)===-1){errMsg.textContent='Yalnızca PDF, JPG veya PNG yükleyebilirsiniz.';errBox.style.display='flex';inp.value='';checkStep3();return;}
+    nameBox.textContent='✓ '+f.name; nameBox.style.display='block'; checkStep3();
+}
+
+function checkStep3() {
+    var name=(document.getElementById('fName')||{}).value||'';
+    var phone=(document.getElementById('fPhone')||{}).value||'';
+    var email=(document.getElementById('fEmail')||{}).value||'';
+    var file=document.getElementById('fReceipt');
+    var ok=name.trim().length>=2&&/^05\d{9}$/.test(phone.replace(/\s/g,''))&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&file&&file.files&&file.files[0];
+    document.getElementById('btn3Submit').disabled=!ok;
+}
+
+function submitReservation() {
+    fillHidden();
+    if(confirm('Rezervasyon talebinizi göndermek istiyor musunuz?')) document.getElementById('reserveForm').submit();
+}
+
+function formatDate(str) {
+    if(!str)return'—'; var p=str.split('-'); return p[2]+'.'+p[1]+'.'+p[0];
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+    document.getElementById('selDate').addEventListener('change',checkStep1);
+    var zone=document.getElementById('uploadZone');
+    if(zone){
+        zone.addEventListener('dragover',function(e){e.preventDefault();zone.classList.add('dragover');});
+        zone.addEventListener('dragleave',function(){zone.classList.remove('dragover');});
+        zone.addEventListener('drop',function(e){e.preventDefault();zone.classList.remove('dragover');var inp=document.getElementById('fReceipt');inp.files=e.dataTransfer.files;handleFile(inp);});
+    }
+    var phone=document.getElementById('fPhone');
+    if(phone){
+        phone.addEventListener('input',function(){
+            var msg=document.getElementById('phoneMsg'),val=phone.value.replace(/\s/g,'');
+            if(!val){msg.className='phone-msg';return;}
+            var ok=/^05\d{9}$/.test(val);
+            msg.className='phone-msg show '+(ok?'ok':'err');
+            msg.innerHTML=ok?'<i class="fas fa-check-circle"></i> Geçerli numara':'<i class="fas fa-times-circle"></i> Format: 05XX XXX XX XX';
+            checkStep3();
+        });
+    }
+    ['fName','fEmail'].forEach(function(id){var el=document.getElementById(id);if(el){el.addEventListener('input',checkStep3);}});
+});
+</script>
 {% endblock %}

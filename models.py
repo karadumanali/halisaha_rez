@@ -10,9 +10,7 @@ class Admin(UserMixin, db.Model):
     __tablename__ = 'admins'
     
     id = db.Column(db.Integer, primary_key=True)
-    # Maksimum 50 karakter sınırı (Buffer/Payload kısıtlaması)
     username = db.Column(db.String(50), unique=True, nullable=False) 
-    # Şifreler kesinlikle düz metin tutulmaz, her zaman hashlenmiş olmalı.
     password_hash = db.Column(db.String(256), nullable=False)
 
     def __repr__(self):
@@ -24,55 +22,55 @@ class Pitch(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    price = db.Column(db.Integer, nullable=False) # Ücret (TL cinsinden tam sayı)
+    price = db.Column(db.Integer, nullable=False)
     
-    # Bir sahanın birden fazla rezervasyonu olabilir
-    reservations = db.relationship('Reservation', backref='pitch', lazy=True)
-
-    # Sahaya ait resimleri bağladığımız yer 
-    images = db.relationship('PitchImage', backref='pitch', cascade='all, delete-orphan', lazy=True)
+    # İlişkilerin hepsi tek bir yerde toplandı
+    reservations = db.relationship('Reservation', backref='pitch', lazy=True, cascade='all, delete-orphan')
+    images = db.relationship('PitchImage', backref='pitch', lazy=True, cascade='all, delete-orphan')
+    blocked_slots = db.relationship('BlockedSlot', backref='pitch', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Pitch {self.name}>'
 
-
-# SAHA RESİMLERİ
+# SAHA RESİMLERİ TABLOSU
 class PitchImage(db.Model):
     __tablename__ = 'pitch_images'
     
     id = db.Column(db.Integer, primary_key=True)
-    # Hangi sahaya ait olduğu (Yabancı Anahtar)
     pitch_id = db.Column(db.Integer, db.ForeignKey('pitches.id'), nullable=False)
-    
-    # Resmin sunucudaki güvenli adı
     image_filename = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# 3. REZERVASYON TABLOSU (Sistemin Kalbi ve En Güvenli Olması Gereken Yer)
+# 3. REZERVASYON TABLOSU
 class Reservation(db.Model):
     __tablename__ = 'reservations'
     
-    # IDOR ZAFİYETİNE KARŞI ÖNLEM: Sıralı ID yerine tahmin edilemez UUID kullanıyoruz.
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    
     pitch_id = db.Column(db.Integer, db.ForeignKey('pitches.id'), nullable=False)
     
-    date = db.Column(db.Date, nullable=False) # Sadece tarih: 2026-02-20
-    time_slot = db.Column(db.String(20), nullable=False) # "20:00 - 21:00"
-    
-    # Veri bütünlüğü için kısıtlamalar
+    date = db.Column(db.Date, nullable=False)
+    time_slot = db.Column(db.String(20), nullable=False)
     customer_name = db.Column(db.String(100), nullable=False)
-    customer_phone = db.Column(db.String(15), nullable=False) # İletişim için şart
-    # YENİ EKLENEN SATIR: Müşteri E-Posta adresi
+    customer_phone = db.Column(db.String(15), nullable=False)
     customer_email = db.Column(db.String(120), nullable=False)
-    # Dekont dosyasının sunucudaki güvenli adı (Path Traversal engellenecek)
     receipt_filename = db.Column(db.String(255), nullable=False)
     
-    # Durum: Pending (Bekliyor), Approved (Onaylandı), Rejected (Reddedildi)
     status = db.Column(db.String(20), default='Pending', nullable=False)
-    
-    # Loglama ve denetim (Audit) için kayıt zamanı
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return f'<Reservation {self.date} {self.time_slot} - {self.status}>'
+
+# 4. KİLİTLİ SLOT TABLOSU
+class BlockedSlot(db.Model):
+    __tablename__ = 'blocked_slots'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    pitch_id = db.Column(db.Integer, db.ForeignKey('pitches.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    time_slot = db.Column(db.String(20), nullable=False)
+    reason = db.Column(db.String(200), nullable=False, default='Bahar Şenlikleri Sebebiyle Sahamız kullanılamamaktadır.')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<BlockedSlot {self.date} {self.time_slot} pitch={self.pitch_id}>'

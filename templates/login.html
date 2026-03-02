@@ -1,85 +1,225 @@
 {% extends "layout.html" %}
-
 {% block body %}
 <style>
-    /* Kilitli Buton Görünümü */
-    #loginBtn:disabled {
-        opacity: 0.4 !important;
-        cursor: not-allowed !important;
-        background-color: #6c757d !important;
-        border-color: #6c757d !important;
-        pointer-events: none;
-    }
+.login-page {
+    display: flex; align-items: center; justify-content: center;
+    min-height: calc(100vh - 180px); padding: 24px 16px;
+}
+.login-box { width: 100%; max-width: 440px; }
 
-    /* Edge ve IE'deki "Şifreyi Göster" (Göz) ikonunu tamamen gizle */
-    input::-ms-reveal,
-    input::-ms-clear {
-        display: none !important;
-    }
-    
-    /* Chrome ve Edge'in inatçı "Şifre Kaydetme/Yönetici" ANAHTAR ikonunu yok et */
-    input::-webkit-credentials-auto-fill-button {
-        visibility: hidden !important;
-        display: none !important;
-        pointer-events: none !important;
-        height: 0;
-        width: 0;
-        margin: 0;
-    }
+.login-heading { text-align: center; margin-bottom: 24px; }
+.login-heading h1 {
+    font-size: clamp(1.9rem, 5vw, 2.2rem); font-weight: 800;
+    color: var(--ink); letter-spacing: -0.025em; line-height: 1.2; margin-bottom: 6px;
+}
+.login-heading p { font-size: 1rem; color: var(--gray-400); font-weight: 500; }
 
-    /* Tarayıcı otomatik doldurduğunda kutunun içinin çirkin sarı/mavi olmasını engelle */
-    input:-webkit-autofill,
-    input:-webkit-autofill:hover, 
-    input:-webkit-autofill:focus, 
-    input:-webkit-autofill:active {
-        -webkit-box-shadow: 0 0 0 30px white inset !important;
-        transition: background-color 5000s ease-in-out 0s;
-    }
+.login-stripe {
+    height: 4px;
+    background: linear-gradient(90deg, var(--teal-dk), var(--teal-lt));
+    border-radius: var(--r) var(--r) 0 0;
+}
+.login-card {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    padding: 32px 28px 26px !important;
+}
+
+.login-avatar {
+    width: 62px; height: 62px; border-radius: 50%;
+    background: var(--teal-pale); border: 2.5px solid var(--mint-mid);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 26px;
+}
+.login-avatar i { color: var(--teal); font-size: 1.6rem; }
+
+.form-label { font-size: 0.95rem !important; font-weight: 700 !important; color: var(--gray-700) !important; }
+.form-control { font-size: 1rem !important; padding: 13px 14px !important; }
+
+.inp-wrap { position: relative; }
+.inp-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--gray-400); font-size: 0.85rem; pointer-events: none;
+    transition: color 0.15s; z-index: 1;
+}
+.inp-wrap:focus-within .inp-icon { color: var(--teal); }
+.inp-wrap .form-control { padding-left: 42px !important; }
+.inp-wrap.has-eye .form-control { padding-right: 46px !important; }
+.pw-eye {
+    position: absolute; right: 0; top: 0; width: 46px; height: 100%;
+    background: none; border: none; padding: 0; cursor: pointer;
+    color: var(--gray-400); font-size: 0.85rem; transition: color 0.15s;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.pw-eye:hover { color: var(--teal); }
+
+.btn-login {
+    width: 100%; min-height: 54px; padding: 14px;
+    background: var(--teal); color: var(--white);
+    font-size: 1.05rem; font-weight: 800; border-radius: var(--r-sm);
+    border: none; cursor: pointer; transition: all 0.18s;
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    margin-top: 8px; font-family: var(--font);
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.btn-login:hover:not(:disabled) {
+    background: var(--teal-dk); transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(14,168,116,0.35);
+}
+.btn-login:active:not(:disabled) { transform: translateY(0); }
+.btn-login:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+.attempt-bar {
+    display: none; align-items: center; gap: 8px;
+    background: var(--warning-bg); border: 1.5px solid var(--warning-bd);
+    border-radius: var(--r-sm); padding: 11px 14px; margin-bottom: 16px;
+    font-size: 0.9rem; color: var(--warning-tx); flex-wrap: wrap;
+}
+.attempt-bar.show { display: flex; }
+.dots { display: flex; gap: 5px; align-items: center; }
+.dot  { width: 10px; height: 10px; border-radius: 50%; background: var(--warning-bd); transition: background 0.2s; }
+.dot.used { background: var(--danger); }
+
+.lockout-bar {
+    display: none; align-items: center; gap: 10px;
+    background: var(--danger-bg); border: 1.5px solid #fed7d7;
+    border-radius: var(--r-sm); padding: 12px 14px; margin-bottom: 16px;
+    font-size: 0.9rem; color: var(--danger-tx);
+}
+.lockout-bar.show { display: flex; }
+.lockout-bar > i  { flex-shrink: 0; }
+.lcd { font-weight: 800; font-size: 1rem; min-width: 22px; display: inline-block; }
+
+input::-ms-reveal, input::-ms-clear { display: none !important; }
+input::-webkit-credentials-auto-fill-button { visibility: hidden !important; }
+input:-webkit-autofill, input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 40px #fff inset !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+@media (max-width: 400px) { .login-card { padding: 24px 18px 20px !important; } }
 </style>
 
-<div class="row justify-content-center mt-5">
-    <div class="col-md-4">
-        <div class="card shadow-lg border-0 bg-body-tertiary">
-            <div class="card-header bg-dark text-white text-center py-3">
-                <h4 class="mb-0"><i class="fas fa-user-shield me-2"></i>Yönetici Girişi</h4>
-            </div>
-            <div class="card-body p-4">
-                <form action="/login" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Kullanıcı Adı</label>
-                        <input type="text" id="usernameInp" name="username" class="form-control border-secondary" required minlength="4" placeholder="Username" autocomplete="off">
-                    </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Parola</label>
-                        <input type="password" id="passwordInp" name="password" class="form-control border-secondary" required minlength="6" placeholder="Password" autocomplete="new-password">
-                    </div>
-                    
-                    <button type="submit" id="loginBtn" class="btn btn-dark w-100 fw-bold shadow-sm" disabled>
-                        <i class="fas fa-sign-in-alt me-2"></i>Sisteme Giriş Yap
-                    </button>
-                </form>
+<div class="login-page">
+<div class="login-box">
+
+    <div class="login-heading">
+        <h1>AYBÜ Halı Saha</h1>
+        <p>Yönetici girişi yapın</p>
+    </div>
+
+    <div class="login-stripe"></div>
+    <div class="card login-card">
+
+        <div class="login-avatar">
+            <i class="fas fa-user-shield"></i>
+        </div>
+
+        <div class="lockout-bar" id="lockoutBar" role="alert" aria-live="assertive">
+            <i class="fas fa-lock"></i>
+            <div>Çok fazla başarısız deneme. <span class="lcd" id="lcdNum">30</span> saniye bekleyin.</div>
+        </div>
+
+        <div class="attempt-bar" id="attemptBar" role="alert" aria-live="polite">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>Başarısız denemeler:</span>
+            <div class="dots" aria-hidden="true">
+                <div class="dot" id="d1"></div><div class="dot" id="d2"></div>
+                <div class="dot" id="d3"></div><div class="dot" id="d4"></div>
+                <div class="dot" id="d5"></div>
             </div>
         </div>
+
+        <form id="loginForm" action="/login" method="POST" autocomplete="off" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="mb-4">
+                <label class="form-label" for="uInp">
+                    <i class="fas fa-user"></i> Kullanıcı Adı
+                </label>
+                <div class="inp-wrap">
+                    <input type="text" id="uInp" name="username"
+                           class="form-control" required minlength="4" maxlength="50"
+                           placeholder="Kullanıcı adınızı girin"
+                           autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="off">
+                    <i class="fas fa-user inp-icon"></i>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label" for="pInp">
+                    <i class="fas fa-lock"></i> Parola
+                </label>
+                <div class="inp-wrap has-eye">
+                    <input type="password" id="pInp" name="password"
+                           class="form-control" required minlength="6" maxlength="128"
+                           placeholder="Parolanızı girin" autocomplete="new-password">
+                    <i class="fas fa-lock inp-icon"></i>
+                    <button type="button" class="pw-eye" id="pwEye" tabindex="-1" aria-label="Parolayı göster/gizle">
+                        <i class="fas fa-eye" id="pwIcon"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" id="loginBtn" class="btn-login" disabled aria-disabled="true">
+                <i class="fas fa-sign-in-alt"></i> Giriş Yap
+            </button>
+        </form>
     </div>
+</div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const userInp = document.getElementById('usernameInp');
-        const passInp = document.getElementById('passwordInp');
-        const btn = document.getElementById('loginBtn');
+document.addEventListener('DOMContentLoaded', function () {
+    var uInp=document.getElementById('uInp'), pInp=document.getElementById('pInp');
+    var loginBtn=document.getElementById('loginBtn');
+    var pwEye=document.getElementById('pwEye'), pwIcon=document.getElementById('pwIcon');
+    var lockoutBar=document.getElementById('lockoutBar'), lcdNum=document.getElementById('lcdNum');
+    var attemptBar=document.getElementById('attemptBar');
+    var dots=['d1','d2','d3','d4','d5'].map(function(id){return document.getElementById(id);});
+    var MAX=5, LOCK=30;
 
-        function checkInputs() {
-            if (userInp.value.trim().length >= 4 && passInp.value.trim().length >= 6) {
-                btn.disabled = false;
-            } else {
-                btn.disabled = true;
-            }
-        }
-
-        userInp.addEventListener('input', checkInputs);
-        passInp.addEventListener('input', checkInputs);
+    pwEye.addEventListener('click',function(){
+        var show=pInp.type==='password'; pInp.type=show?'text':'password';
+        pwIcon.className=show?'fas fa-eye-slash':'fas fa-eye'; pInp.focus();
     });
+
+    function refresh(){
+        var ok=uInp.value.trim().length>=4&&pInp.value.trim().length>=6&&!isLocked();
+        loginBtn.disabled=!ok; loginBtn.setAttribute('aria-disabled',String(!ok));
+    }
+    uInp.addEventListener('input',refresh); pInp.addEventListener('input',refresh);
+
+    function getN(){return parseInt(sessionStorage.getItem('_lt')||'0');}
+    function getLock(){return parseInt(sessionStorage.getItem('_lu')||'0');}
+    function isLocked(){return Date.now()<getLock();}
+
+    function drawDots(){
+        var n=getN(); attemptBar.classList.toggle('show',n>0);
+        dots.forEach(function(d,i){d.className='dot'+(i<n?' used':'');});
+    }
+
+    function startLockdown(){
+        loginBtn.disabled=true; lockoutBar.classList.add('show');
+        var iv=setInterval(function(){
+            var rem=Math.ceil((getLock()-Date.now())/1000);
+            if(rem<=0){clearInterval(iv);sessionStorage.setItem('_lt','0');lockoutBar.classList.remove('show');drawDots();refresh();}
+            else{lcdNum.textContent=rem;}
+        },500);
+    }
+
+    /* Başarılı giriş olduysa sayacı sıfırla */
+    if(document.querySelector('.alert-success')){
+        sessionStorage.setItem('_lt','0'); sessionStorage.removeItem('_lu');
+    }
+
+    document.getElementById('loginForm').addEventListener('submit',function(){
+        var n=getN()+1; sessionStorage.setItem('_lt',n);
+        if(n>=MAX) sessionStorage.setItem('_lu',Date.now()+LOCK*1000);
+    });
+
+    drawDots(); if(isLocked()) startLockdown(); refresh();
+});
 </script>
 {% endblock %}

@@ -3,46 +3,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Halı Saha Rezervasyon</title>
+    <title>AYBU Halı Saha Rezervasyon Sistemi</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            /* Ana renkler — daha canlı */
+            --teal:        #0ea874;
+            --teal-dk:     #0b8a5f;
+            --teal-lt:     #16c98a;
+            --teal-pale:   #d0f5e8;
+            --teal-glass:  rgba(14,168,116,0.12);
+
+            /* Arkaplan — daha az soluk */
+            --mint-bg:     #dff5ec;
+            --mint-mid:    #b0e4cc;
+
+            /* Nötrler */
+            --white:       #ffffff;
+            --gray-50:     #f9fafb;
+            --gray-100:    #f0f1f3;
+            --gray-200:    #e2e4e8;
+            --gray-300:    #c8cdd6;
+            --gray-400:    #8f97a8;
+            --gray-600:    #4a5568;
+            --gray-700:    #2d3748;
+            --ink:         #0d1f17;
+
+            /* Durum */
+            --success-bg:  #e6faf2; --success-tx: #065f3e;
+            --warning-bg:  #fffbeb; --warning-tx: #92400e; --warning-bd: #fcd34d;
+            --danger:      #e53e3e; --danger-bg:  #fff5f5; --danger-tx:  #9b2c2c;
+            --info-bg:     #ebf8ff; --info-tx:    #1e40af;
+
+            --font: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            --r:    16px;
+            --r-sm: 10px;
+            --r-xs:  6px;
+            --sh-xs: 0 1px 3px  rgba(0,0,0,0.06);
+            --sh-sm: 0 2px 8px  rgba(0,0,0,0.08);
+            --sh-md: 0 4px 20px rgba(0,0,0,0.10);
+            --sh-lg: 0 12px 40px rgba(0,0,0,0.14);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font);
+            background: var(--mint-bg);
+            color: var(--ink);
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── NAVBAR ── */
+        .site-nav {
+            background: var(--white);
+            border-bottom: 2px solid var(--mint-mid);
+            box-shadow: var(--sh-xs);
+            position: sticky; top: 0; z-index: 900;
+        }
+        .nav-inner {
+            display: flex; align-items: center;
+            height: 62px; gap: 13px;
+        }
+        .nav-logo {
+            width: 38px; height: 38px; border-radius: 10px;
+            background: var(--teal-pale); border: 2px solid var(--mint-mid);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; overflow: hidden;
+        }
+        .nav-logo img { width:100%; height:100%; object-fit:cover; border-radius:8px; }
+        .nav-logo-fb  { display:none; align-items:center; justify-content:center; width:100%; height:100%; }
+        .nav-logo-fb i { color: var(--teal); font-size: 1rem; }
+        .nav-brand      { flex: 1; }
+        .nav-brand-name { font-size: 0.97rem; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; line-height: 1.25; }
+        .nav-brand-sub  { font-size: 0.71rem; font-weight: 400; color: var(--gray-400); margin-top: 1px; }
+        .nav-secure {
+            display: flex; align-items: center; gap: 5px;
+            background: var(--teal-glass);
+            border: 1.5px solid rgba(14,168,116,0.28);
+            border-radius: 20px; padding: 5px 13px;
+            font-size: 0.7rem; font-weight: 700;
+            color: var(--teal-dk); letter-spacing: 0.04em;
+        }
+        .nav-secure i { font-size: 0.63rem; }
+
+        /* ── MAIN ── */
+        main.site-main { flex: 1; padding: 36px 0 72px; }
+
+        /* ── FLASH ── */
+        .flash-wrap { margin-bottom: 20px; }
+        .alert {
+            border: none; border-radius: var(--r-sm);
+            font-size: 0.9rem; font-weight: 500;
+            padding: 13px 18px;
+            display: flex; align-items: center; gap: 10px;
+            box-shadow: var(--sh-xs);
+        }
+        .alert-success { background: var(--success-bg); color: var(--success-tx); border-left: 3px solid var(--teal); }
+        .alert-danger  { background: var(--danger-bg);  color: var(--danger-tx);  border-left: 3px solid var(--danger); }
+        .alert-warning { background: var(--warning-bg); color: var(--warning-tx); border-left: 3px solid var(--warning-bd); }
+        .alert-info    { background: var(--info-bg);    color: var(--info-tx);    border-left: 3px solid #3b82f6; }
+        .alert .btn-close { margin-left: auto; opacity: 0.4; flex-shrink: 0; }
+
+        /* ── CARD ── */
+        .card {
+            background: var(--white) !important;
+            border: 1.5px solid rgba(0,0,0,0.07) !important;
+            border-radius: var(--r) !important;
+            box-shadow: var(--sh-md);
+            overflow: hidden;
+        }
+
+        /* ── FORM ── */
+        .form-control, .form-select {
+            border: 1.5px solid var(--gray-300);
+            border-radius: var(--r-sm);
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            font-family: var(--font);
+            color: var(--ink);
+            background: var(--white);
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .form-control::placeholder { color: var(--gray-400); }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--teal);
+            box-shadow: 0 0 0 3px rgba(14,168,116,0.15);
+            outline: none;
+        }
+        .form-label {
+            font-size: 0.9rem; font-weight: 700;
+            color: var(--gray-700); margin-bottom: 7px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .form-label i { color: var(--teal); font-size: 0.8rem; }
+        .form-text { font-size: 0.8rem; color: var(--gray-400); margin-top: 5px; }
+
+        /* ── BUTONLAR ── */
+        .btn {
+            font-family: var(--font); font-weight: 700;
+            font-size: 0.9rem; border-radius: var(--r-sm);
+            padding: 11px 22px; transition: all 0.15s;
+            cursor: pointer; border: none;
+            display: inline-flex; align-items: center; gap: 7px;
+        }
+        .btn-teal { background: var(--teal); color: var(--white); }
+        .btn-teal:hover:not(:disabled) {
+            background: var(--teal-dk); color: var(--white);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(14,168,116,0.35);
+        }
+        .btn-teal:disabled { opacity: 0.38; cursor: not-allowed; }
+        .btn-outline-teal { background: transparent; color: var(--teal); border: 1.5px solid var(--teal); }
+        .btn-outline-teal:hover { background: var(--teal-pale); color: var(--teal-dk); }
+        .btn-ghost { background: var(--gray-100); color: var(--gray-700); border: 1.5px solid var(--gray-200); }
+        .btn-ghost:hover { background: var(--gray-200); color: var(--ink); }
+        .btn-danger-soft { background: var(--danger-bg); color: var(--danger); border: 1.5px solid #fed7d7; }
+        .btn-danger-soft:hover { background: var(--danger); color: var(--white); }
+
+        /* ── PILL ── */
+        .pill { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:700; }
+        .pill-pending  { background: #fef9c3; color: #854d0e; }
+        .pill-approved { background: #d0f5e8; color: #065f3e; }
+        .pill-rejected { background: #fee2e2; color: #9b2c2c; }
+
+        /* ── MODAL ── */
+        .modal-content { border:none !important; border-radius:var(--r) !important; box-shadow:var(--sh-lg); overflow:hidden; }
+        .modal-header  { padding:18px 22px; border-bottom:1.5px solid var(--gray-200); }
+        .modal-body    { padding:22px; }
+        .modal-footer  { padding:14px 22px; border-top:1.5px solid var(--gray-200); background:var(--gray-50); border-radius:0 0 var(--r) var(--r); gap:8px; }
+
+        /* ── INPUT GROUP ── */
+        .input-group-text { background:var(--gray-100); border:1.5px solid var(--gray-300); color:var(--gray-600); font-size:0.85rem; }
+
+        /* ── FOOTER ── */
+        .site-footer { background:var(--white); border-top:2px solid var(--mint-mid); padding:15px 0; }
+        .footer-inner {
+            display:flex; align-items:center; justify-content:center;
+            flex-wrap:wrap; gap:8px; font-size:0.77rem; color:var(--gray-400);
+        }
+        .footer-dot { color: var(--mint-mid); user-select:none; }
+        .footer-secure { display:inline-flex; align-items:center; gap:4px; color:var(--teal); font-weight:700; font-size:0.73rem; }
+        .footer-secure i { font-size:0.63rem; }
+    </style>
 </head>
-<body class="bg-light">
+<body>
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
-        <div class="container">
-            <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
-                <img src="{{ url_for('static', filename='uploads/receipts/site_logo.png') }}" 
-                    alt="Logo" 
-                    width="40" 
-                    height="40" 
-                    class="me-2 rounded-circle shadow-sm bg-white"
-                    onerror="this.style.display='none'"> 
-                AYBÜ Spor, Kültür ve Sağlık Halısaha Sistemi
-            </a>
+<nav class="site-nav">
+    <div class="container" style="max-width:740px;">
+        <div class="nav-inner">
+            <div class="nav-logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo"
+                     onerror="this.style.display='none'; this.parentElement.querySelector('.nav-logo-fb').style.display='flex';">
+                <div class="nav-logo-fb"><i class="fas fa-futbol"></i></div>
+            </div>
+            <div class="nav-brand">
+                <div class="nav-brand-name">AYBÜ Halı Saha</div>
+                <div class="nav-brand-sub">Rezervasyon Sistemi</div>
+            </div>
+            <div class="nav-secure"><i class="fas fa-shield-alt"></i> Güvenli</div>
         </div>
-    </nav>
-
-    <div class="container" style="min-height: 80vh;">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
-        {% block body %}
-        {% endblock %}
     </div>
+</nav>
 
-    <footer class="text-center text-secondary py-4 mt-5 border-top">
-        <small>&copy; 2026 Güvenli Halı Saha Sistemi. Tüm hakları saklıdır.</small>
-    </footer>
+<main class="site-main">
+    <div class="container" style="max-width:740px;">
+        <div class="flash-wrap">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {% if   category == 'success' %}<i class="fas fa-check-circle"></i>
+                            {% elif category == 'danger'  %}<i class="fas fa-exclamation-circle"></i>
+                            {% elif category == 'warning' %}<i class="fas fa-exclamation-triangle"></i>
+                            {% else                       %}<i class="fas fa-info-circle"></i>{% endif %}
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        {% block body %}{% endblock %}
+    </div>
+</main>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<footer class="site-footer">
+    <div class="container" style="max-width:740px;">
+        <div class="footer-inner">
+            <span>&copy; 2026 AYBÜ Spor &amp; Kültür</span>
+            <span class="footer-dot">·</span>
+            <span class="footer-secure"><i class="fas fa-lock"></i> SSL Korumalı</span>
+            <span class="footer-dot">·</span>
+            <span>Tüm hakları saklıdır</span>
+        </div>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
