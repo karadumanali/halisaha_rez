@@ -192,9 +192,112 @@
 }
 .block-form-card h3 {
     font-size: 1rem; font-weight: 800; color: var(--ink);
-    margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
 .block-form-card h3 i { color: #7c3aed; }
+.multi-hint { font-size: 0.72rem; font-weight: 600; color: var(--gray-400); }
+
+/* Yeni çoklu seçim grid */
+.block-multi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr 1fr;
+    gap: 16px;
+}
+.block-reason-col {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px; align-items: start;
+}
+.block-reason-col .form-label { grid-column: 1 / -1; }
+.block-reason-col .form-control { align-self: start; }
+
+/* Çoklu seçim listesi (saha & saat) */
+.multi-pick-list {
+    border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
+    overflow: hidden; background: var(--white);
+    max-height: 260px; overflow-y: auto;
+}
+.multi-pick-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 14px; cursor: pointer;
+    border-bottom: 1px solid var(--gray-200);
+    font-size: 0.88rem; font-weight: 600; color: var(--ink);
+    transition: background 0.12s; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.multi-pick-item:last-child { border-bottom: none; }
+.multi-pick-item i:first-child { color: var(--gray-400); font-size: 0.8rem; flex-shrink: 0; }
+.multi-pick-item .pick-check { margin-left: auto; color: var(--teal); display: none; flex-shrink: 0; }
+.multi-pick-item:hover { background: var(--gray-50); }
+.multi-pick-item.selected { background: var(--teal-pale); border-left: 3px solid var(--teal); }
+.multi-pick-item.selected i:first-child { color: var(--teal); }
+.multi-pick-item.selected .pick-check { display: block; }
+
+/* TAKVİM */
+.cal-wrap {
+    border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
+    overflow: hidden; background: var(--white);
+}
+.cal-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+}
+.cal-nav-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--gray-600); font-size: 0.85rem; padding: 4px 8px;
+    border-radius: var(--r-xs); transition: background 0.12s; font-family: var(--font);
+}
+.cal-nav-btn:hover { background: var(--gray-200); }
+.cal-month-label { font-size: 0.9rem; font-weight: 800; color: var(--ink); }
+.cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 2px; padding: 8px;
+}
+.cal-day-name {
+    text-align: center; font-size: 0.65rem; font-weight: 800;
+    color: var(--gray-400); padding: 4px 0; text-transform: uppercase;
+}
+.cal-day {
+    text-align: center; padding: 7px 2px;
+    font-size: 0.82rem; font-weight: 600; border-radius: 6px;
+    cursor: pointer; transition: all 0.12s; color: var(--ink);
+    user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.cal-day:hover:not(.cal-disabled):not(.cal-empty) { background: var(--teal-pale); color: var(--teal-dk); }
+.cal-day.cal-selected { background: var(--teal); color: var(--white) !important; font-weight: 800; }
+.cal-day.cal-today { border: 1.5px solid var(--teal); color: var(--teal); }
+.cal-day.cal-today.cal-selected { border-color: transparent; }
+.cal-day.cal-disabled { color: var(--gray-300); cursor: not-allowed; }
+.cal-day.cal-empty { cursor: default; }
+
+/* Seçili tarih etiketleri */
+.cal-selected-tags {
+    padding: 8px 10px; border-top: 1px solid var(--gray-200);
+    display: flex; flex-wrap: wrap; gap: 5px; min-height: 36px;
+    background: var(--gray-50);
+}
+.cal-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--teal); color: var(--white);
+    font-size: 0.72rem; font-weight: 700;
+    padding: 3px 8px; border-radius: 12px; cursor: pointer;
+    transition: background 0.12s;
+}
+.cal-tag:hover { background: var(--teal-dk); }
+.cal-tag i { font-size: 0.62rem; }
+.cal-no-selection { font-size: 0.78rem; color: var(--gray-400); padding: 4px 2px; align-self: center; }
+
+/* Özet + sebep satırı */
+.block-summary {
+    grid-column: 1 / -1;
+    display: flex; align-items: flex-start; gap: 8px;
+    background: #f3e8ff; border: 1px solid #d8b4fe;
+    border-radius: var(--r-xs); padding: 8px 12px;
+    font-size: 0.8rem; color: #6b21a8; font-weight: 600;
+}
+.block-summary i { flex-shrink: 0; margin-top: 1px; }
 
 .block-list { display: flex; flex-direction: column; gap: 8px; }
 .block-item {
@@ -297,6 +400,9 @@
 /* Responsive */
 @media (max-width: 768px) {
     .res-card-body { grid-template-columns: repeat(2, 1fr); }
+    .block-multi-grid { grid-template-columns: 1fr; }
+    .block-reason-col { grid-template-columns: 1fr; }
+    .block-reason-col button { width: 100% !important; }
     .admin-main-title { font-size: 1.3rem; }
 }
 @media (max-width: 480px) {
@@ -306,6 +412,7 @@
 }
 </style>
 
+<!-- ── ÜST BAR ── -->
 <div class="admin-topbar">
     <div>
         <div class="admin-role-tag"><i class="fas fa-shield-alt"></i> Yonetici Paneli</div>
@@ -317,6 +424,7 @@
     </a>
 </div>
 
+<!-- ── OTURUM SAYACI ── -->
 <div class="session-bar">
     <i class="fas fa-shield-alt"></i>
     <span>Oturum suresi:</span>
@@ -327,6 +435,7 @@
     <span id="sessionWarnMsg"><i class="fas fa-exclamation-triangle"></i> Sure doluyor!</span>
 </div>
 
+<!-- ── İSTATİSTİKLER ── -->
 {% set pending_count  = reservations | selectattr('status','equalto','Pending')  | list | length %}
 {% set approved_count = reservations | selectattr('status','equalto','Approved') | list | length %}
 {% set rejected_count = reservations | selectattr('status','equalto','Rejected') | list | length %}
@@ -351,6 +460,7 @@
     </div>
 </div>
 
+<!-- ── TABLAR ── -->
 <div class="admin-tabs" role="tablist">
     <button class="tab-btn active" onclick="switchTab('rezervasyonlar',this)" role="tab">
         <i class="fas fa-clipboard-list"></i> Rezervasyonlar
@@ -365,6 +475,9 @@
     </button>
 </div>
 
+<!-- ══════════════════════════════════════
+     TAB 1: REZERVASYONLAR
+══════════════════════════════════════ -->
 <div class="tab-panel active" id="tab-rezervasyonlar">
 
     <div class="res-filter-row">
@@ -444,11 +557,15 @@
     </div>
     {% endfor %}
 
-</div>
+</div><!-- /tab-rezervasyonlar -->
 
+<!-- ══════════════════════════════════════
+     TAB 2: SAHALAR
+══════════════════════════════════════ -->
 <div class="tab-panel" id="tab-sahalar">
     <div class="row g-4">
 
+        <!-- Saha Ekle -->
         <div class="col-md-5 col-lg-4">
             <div class="card">
                 <div class="section-head-inline">
@@ -480,6 +597,7 @@
             </div>
         </div>
 
+        <!-- Mevcut Sahalar -->
         <div class="col-md-7 col-lg-8">
             <div class="card" style="overflow:hidden;">
                 <div class="section-head-inline">
@@ -536,6 +654,7 @@
 
     </div>
 
+    <!-- Fiyat Modalleri -->
     {% for pitch in pitches %}
     <div class="modal fade" id="priceModal{{ pitch.id }}" tabindex="-1">
         <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -566,79 +685,88 @@
     </div>
     {% endfor %}
 
-</div>
+</div><!-- /tab-sahalar -->
 
+<!-- ══════════════════════════════════════
+     TAB 3: SLOT KİLİTLERİ
+══════════════════════════════════════ -->
 <div class="tab-panel" id="tab-kilitler">
 
+    <!-- Yeni kilit ekle -->
+    <!-- YENİ: Çoklu tarih, saha, saat kilitleme formu -->
     <div class="block-form-card">
-        <h3><i class="fas fa-lock"></i> Yeni Slot Kilitle</h3>
-        <form action="/admin/block_slot" method="POST">
+        <h3><i class="fas fa-lock"></i> Yeni Slot Kilitle
+            <span style="font-size:0.75rem;font-weight:600;color:var(--gray-400);margin-left:8px;">
+                Birden fazla secim yapabilirsiniz
+            </span>
+        </h3>
+
+        <form id="blockForm" action="/admin/block_slot" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            
-            <style>
-                /* Yeni Mobil Uyumlu Hap Buton Tasarımı */
-                .form-section { margin-bottom: 20px; }
-                .chip-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-                .chip-label { cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
-                .chip-label input[type="checkbox"] { display: none; }
-                .chip-label span {
-                    display: inline-flex; align-items: center; gap: 6px;
-                    padding: 8px 16px; border: 1.5px solid var(--gray-300);
-                    border-radius: 30px; color: var(--gray-600);
-                    background: var(--white); font-size: 0.85rem; font-weight: 700;
-                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                }
-                .chip-label input[type="checkbox"]:checked + span {
-                    background: #7c3aed; color: white; border-color: #7c3aed;
-                    box-shadow: 0 4px 10px rgba(124, 58, 237, 0.25);
-                }
-                .chip-label:active span { transform: scale(0.95); }
-                .block-form-container { display: flex; flex-direction: column; gap: 10px; }
-            </style>
+            <!-- JS bu hidden inputları doldurur -->
+            <div id="blockHiddenInputs"></div>
 
-            <div class="block-form-container">
-                
-                <div class="form-section">
-                    <label class="form-label mb-0"><i class="fas fa-futbol"></i> Saha Secimi (Birden fazla secebilirsiniz)</label>
-                    <div class="chip-group">
-                        {% for pitch in pitches %}
-                        <label class="chip-label">
-                            <input type="checkbox" name="pitch_ids" value="{{ pitch.id }}">
-                            <span>{{ pitch.name }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
+            <div class="block-multi-grid">
 
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;" class="form-section">
-                    <div>
-                        <label class="form-label"><i class="fas fa-calendar-alt"></i> Tarih</label>
-                        <input type="date" name="date" class="form-control"
-                               min="{{ now.date().isoformat() if now else '' }}" required>
-                    </div>
-                    <div>
-                        <label class="form-label"><i class="fas fa-comment"></i> Kilit Sebebi</label>
-                        <input type="text" name="reason" class="form-control"
-                               maxlength="200" placeholder="Orn: Bakim, Özel Turnuva...">
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <label class="form-label mb-0"><i class="fas fa-clock"></i> Saat Dilimleri (Birden fazla secebilirsiniz)</label>
-                    <div class="chip-group">
-                        {% set slots = ["16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00", "20:00 - 21:00", "21:00 - 22:00", "22:00 - 23:00"] %}
-                        {% for slot in slots %}
-                        <label class="chip-label">
-                            <input type="checkbox" name="time_slots" value="{{ slot }}">
-                            <span>{{ slot }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-
+                <!-- 1. SAHA -->
                 <div>
-                    <button type="submit" class="btn-purple" style="width:100%; padding: 12px; font-size: 1rem;">
-                        <i class="fas fa-lock"></i> Secilenleri Kilitle
+                    <label class="form-label"><i class="fas fa-futbol"></i> Saha <span class="multi-hint">(coklu secim)</span></label>
+                    <div class="multi-pick-list" id="pitchPicker">
+                        {% for pitch in pitches %}
+                        <div class="multi-pick-item" data-val="{{ pitch.id }}" onclick="togglePick(this,'pitch')">
+                            <i class="fas fa-futbol"></i> {{ pitch.name }}
+                            <i class="fas fa-check pick-check"></i>
+                        </div>
+                        {% endfor %}
+                        {% if not pitches %}
+                        <div style="padding:10px;color:var(--gray-400);font-size:0.85rem;">Henuz saha yok.</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 2. TARİH TAKVİM -->
+                <div>
+                    <label class="form-label"><i class="fas fa-calendar-alt"></i> Tarih <span class="multi-hint">(coklu secim)</span></label>
+                    <div class="cal-wrap">
+                        <div class="cal-nav">
+                            <button type="button" class="cal-nav-btn" id="calPrev"><i class="fas fa-chevron-left"></i></button>
+                            <span class="cal-month-label" id="calMonthLabel"></span>
+                            <button type="button" class="cal-nav-btn" id="calNext"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                        <div class="cal-grid" id="calGrid"></div>
+                        <div class="cal-selected-tags" id="calSelectedTags"></div>
+                    </div>
+                </div>
+
+                <!-- 3. SAAT -->
+                <div>
+                    <label class="form-label"><i class="fas fa-clock"></i> Saat Dilimi <span class="multi-hint">(coklu secim)</span></label>
+                    <div class="multi-pick-list" id="slotPicker">
+                        {% set slots = ['16:00 - 17:00','17:00 - 18:00','18:00 - 19:00','19:00 - 20:00','20:00 - 21:00','21:00 - 22:00','22:00 - 23:00'] %}
+                        {% for s in slots %}
+                        <div class="multi-pick-item" data-val="{{ s }}" onclick="togglePick(this,'slot')">
+                            <i class="fas fa-clock"></i> {{ s }}
+                            <i class="fas fa-check pick-check"></i>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 4. SEBEP + BUTON -->
+                <div class="block-reason-col">
+                    <label class="form-label" for="bReason">
+                        <i class="fas fa-comment"></i> Kilitleme Sebebi <span class="multi-hint">(kullaniciya gosterilir)</span>
+                    </label>
+                    <input type="text" id="bReason" name="reason" class="form-control"
+                           maxlength="200"
+                           placeholder="Orn: Bakim, Okul etkinligi, Ozel rezervasyon...">
+                    <div class="block-summary" id="blockSummary" style="display:none;">
+                        <i class="fas fa-info-circle"></i>
+                        <span id="blockSummaryText"></span>
+                    </div>
+                    <button type="button" class="btn-purple" id="blockSubmitBtn"
+                            style="width:100%;margin-top:10px;" onclick="submitBlock()">
+                        <i class="fas fa-lock"></i> Kilitle
                     </button>
                 </div>
 
@@ -646,6 +774,7 @@
         </form>
     </div>
 
+    <!-- Mevcut kilitler -->
     <div class="card" style="overflow:hidden;">
         <div class="section-head-inline">
             <i class="fas fa-lock" style="color:#7c3aed"></i>
@@ -686,10 +815,10 @@
         </div>
     </div>
 
-</div>
+</div><!-- /tab-kilitler -->
 
 <script>
-/* Tab sistemi */
+/* ── TAB SİSTEMİ ── */
 function switchTab(name, btn) {
     document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
     document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
@@ -697,60 +826,204 @@ function switchTab(name, btn) {
     btn.classList.add('active');
 }
 
-/* Rezervasyon filtresi */
+/* ── REZERVASYON FİLTRESİ ── */
 function filterRes(status, btn) {
     document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
     btn.classList.add('active');
     document.querySelectorAll('.res-card').forEach(function(card){
-        if (status === 'all' || card.dataset.status === status) {
-            card.style.display = '';
-        } else {
-            card.style.display = 'none';
-        }
+        card.style.display = (status === 'all' || card.dataset.status === status) ? '' : 'none';
     });
 }
 
-/* Oturum geri sayimi */
+/* ── OTURUM GERİ SAYIMI ── */
 (function () {
-    var TOTAL = 30 * 60;
-    var remaining = TOTAL;
+    var TOTAL = 30 * 60, remaining = TOTAL;
     var valEl  = document.getElementById('sessionTimerVal');
     var fillEl = document.getElementById('sessionProgressFill');
     var warnEl = document.getElementById('sessionWarnMsg');
-
     function tick() {
         remaining--;
         if (remaining <= 0) {
-            alert('Oturumunuzun suresi doldu. Yeniden giris yapmaniz gerekiyor.');
+            alert('Oturumunuzun suresi doldu.');
             window.location.href = '/logout';
             return;
         }
-        var m = Math.floor(remaining / 60);
-        var s = remaining % 60;
-        valEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+        var m = Math.floor(remaining / 60), s = remaining % 60;
+        valEl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
         fillEl.style.width = ((remaining / TOTAL) * 100) + '%';
-        if (remaining <= 120) {
-            fillEl.style.background = '#f87171';
-            warnEl.style.display = 'inline';
-            valEl.style.color = '#f87171';
-        } else if (remaining <= 300) {
-            fillEl.style.background = '#fbbf24';
-        }
+        if (remaining <= 120) { fillEl.style.background='#f87171'; warnEl.style.display='inline'; valEl.style.color='#f87171'; }
+        else if (remaining <= 300) { fillEl.style.background='#fbbf24'; }
         setTimeout(tick, 1000);
     }
     setTimeout(tick, 1000);
 })();
 
-/* Tarih input min = bugun */
-document.addEventListener('DOMContentLoaded', function(){
-    var bDate = document.getElementById('bDate');
-    if (bDate) {
-        var today = new Date();
-        var y = today.getFullYear();
-        var m = String(today.getMonth()+1).padStart(2,'0');
-        var d = String(today.getDate()).padStart(2,'0');
-        bDate.min = y + '-' + m + '-' + d;
+/* ═══════════════════════════════════════════════════
+   ÇOK SEÇİMLİ KİLİTLEME FORMU
+═══════════════════════════════════════════════════ */
+
+/* Seçili değerler */
+var selPitches = [];  // pitch id'leri
+var selDates   = [];  // 'YYYY-MM-DD' dizisi
+var selSlots   = [];  // saat dilimleri
+
+/* ── ÇOKLU SEÇİM (saha & saat) ── */
+function togglePick(el, type) {
+    var val = el.dataset.val;
+    var arr = type === 'pitch' ? selPitches : selSlots;
+    var idx = arr.indexOf(val);
+    if (idx === -1) { arr.push(val); el.classList.add('selected'); }
+    else            { arr.splice(idx,1); el.classList.remove('selected'); }
+    updateSummary();
+}
+
+/* ═══════════════════════════
+   TAKVİM
+═══════════════════════════ */
+var calYear, calMonth;
+var MONTHS_TR = ['Ocak','Subat','Mart','Nisan','Mayis','Haziran',
+                 'Temmuz','Agustos','Eylul','Ekim','Kasim','Aralik'];
+var DAYS_TR   = ['Pt','Sa','Ca','Pe','Cu','Ct','Pz'];
+
+function initCal() {
+    var now = new Date();
+    calYear  = now.getFullYear();
+    calMonth = now.getMonth();
+    renderCal();
+    document.getElementById('calPrev').addEventListener('click', function(){
+        calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCal();
+    });
+    document.getElementById('calNext').addEventListener('click', function(){
+        calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCal();
+    });
+}
+
+function renderCal() {
+    document.getElementById('calMonthLabel').textContent = MONTHS_TR[calMonth] + ' ' + calYear;
+    var grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+
+    /* Gün isimleri — Pazartesi başlangıç */
+    DAYS_TR.forEach(function(d){
+        var el = document.createElement('div');
+        el.className = 'cal-day-name'; el.textContent = d;
+        grid.appendChild(el);
+    });
+
+    var firstDay = new Date(calYear, calMonth, 1);
+    /* JS: 0=Pz, 1=Pt... → Pazartesi bazlı offset */
+    var startOffset = (firstDay.getDay() + 6) % 7;
+    var daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+    var today = new Date(); today.setHours(0,0,0,0);
+
+    /* Boş hücreler */
+    for (var i = 0; i < startOffset; i++) {
+        var emp = document.createElement('div');
+        emp.className = 'cal-day cal-empty'; grid.appendChild(emp);
     }
-});
+
+    for (var d = 1; d <= daysInMonth; d++) {
+        var dayEl   = document.createElement('div');
+        var dayDate = new Date(calYear, calMonth, d);
+        var dateStr = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+
+        dayEl.className = 'cal-day';
+        dayEl.textContent = d;
+        dayEl.dataset.date = dateStr;
+
+        if (dayDate < today) {
+            dayEl.classList.add('cal-disabled');
+        } else {
+            if (dayDate.toDateString() === today.toDateString()) dayEl.classList.add('cal-today');
+            if (selDates.indexOf(dateStr) !== -1) dayEl.classList.add('cal-selected');
+            dayEl.addEventListener('click', function(){ toggleDate(this); });
+        }
+        grid.appendChild(dayEl);
+    }
+    renderDateTags();
+}
+
+function toggleDate(el) {
+    var dateStr = el.dataset.date;
+    var idx = selDates.indexOf(dateStr);
+    if (idx === -1) { selDates.push(dateStr); el.classList.add('cal-selected'); }
+    else            { selDates.splice(idx,1);  el.classList.remove('cal-selected'); }
+    renderDateTags();
+    updateSummary();
+}
+
+function removeDate(dateStr) {
+    var idx = selDates.indexOf(dateStr);
+    if (idx !== -1) selDates.splice(idx, 1);
+    /* Takvimde de kaldır */
+    var cells = document.querySelectorAll('.cal-day[data-date="' + dateStr + '"]');
+    cells.forEach(function(c){ c.classList.remove('cal-selected'); });
+    renderDateTags();
+    updateSummary();
+}
+
+function renderDateTags() {
+    var container = document.getElementById('calSelectedTags');
+    container.innerHTML = '';
+    if (selDates.length === 0) {
+        var hint = document.createElement('div');
+        hint.className = 'cal-no-selection'; hint.textContent = 'Tarih secilmedi';
+        container.appendChild(hint); return;
+    }
+    /* Sırala */
+    var sorted = selDates.slice().sort();
+    sorted.forEach(function(ds){
+        var parts = ds.split('-');
+        var label = parts[2] + '.' + parts[1] + '.' + parts[0];
+        var tag = document.createElement('div');
+        tag.className = 'cal-tag';
+        tag.innerHTML = label + ' <i class="fas fa-times"></i>';
+        tag.addEventListener('click', function(){ removeDate(ds); });
+        container.appendChild(tag);
+    });
+}
+
+/* ── ÖZET GÜNCELLE ── */
+function updateSummary() {
+    var sumEl  = document.getElementById('blockSummary');
+    var sumTxt = document.getElementById('blockSummaryText');
+    var total  = selPitches.length * selDates.length * selSlots.length;
+    if (total > 0) {
+        sumEl.style.display = 'flex';
+        sumTxt.textContent = selPitches.length + ' saha x ' + selDates.length + ' tarih x ' +
+                             selSlots.length + ' saat = ' + total + ' slot kilitlenecek';
+    } else {
+        sumEl.style.display = 'none';
+    }
+}
+
+/* ── FORM GÖNDER ── */
+function submitBlock() {
+    if (selPitches.length === 0) { alert('En az 1 saha secin!'); return; }
+    if (selDates.length === 0)   { alert('En az 1 tarih secin!'); return; }
+    if (selSlots.length === 0)   { alert('En az 1 saat dilimi secin!'); return; }
+
+    var total = selPitches.length * selDates.length * selSlots.length;
+    if (!confirm(total + ' slot kilitlenecek. Devam etmek istiyor musunuz?')) return;
+
+    /* Hidden input'ları oluştur */
+    var container = document.getElementById('blockHiddenInputs');
+    container.innerHTML = '';
+
+    function addInput(name, val) {
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = name; inp.value = val;
+        container.appendChild(inp);
+    }
+
+    selPitches.forEach(function(p){ addInput('pitch_ids', p); });
+    selDates.forEach(function(d){   addInput('dates', d); });
+    selSlots.forEach(function(s){   addInput('time_slots', s); });
+
+    document.getElementById('blockForm').submit();
+}
+
+/* ── BAŞLAT ── */
+document.addEventListener('DOMContentLoaded', function(){ initCal(); });
 </script>
 {% endblock %}

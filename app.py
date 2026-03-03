@@ -187,21 +187,20 @@ def busy_slots():
     try:
         date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
     except Exception:
-        return jsonify({'busy': {}, 'blocked': {}})
+        return jsonify({'busy': [], 'blocked': {}})
 
-    # Rezervasyon dolu slotlar (Durumu ile birlikte: 'Pending' veya 'Approved')
-    busy_records = Reservation.query.filter_by(
+    # Rezervasyon dolu slotlar
+    busy = Reservation.query.filter_by(
         pitch_id=pitch_id, date=date_obj
-    ).filter(Reservation.status.in_(['Pending', 'Approved'])).all()
-    
-    # Artık liste değil, { '20:00 - 21:00': 'Pending', '21:00 - 22:00': 'Approved' } şeklinde dönecek
-    busy_dict = {r.time_slot: r.status for r in busy_records}
+    ).filter(Reservation.status.in_(['Pending', 'Approved'])
+    ).with_entities(Reservation.time_slot).all()
+    busy_list = [r.time_slot for r in busy]
 
     # Manuel kilitli slotlar (sebep mesajıyla birlikte)
     blocked = BlockedSlot.query.filter_by(pitch_id=pitch_id, date=date_obj).all()
     blocked_dict = {b.time_slot: b.reason for b in blocked}
 
-    return jsonify({'busy': busy_dict, 'blocked': blocked_dict})
+    return jsonify({'busy': busy_list, 'blocked': blocked_dict})
 
 
 @app.route('/reserve', methods=['POST'])
@@ -320,50 +319,41 @@ def admin_dashboard():
 @app.route('/admin/block_slot', methods=['POST'])
 @login_required
 def block_slot():
-    # Çoklu seçimleri yakalamak için getlist() kullanıyoruz
     pitch_ids  = request.form.getlist('pitch_ids')
-    date_str   = request.form.get('date')
+    dates      = request.form.getlist('dates')
     time_slots = request.form.getlist('time_slots')
-    reason     = request.form.get('reason', 'Bahar Şenlikleri Sebebiyle Kilitlidir').strip()[:200]
+    reason     = request.form.get('reason', 'Bakim / Rezerve').strip()[:200]
 
-    if not pitch_ids or not date_str or not time_slots:
-        flash('Lütfen saha, tarih ve en az bir saat dilimi seçin!', 'danger')
+    if not pitch_ids or not dates or not time_slots:
+        flash('Saha, tarih ve saat dilimi secmelisiniz!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
-    try:
-        date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
-    except ValueError:
-        flash('Gecersiz tarih!', 'danger')
-        return redirect(url_for('admin_dashboard'))
-
-    added_count = 0
-    skipped_count = 0
-
-    # Seçilen her bir saha ve her bir saat dilimi için döngü oluşturuyoruz
-    for p_id in pitch_ids:
-        for t_slot in time_slots:
-            # Bu saha ve saat zaten kilitli mi diye kontrol et
-            existing = BlockedSlot.query.filter_by(
-                pitch_id=p_id, date=date_obj, time_slot=t_slot
-            ).first()
-
-            if not existing:
+    added = 0
+    skipped = 0
+    for pitch_id in pitch_ids:
+        for date_str in dates:
+            try:
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                continue
+            for time_slot in time_slots:
+                existing = BlockedSlot.query.filter_by(
+                    pitch_id=pitch_id, date=date_obj, time_slot=time_slot
+                ).first()
+                if existing:
+                    skipped += 1
+                    continue
                 db.session.add(BlockedSlot(
-                    pitch_id=p_id, date=date_obj,
-                    time_slot=t_slot, reason=reason
+                    pitch_id=pitch_id, date=date_obj,
+                    time_slot=time_slot, reason=reason
                 ))
-                added_count += 1
-            else:
-                skipped_count += 1
+                added += 1
 
     db.session.commit()
-
-    # Kullanıcıya akıllı bir bildirim mesajı göster
-    msg = f'{date_obj.strftime("%d.%m.%Y")} tarihi için {added_count} adet slot başarıyla kilitlendi.'
-    if skipped_count > 0:
-        msg += f' ({skipped_count} slot zaten kilitli olduğu için atlandı.)'
-
-    flash(msg, 'success' if added_count > 0 else 'warning')
+    msg = f'{added} slot basariyla kilitlendi.'
+    if skipped > 0:
+        msg += f' ({skipped} slot zaten kilitliydi, atlandi.)'
+    flash(msg, 'success' if added > 0 else 'warning')
     return redirect(url_for('admin_dashboard'))
 
 
