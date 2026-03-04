@@ -68,32 +68,35 @@
             border-bottom: 2px solid var(--mint-mid);
             box-shadow: var(--sh-xs);
             position: sticky; top: 0; z-index: 900;
+            padding: 5px 0; /* Logoya yer açmak için biraz padding */
         }
         .nav-inner {
             display: flex; align-items: center;
-            height: 62px; gap: 13px;
+            justify-content: space-between; /* İki uca yasla */
+            height: 70px; /* Navbar yüksekliğini artırdık */
         }
+        
+        /* Tıklanabilir Logo ve Başlık Linki */
+        .nav-home-link {
+            display: flex; align-items: center; gap: 15px;
+            text-decoration: none; color: inherit;
+            transition: opacity 0.2s;
+        }
+        .nav-home-link:hover { opacity: 0.85; }
+
         .nav-logo {
-            width: 38px; height: 38px; border-radius: 10px;
-            background: var(--teal-pale); border: 2px solid var(--mint-mid);
+            /* LOGO BOYUTU GÜNCELLENDİ: 60px */
+            width: 60px; height: 60px; 
+            border-radius: 500px;
+            /* Arka planı kaldırdık, şeffaf olsun */
             display: flex; align-items: center; justify-content: center;
             flex-shrink: 0; overflow: hidden;
         }
-        .nav-logo img { width:100%; height:100%; object-fit:cover; border-radius:8px; }
-        .nav-logo-fb  { display:none; align-items:center; justify-content:center; width:100%; height:100%; }
-        .nav-logo-fb i { color: var(--teal); font-size: 1rem; }
-        .nav-brand      { flex: 1; }
-        .nav-brand-name { font-size: 0.97rem; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; line-height: 1.25; }
-        .nav-brand-sub  { font-size: 0.71rem; font-weight: 400; color: var(--gray-400); margin-top: 1px; }
-        .nav-secure {
-            display: flex; align-items: center; gap: 5px;
-            background: var(--teal-glass);
-            border: 1.5px solid rgba(14,168,116,0.28);
-            border-radius: 20px; padding: 5px 13px;
-            font-size: 0.7rem; font-weight: 700;
-            color: var(--teal-dk); letter-spacing: 0.04em;
-        }
-        .nav-secure i { font-size: 0.63rem; }
+        .nav-logo img { width:100%; height:100%; object-fit:contain; }
+        .nav-logo-fb  { display:none; align-items:center; justify-content:center; width:100%; height:100%; font-size: 1.5rem; color: var(--teal); }
+        
+        .nav-brand-name { font-size: 1.1rem; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; line-height: 1.2; }
+        .nav-brand-sub  { font-size: 0.8rem; font-weight: 500; color: var(--gray-600); margin-top: 2px; }
 
         /* ── MAIN ── */
         main.site-main { flex: 1; padding: 36px 0 72px; }
@@ -200,17 +203,20 @@
 <nav class="site-nav">
     <div class="container" style="max-width:740px;">
         <div class="nav-inner">
-            <div class="nav-logo">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo"
-                     onerror="this.style.display='none'; this.parentElement.querySelector('.nav-logo-fb').style.display='flex';">
-                <div class="nav-logo-fb"><i class="fas fa-futbol"></i></div>
+            
+            <a href="/" class="nav-home-link" title="Ana Sayfaya Dön">
+                <div class="nav-logo">
+                    <img src="{{ url_for('static', filename='uploads/receipts/site_logo.png') }}" alt="Logo"
+                         onerror="this.style.display='none'; this.parentElement.querySelector('.nav-logo-fb').style.display='flex';">
+                    <div class="nav-logo-fb"><i class="fas fa-futbol"></i></div>
+                </div>
+                <div class="nav-brand">
+                    <div class="nav-brand-name">AYBÜ Halı Saha</div>
+                    <div class="nav-brand-sub">Rezervasyon Sistemi</div>
+                </div>
+            </a>
+
             </div>
-            <div class="nav-brand">
-                <div class="nav-brand-name">AYBÜ Halı Saha</div>
-                <div class="nav-brand-sub">Rezervasyon Sistemi</div>
-            </div>
-            <div class="nav-secure"><i class="fas fa-shield-alt"></i> Güvenli</div>
-        </div>
     </div>
 </nav>
 

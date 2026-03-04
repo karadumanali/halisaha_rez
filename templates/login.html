@@ -121,7 +121,7 @@ input:-webkit-autofill, input:-webkit-autofill:focus {
             <div>Çok fazla başarısız deneme. <span class="lcd" id="lcdNum">30</span> saniye bekleyin.</div>
         </div>
 
-        <div class="attempt-bar" id="attemptBar" role="alert" aria-live="polite">
+        <!-- <div class="attempt-bar" id="attemptBar" role="alert" aria-live="polite">
             <i class="fas fa-exclamation-triangle"></i>
             <span>Başarısız denemeler:</span>
             <div class="dots" aria-hidden="true">
@@ -129,7 +129,7 @@ input:-webkit-autofill, input:-webkit-autofill:focus {
                 <div class="dot" id="d3"></div><div class="dot" id="d4"></div>
                 <div class="dot" id="d5"></div>
             </div>
-        </div>
+        </div> -->
 
         <form id="loginForm" action="/login" method="POST" autocomplete="off" novalidate>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
