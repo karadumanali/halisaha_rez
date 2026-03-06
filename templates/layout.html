@@ -187,6 +187,9 @@
         /* ── INPUT GROUP ── */
         .input-group-text { background:var(--gray-100); border:1.5px solid var(--gray-300); color:var(--gray-600); font-size:0.85rem; }
 
+        /* ── CONTAINER ── */
+        .site-container { max-width: 740px; }
+
         /* ── FOOTER ── */
         .site-footer { background:var(--white); border-top:2px solid var(--mint-mid); padding:15px 0; }
         .footer-inner {
@@ -201,7 +204,7 @@
 <body>
 
 <nav class="site-nav">
-    <div class="container" style="max-width:740px;">
+    <div class="container site-container">
         <div class="nav-inner">
             
             <a href="/" class="nav-home-link" title="Ana Sayfaya Dön">
@@ -221,7 +224,7 @@
 </nav>
 
 <main class="site-main">
-    <div class="container" style="max-width:740px;">
+    <div class="container site-container">
         <div class="flash-wrap">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -243,7 +246,7 @@
 </main>
 
 <footer class="site-footer">
-    <div class="container" style="max-width:740px;">
+    <div class="container site-container">
         <div class="footer-inner">
             <span>&copy; 2026 AYBÜ Spor &amp; Kültür</span>
             <span class="footer-dot">·</span>
