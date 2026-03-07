@@ -481,6 +481,41 @@ def anti_cache(response):
         response.headers["Expires"] = "0"
     return response
 
+@app.after_request
+def anti_cache(response):
+    if response.status_code == 200 and response.content_type and \
+       response.content_type.startswith('text/html'):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"]  = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+# ================= BURADAN İTİBAREN KOPYALA =================
+from werkzeug.security import generate_password_hash
+
+with app.app_context():
+    # 1. Eski verilere ve tablolara ASLA dokunmaz, sadece eksik olanları sıfırdan oluşturur.
+    db.create_all()
+    print("✅ Veritabani tablolari kontrol edildi (Eksikler olusturuldu).")
+
+    # 2. 'yonetici' adinda bir admin var mi diye kontrol eder.
+    admin_var_mi = Admin.query.filter_by(username='yonetici').first()
+    
+    # Eger yoksa (yani veritabani bombossa) ilk admini olusturur.
+    if not admin_var_mi:
+        hashed_password = generate_password_hash("halisaha123", method='pbkdf2:sha256')
+        yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
+        db.session.add(yeni_admin)
+        db.session.commit()
+        print("👑 Ilk yonetici hesabi basariyla eklendi!")
+    else:
+        print("⚡ Yonetici zaten mevcut, yeni admin olusturulmadi.")
+# ================= BURAYA KADAR KOPYALA =================
+
+if __name__ == '__main__':
+    is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
+    app.run(debug=is_debug)
+
 
 if __name__ == '__main__':
     is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
