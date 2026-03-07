@@ -397,15 +397,7 @@ input[type="date"].form-control {
                 <input type="hidden" name="date"       id="hDate">
                 <input type="hidden" name="time_slot"  id="hSlot">
 
-                <div class="iban-box">
-                    <div class="iban-label">Ödeme IBAN</div>
-                    <div class="iban-val">TR33 0006 1005 1978 6457 8413 26</div>
-                </div>
-                <div class="iban-notice">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span><strong>Önemli:</strong> Ödemeyi yukarıdaki IBAN'a yaptıktan sonra dekontunuzu PDF veya resim olarak yükleyin.</span>
-                </div>
-
+                <!-- ── 1. Kişi Bilgileri ── -->
                 <div class="section-head"><i class="fas fa-user"></i> Kişi Bilgileri</div>
 
                 <div class="mb-3">
@@ -429,6 +421,17 @@ input[type="date"].form-control {
                     <div class="form-text">Rezervasyon onayı bu adrese gönderilecektir.</div>
                 </div>
 
+                <!-- ── 2. Ödeme IBAN ── -->
+                <div class="iban-box">
+                    <div class="iban-label">Ödeme IBAN</div>
+                    <div class="iban-val">TR33 0006 1005 1978 6457 8413 26</div>
+                </div>
+                <div class="iban-notice">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span><strong>Önemli:</strong> Ödemeyi yukarıdaki IBAN'a yaptıktan sonra dekontunuzu PDF veya resim olarak yükleyin.</span>
+                </div>
+
+                <!-- ── 3. Dekont Yükleme ── -->
                 <div class="section-head"><i class="fas fa-upload"></i> Dekont Yükleme</div>
 
                 <div class="upload-zone" id="uploadZone">
