@@ -9,8 +9,8 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 if hasattr(os, 'add_dll_directory'):
     os.add_dll_directory(base_dir)
 
-os.environ['PATH']  = base_dir + os.pathsep + os.environ['PATH']
-os.environ['MAGIC'] = os.path.join(base_dir, 'magic.mgc')
+os.environ['PATH'] = base_dir + os.pathsep + os.environ['PATH']
+# python-magic artık kullanılmıyor — saf Python ile MIME tespiti yapılıyor
 
 import logging
 import requests as http_requests
@@ -30,7 +30,6 @@ from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from apscheduler.schedulers.background import BackgroundScheduler
-import magic
 
 # .env yükle
 dotenv_path = os.path.join(base_dir, '.env')
@@ -61,15 +60,14 @@ if os.getenv('FLASK_ENV') == 'production':
     app.config['DEBUG']   = False
     app.config['TESTING'] = False
 
-UPLOAD_FOLDER       = 'uploads/receipts'   # static/ DIŞINDA — doğrudan URL ile erişilemez
-PITCH_IMAGES_FOLDER = 'static/uploads/pitches'
+UPLOAD_FOLDER       = os.path.join(base_dir, 'static', 'uploads', 'receipts')
+PITCH_IMAGES_FOLDER = os.path.join(base_dir, 'static', 'uploads', 'pitches')
 app.config['UPLOAD_FOLDER']       = UPLOAD_FOLDER
 app.config['PITCH_IMAGES_FOLDER'] = PITCH_IMAGES_FOLDER
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
 for folder in [UPLOAD_FOLDER, PITCH_IMAGES_FOLDER]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+    os.makedirs(folder, exist_ok=True)
 
 db.init_app(app)
 csrf = CSRFProtect(app)
@@ -174,9 +172,9 @@ RECAPTCHA_MIN_SCORE = 0.5   # 0.0 (bot) — 1.0 (insan), 0.5 güvenli eşik
 
 def verify_recaptcha(token, action='submit'):
     """Google reCAPTCHA v3 token doğrular.
-    SECRET_KEY yoksa (geliştirme ortamı) doğrulamayı atla."""
+    SECRET_KEY yoksa (geliştirme ortamı) doğrulamayı tamamen atla."""
     if not RECAPTCHA_SECRET:
-        return True   # Lokalde .env'de key yoksa engelleme
+        return True   # Lokalde key yoksa her zaman geç
     if not token:
         return False
     try:
@@ -196,6 +194,23 @@ def verify_recaptcha(token, action='submit'):
         return True   # Servis erişilemezse kullanıcıyı engelleme
 
 
+# ─── MIME TESPİTİ (saf Python — DLL/libmagic gerektirmez) ────────
+
+# Dosya imzaları (magic bytes) — Windows ve Linux'ta çalışır
+_MAGIC_BYTES = {
+    b'\xff\xd8\xff':          'image/jpeg',
+    b'\x89PNG\r\n\x1a\n':    'image/png',
+    b'%PDF':                  'application/pdf',
+}
+
+def detect_mime(file_bytes: bytes) -> str:
+    """İlk baytlara bakarak MIME tipini döner. Tanınamazsa '' döner."""
+    for sig, mime in _MAGIC_BYTES.items():
+        if file_bytes.startswith(sig):
+            return mime
+    return ''
+
+
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────
 
 def allowed_file(filename):
@@ -203,17 +218,24 @@ def allowed_file(filename):
 
 
 def save_secure_receipt(file):
-    if not file:
+    if not file or not file.filename:
         return None
-    file_content = file.read(2048); file.seek(0)
-    mime_type = magic.from_buffer(file_content, mime=True)
+    file_content = file.read(2048)
+    file.seek(0)
+    mime_type = detect_mime(file_content)
+    if not mime_type:
+        logger.warning("MIME tespit edilemedi, uzantıya göre devam ediliyor.")
+        ext_guess = secure_filename(file.filename).rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        mime_map  = {'pdf': 'application/pdf', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png'}
+        mime_type = mime_map.get(ext_guess, '')
+
     ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png'}
-    ALLOWED_PDF = {'application/pdf'}
+    ALLOWED_PDF         = {'application/pdf'}
     if mime_type not in (ALLOWED_IMAGE_TYPES | ALLOWED_PDF) or not allowed_file(file.filename):
         return None
-    ext = secure_filename(file.filename).rsplit('.', 1)[1].lower()
+    ext           = secure_filename(file.filename).rsplit('.', 1)[1].lower()
     safe_filename = f"{uuid.uuid4().hex}.{ext}"
-    save_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_filename)
+    save_path     = os.path.join(app.config['UPLOAD_FOLDER'], safe_filename)
     if mime_type in ALLOWED_IMAGE_TYPES:
         try:
             with Image.open(file) as img:
@@ -223,18 +245,24 @@ def save_secure_receipt(file):
                     img = img.convert("RGB")
                 img.thumbnail((1920, 1920))
                 img.save(save_path, optimize=True, quality=85)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Resim işleme hatası: {e}")
             return None
     elif mime_type in ALLOWED_PDF:
-        file.save(save_path)
+        try:
+            file.save(save_path)
+        except Exception as e:
+            logger.warning(f"PDF kaydetme hatası: {e}")
+            return None
     return safe_filename
 
 
 def save_secure_pitch_image(file):
     if not file:
         return None
-    file_content = file.read(2048); file.seek(0)
-    mime_type = magic.from_buffer(file_content, mime=True)
+    file_content = file.read(2048)
+    file.seek(0)
+    mime_type = detect_mime(file_content)
     ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png'}
     if mime_type not in ALLOWED_IMAGE_TYPES or not allowed_file(file.filename):
         return None
@@ -614,8 +642,9 @@ def update_logo():
     if not logo_file:
         flash('Lutfen bir resim secin.', 'danger')
         return redirect(url_for('admin_dashboard'))
-    file_content = logo_file.read(2048); logo_file.seek(0)
-    mime_type = magic.from_buffer(file_content, mime=True)
+    file_content = logo_file.read(2048)
+    logo_file.seek(0)
+    mime_type = detect_mime(file_content)
     if mime_type not in {'image/jpeg', 'image/png'} or not allowed_file(logo_file.filename):
         flash('Gecersiz dosya!', 'danger')
         return redirect(url_for('admin_dashboard'))
@@ -639,7 +668,6 @@ def update_logo():
 @app.route('/admin/receipt/<filename>')
 @login_required
 def view_receipt(filename):
-    # Path traversal koruması: sadece dosya adı, dizin geçişi yok
     safe_name = os.path.basename(filename)
     return send_from_directory(app.config['UPLOAD_FOLDER'], safe_name)
 
@@ -701,4 +729,4 @@ if __name__ == '__main__':
     is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
     if os.getenv('FLASK_ENV') == 'production':
         is_debug = False
-    app.run(debug=is_debug)
+    app.run(debug=is_debug, use_reloader=True)
