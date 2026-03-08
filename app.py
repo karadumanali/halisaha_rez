@@ -254,6 +254,13 @@ def send_customer_approval_email(customer_email, customer_name, pitch_name, date
         print(f"Mail hatasi: {e}")
 
 
+# ─── SABİTLER ────────────────────────────────────────────────────
+
+VALID_SLOTS = [
+    '16:00 - 17:00', '17:00 - 18:00', '18:00 - 19:00',
+    '19:00 - 20:00', '20:00 - 21:00', '21:00 - 22:00', '22:00 - 23:00'
+]
+
 # ─── ROTALAR ─────────────────────────────────────────────────────
 
 @app.route('/')
@@ -265,8 +272,11 @@ def index():
 
 @app.route('/busy_slots')
 def busy_slots():
-    pitch_id = request.args.get('pitch_id')
-    date_str  = request.args.get('date')
+    date_str = request.args.get('date')
+    try:
+        pitch_id = int(request.args.get('pitch_id', 0))
+    except (ValueError, TypeError):
+        return jsonify({'busy': {}, 'blocked': {}})
     try:
         date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
     except Exception:
@@ -289,7 +299,24 @@ def reserve():
     pitch_id      = request.form.get('pitch_id')
     date_str      = request.form.get('date')
     time_slot     = request.form.get('time_slot')
-    customer_name = request.form.get('customer_name')
+    customer_name = request.form.get('customer_name', '').strip()
+
+    # ── Saat dilimi whitelist kontrolü ──
+    if time_slot not in VALID_SLOTS:
+        flash('Gecersiz saat dilimi!', 'danger')
+        return redirect(url_for('index'))
+
+    # ── pitch_id integer kontrolü ──
+    try:
+        pitch_id = int(pitch_id)
+    except (ValueError, TypeError):
+        flash('Gecersiz saha!', 'danger')
+        return redirect(url_for('index'))
+
+    # ── customer_name uzunluk kontrolü ──
+    if not customer_name or len(customer_name) < 2 or len(customer_name) > 100:
+        flash('Gecersiz isim! En az 2, en fazla 100 karakter olmalıdır.', 'danger')
+        return redirect(url_for('index'))
 
     raw_phone   = request.form.get('customer_phone', '')
     clean_phone = raw_phone.replace(" ", "")
