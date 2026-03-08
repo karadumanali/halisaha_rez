@@ -29,15 +29,16 @@ import magic
 dotenv_path = os.path.join(base_dir, '.env')
 load_dotenv(dotenv_path)
 
-print("=" * 50)
-print("TEST - SECRET_KEY:", "BULUNDU" if os.getenv('SECRET_KEY') else "BULUNAMADI!")
-print("=" * 50)
-
 app = Flask(__name__)
 
-_secret = os.getenv('SECRET_KEY') or 'GECICI-DEV-KEY-CANLI-ORTAMDA-DEGISTIR-99887766'
-if not os.getenv('SECRET_KEY'):
-    print("UYARI: SECRET_KEY bulunamadi, gecici anahtar kullaniliyor!")
+# ── GÜVENLİK: SECRET_KEY zorunludur, fallback/hardcoded değer YOK ──
+_secret = os.getenv('SECRET_KEY')
+if not _secret:
+    raise RuntimeError(
+        "SECRET_KEY ortam değişkeni ZORUNLUDUR! "
+        ".env dosyanızı kontrol edin. "
+        "Üretmek için: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 
 app.config['SECRET_KEY']                     = _secret
 app.config['SQLALCHEMY_DATABASE_URI']        = os.getenv('DATABASE_URL')
@@ -46,6 +47,11 @@ app.config['SESSION_PERMANENT']              = False
 app.config['SESSION_COOKIE_HTTPONLY']        = True
 app.config['SESSION_COOKIE_SAMESITE']        = 'Lax'
 app.config['MAX_CONTENT_LENGTH']             = 5 * 1024 * 1024
+
+# ── GÜVENLİK: Production ortamında DEBUG kesinlikle False ──
+if os.getenv('FLASK_ENV') == 'production':
+    app.config['DEBUG']   = False
+    app.config['TESTING'] = False
 
 UPLOAD_FOLDER       = 'static/uploads/receipts'
 PITCH_IMAGES_FOLDER = 'static/uploads/pitches'
@@ -189,13 +195,11 @@ def busy_slots():
     except Exception:
         return jsonify({'busy': {}, 'blocked': {}})
 
-    # { 'slot': 'Pending' veya 'Approved' } şeklinde döner
     busy_records = Reservation.query.filter_by(
         pitch_id=pitch_id, date=date_obj
     ).filter(Reservation.status.in_(['Pending', 'Approved'])).all()
     busy_dict = {r.time_slot: r.status for r in busy_records}
 
-    # Manuel kilitli slotlar: { 'slot': 'sebep mesaji' }
     blocked = BlockedSlot.query.filter_by(pitch_id=pitch_id, date=date_obj).all()
     blocked_dict = {b.time_slot: b.reason for b in blocked}
 
@@ -237,7 +241,6 @@ def reserve():
         flash('Gecersiz tarih veya saat!', 'danger')
         return redirect(url_for('index'))
 
-    # Manuel kilitli mi?
     blocked = BlockedSlot.query.filter_by(
         pitch_id=pitch_id, date=date_obj, time_slot=time_slot
     ).first()
@@ -245,7 +248,6 @@ def reserve():
         flash(f'Bu saat dilimi kilitli: {blocked.reason}', 'danger')
         return redirect(url_for('index'))
 
-    # Rezervasyon çakışması?
     existing = Reservation.query.filter_by(
         pitch_id=pitch_id, date=date_obj, time_slot=time_slot
     ).filter(Reservation.status.in_(['Pending', 'Approved'])).first()
@@ -430,7 +432,7 @@ def change_status(res_id, action):
     return redirect(url_for('admin_dashboard'))
 
 
-# ─── GÖRSEl ROUTE'LAR ────────────────────────────────────────────
+# ─── GÖRSEL ROUTE'LAR ────────────────────────────────────────────
 
 @app.route('/admin/pitch/<int:pitch_id>/add_image', methods=['POST'])
 @login_required
@@ -481,28 +483,14 @@ def anti_cache(response):
         response.headers["Expires"] = "0"
     return response
 
-@app.after_request
-def anti_cache(response):
-    if response.status_code == 200 and response.content_type and \
-       response.content_type.startswith('text/html'):
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-        response.headers["Pragma"]  = "no-cache"
-        response.headers["Expires"] = "0"
-    return response
-
-# ================= BURADAN İTİBAREN KOPYALA =================
-from werkzeug.security import generate_password_hash
 
 with app.app_context():
-    # 1. Eski verilere ve tablolara ASLA dokunmaz, sadece eksik olanları sıfırdan oluşturur.
     db.create_all()
     print("✅ Veritabani tablolari kontrol edildi (Eksikler olusturuldu).")
 
-    # 2. 'yonetici' adinda bir admin var mi diye kontrol eder.
     admin_var_mi = Admin.query.filter_by(username='yonetici').first()
-    
-    # Eger yoksa (yani veritabani bombossa) ilk admini olusturur.
     if not admin_var_mi:
+        from werkzeug.security import generate_password_hash
         hashed_password = generate_password_hash("halisaha123", method='pbkdf2:sha256')
         yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
         db.session.add(yeni_admin)
@@ -510,13 +498,11 @@ with app.app_context():
         print("👑 Ilk yonetici hesabi basariyla eklendi!")
     else:
         print("⚡ Yonetici zaten mevcut, yeni admin olusturulmadi.")
-# ================= BURAYA KADAR KOPYALA =================
-
-if __name__ == '__main__':
-    is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
-    app.run(debug=is_debug)
 
 
 if __name__ == '__main__':
+    # Production'da debug kesinlikle False — .env'den FLASK_DEBUG okumayız
     is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
+    if os.getenv('FLASK_ENV') == 'production':
+        is_debug = False
     app.run(debug=is_debug)
