@@ -2,6 +2,7 @@ import os
 import smtplib
 from email.message import EmailMessage
 from PIL import Image
+from urllib.parse import urlparse
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -13,7 +14,6 @@ os.environ['MAGIC'] = os.path.join(base_dir, 'magic.mgc')
 
 import uuid
 import re
-import random
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from werkzeug.utils import secure_filename
@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from apscheduler.schedulers.background import BackgroundScheduler
 import magic
 
 # .env yükle
@@ -87,6 +88,33 @@ def load_user(user_id):
     return Admin.query.get(int(user_id))
 
 
+# ─── AYLIK OTOMATİK TEMİZLİK (APScheduler) ───────────────────────
+
+def monthly_cleanup():
+    """Her ayın 1'inde gece 03:00'te çalışır.
+    1 aydan eski LoginAttempt kayıtlarını siler."""
+    with app.app_context():
+        cutoff = datetime.utcnow() - timedelta(days=30)
+        deleted = LoginAttempt.query.filter(
+            LoginAttempt.attempted_at < cutoff
+        ).delete()
+        db.session.commit()
+        print(f"[Scheduler] Aylık temizlik tamamlandı — {deleted} eski kayıt silindi. ({datetime.utcnow().isoformat()})")
+
+
+scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
+scheduler.add_job(
+    monthly_cleanup,
+    trigger='cron',
+    day=1,        # Her ayın 1'i
+    hour=3,       # Gece 03:00
+    minute=0,
+    id='monthly_login_cleanup',
+    replace_existing=True
+)
+scheduler.start()
+
+
 # ─── BRUTE-FORCE KORUMA ────────────────────────────────────────────
 
 LOCKOUT_ATTEMPTS = 5   # Bu kadar başarısız denemeden sonra kilitle
@@ -104,9 +132,9 @@ def is_account_locked(username, ip):
     ).count()
 
     fails_by_ip = LoginAttempt.query.filter(
-        LoginAttempt.ip_address  == ip,
-        LoginAttempt.attempted_at > cutoff,
-        LoginAttempt.success     == False   # noqa: E712
+        LoginAttempt.ip_address   == ip,
+        LoginAttempt.attempted_at  > cutoff,
+        LoginAttempt.success      == False   # noqa: E712
     ).count()
 
     return fails_by_username >= LOCKOUT_ATTEMPTS or fails_by_ip >= LOCKOUT_ATTEMPTS
@@ -123,11 +151,17 @@ def record_attempt(username, ip, success):
     db.session.commit()
 
 
-def cleanup_old_attempts():
-    """1 saatten eski denemeleri temizle (DB şişmemesi için)."""
-    cutoff = datetime.utcnow() - timedelta(hours=1)
-    LoginAttempt.query.filter(LoginAttempt.attempted_at < cutoff).delete()
-    db.session.commit()
+# ─── GÜVENLİ YÖNLENDİRME ─────────────────────────────────────────
+
+def safe_redirect(next_url, fallback):
+    """Open Redirect koruması: sadece relative path kabul et.
+    //evil.com gibi şemesiz harici URL'leri reddeder."""
+    if next_url:
+        parsed = urlparse(next_url)
+        # netloc veya scheme varsa dışarıya açılan bir URL demektir → reddet
+        if not parsed.netloc and not parsed.scheme and next_url.startswith('/'):
+            return redirect(next_url)
+    return redirect(fallback)
 
 
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────
@@ -319,7 +353,7 @@ def reserve():
 
 
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("3 per minute, 10 per hour, 20 per day")  # Sıkılaştırıldı
+@limiter.limit("3 per minute, 10 per hour, 20 per day")
 def admin_login():
     if current_user.is_authenticated:
         return redirect(url_for('admin_dashboard'))
@@ -328,13 +362,6 @@ def admin_login():
         username   = request.form.get('username', '').strip()
         password   = request.form.get('password', '')
         ip_address = request.remote_addr
-
-        # Periyodik temizlik: her istekte %10 olasılıkla eski kayıtları sil
-        if random.random() < 0.1:
-            try:
-                cleanup_old_attempts()
-            except Exception:
-                pass
 
         # ── DB tabanlı brute-force kontrolü (curl ile atlatılamaz) ──
         if is_account_locked(username, ip_address):
@@ -349,10 +376,8 @@ def admin_login():
             record_attempt(username, ip_address, success=True)
             login_user(admin, remember=False)
             flash('Yonetici paneline hos geldiniz.', 'success')
-            next_page = request.args.get('next')
-            if next_page and next_page.startswith('/'):
-                return redirect(next_page)
-            return redirect(url_for('admin_dashboard'))
+            # ── GÜVENLİ YÖNLENDİRME: Open Redirect koruması ──
+            return safe_redirect(request.args.get('next'), url_for('admin_dashboard'))
         else:
             record_attempt(username, ip_address, success=False)
             flash('Kullanici adi veya sifre hatali!', 'danger')
