@@ -48,6 +48,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SESSION_PERMANENT']              = False
 app.config['SESSION_COOKIE_HTTPONLY']        = True
 app.config['SESSION_COOKIE_SAMESITE']        = 'Lax'
+app.config['SESSION_COOKIE_SECURE']          = os.getenv('FLASK_ENV') == 'production'  # Prod: HTTPS zorunlu, local: HTTP çalışır
 app.config['MAX_CONTENT_LENGTH']             = 5 * 1024 * 1024
 
 # ── GÜVENLİK: Production ortamında DEBUG kesinlikle False ──
@@ -106,8 +107,8 @@ scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
 scheduler.add_job(
     monthly_cleanup,
     trigger='cron',
-    day=1,        # Her ayın 1'i
-    hour=3,       # Gece 03:00
+    day=1,
+    hour=3,
     minute=0,
     id='monthly_login_cleanup',
     replace_existing=True
@@ -117,12 +118,11 @@ scheduler.start()
 
 # ─── BRUTE-FORCE KORUMA ────────────────────────────────────────────
 
-LOCKOUT_ATTEMPTS = 5   # Bu kadar başarısız denemeden sonra kilitle
-LOCKOUT_MINUTES  = 15  # Bu kadar dakika kilitli kal
+LOCKOUT_ATTEMPTS = 5
+LOCKOUT_MINUTES  = 15
 
 
 def is_account_locked(username, ip):
-    """Kullanıcı adı VEYA IP bazında kilitlenme kontrolü."""
     cutoff = datetime.utcnow() - timedelta(minutes=LOCKOUT_MINUTES)
 
     fails_by_username = LoginAttempt.query.filter(
@@ -141,7 +141,6 @@ def is_account_locked(username, ip):
 
 
 def record_attempt(username, ip, success):
-    """Giriş denemesini veritabanına kaydet."""
     db.session.add(LoginAttempt(
         ip_address=ip,
         username=username,
@@ -154,11 +153,9 @@ def record_attempt(username, ip, success):
 # ─── GÜVENLİ YÖNLENDİRME ─────────────────────────────────────────
 
 def safe_redirect(next_url, fallback):
-    """Open Redirect koruması: sadece relative path kabul et.
-    //evil.com gibi şemesiz harici URL'leri reddeder."""
+    """Open Redirect koruması: sadece relative path kabul et."""
     if next_url:
         parsed = urlparse(next_url)
-        # netloc veya scheme varsa dışarıya açılan bir URL demektir → reddet
         if not parsed.netloc and not parsed.scheme and next_url.startswith('/'):
             return redirect(next_url)
     return redirect(fallback)
@@ -223,15 +220,15 @@ def save_secure_pitch_image(file):
 
 
 def send_admin_notification(customer_name, date, time_slot):
-    sender_email = os.getenv('MAIL_USERNAME')
+    sender_email    = os.getenv('MAIL_USERNAME')
     sender_password = os.getenv('MAIL_PASSWORD')
-    admin_email = os.getenv('ADMIN_EMAIL')
+    admin_email     = os.getenv('ADMIN_EMAIL')
     if not sender_email or not sender_password:
         return
     msg = EmailMessage()
     msg['Subject'] = 'Yeni Rezervasyon Talebi!'
-    msg['From'] = sender_email
-    msg['To'] = admin_email
+    msg['From']    = sender_email
+    msg['To']      = admin_email
     msg.set_content(f"Yeni rezervasyon:\n{customer_name}\n{date}\n{time_slot}")
     try:
         with smtplib.SMTP('smtp.gmail.com', 587) as s:
@@ -241,14 +238,14 @@ def send_admin_notification(customer_name, date, time_slot):
 
 
 def send_customer_approval_email(customer_email, customer_name, pitch_name, date, time_slot):
-    sender_email = os.getenv('MAIL_USERNAME')
+    sender_email    = os.getenv('MAIL_USERNAME')
     sender_password = os.getenv('MAIL_PASSWORD')
     if not sender_email or not sender_password:
         return
     msg = EmailMessage()
     msg['Subject'] = 'Rezervasyonunuz Onaylandi!'
-    msg['From'] = sender_email
-    msg['To'] = customer_email
+    msg['From']    = sender_email
+    msg['To']      = customer_email
     msg.set_content(f"Merhaba {customer_name},\n\nRezervasyon onaylandi.\nSaha: {pitch_name}\nTarih: {date.strftime('%d.%m.%Y')}\nSaat: {time_slot}")
     try:
         with smtplib.SMTP('smtp.gmail.com', 587) as s:
@@ -280,7 +277,7 @@ def busy_slots():
     ).filter(Reservation.status.in_(['Pending', 'Approved'])).all()
     busy_dict = {r.time_slot: r.status for r in busy_records}
 
-    blocked = BlockedSlot.query.filter_by(pitch_id=pitch_id, date=date_obj).all()
+    blocked      = BlockedSlot.query.filter_by(pitch_id=pitch_id, date=date_obj).all()
     blocked_dict = {b.time_slot: b.reason for b in blocked}
 
     return jsonify({'busy': busy_dict, 'blocked': blocked_dict})
@@ -289,9 +286,9 @@ def busy_slots():
 @app.route('/reserve', methods=['POST'])
 @limiter.limit("3 per minute")
 def reserve():
-    pitch_id  = request.form.get('pitch_id')
-    date_str  = request.form.get('date')
-    time_slot = request.form.get('time_slot')
+    pitch_id      = request.form.get('pitch_id')
+    date_str      = request.form.get('date')
+    time_slot     = request.form.get('time_slot')
     customer_name = request.form.get('customer_name')
 
     raw_phone   = request.form.get('customer_phone', '')
@@ -363,7 +360,6 @@ def admin_login():
         password   = request.form.get('password', '')
         ip_address = request.remote_addr
 
-        # ── DB tabanlı brute-force kontrolü (curl ile atlatılamaz) ──
         if is_account_locked(username, ip_address):
             flash(
                 f'Çok fazla başarısız deneme. {LOCKOUT_MINUTES} dakika sonra tekrar deneyin.',
@@ -376,7 +372,6 @@ def admin_login():
             record_attempt(username, ip_address, success=True)
             login_user(admin, remember=False)
             flash('Yonetici paneline hos geldiniz.', 'success')
-            # ── GÜVENLİ YÖNLENDİRME: Open Redirect koruması ──
             return safe_redirect(request.args.get('next'), url_for('admin_dashboard'))
         else:
             record_attempt(username, ip_address, success=False)
@@ -564,13 +559,40 @@ def update_logo():
     return redirect(url_for('admin_dashboard'))
 
 
+# ─── AFTER REQUEST: Cache + Güvenlik Header'ları ─────────────────
+
 @app.after_request
-def anti_cache(response):
+def apply_security_headers(response):
+    # ── Cache engelleme ──
     if response.status_code == 200 and response.content_type and \
        response.content_type.startswith('text/html'):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
-        response.headers["Pragma"]  = "no-cache"
-        response.headers["Expires"] = "0"
+        response.headers["Pragma"]        = "no-cache"
+        response.headers["Expires"]       = "0"
+
+    # ── Güvenlik header'ları ──
+    response.headers['X-Frame-Options']        = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-XSS-Protection']       = '1; mode=block'
+    response.headers['Referrer-Policy']        = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy']     = 'camera=(), microphone=(), geolocation=()'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+        "style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
+        "https://fonts.googleapis.com 'unsafe-inline'; "
+        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'"
+    )
+
+    # HSTS: sadece production/HTTPS ortamında gönder
+    if not app.debug:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+
+    # Sunucu versiyon bilgisini gizle
+    response.headers.pop('Server', None)
+
     return response
 
 
