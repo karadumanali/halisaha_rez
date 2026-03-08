@@ -13,12 +13,13 @@ os.environ['MAGIC'] = os.path.join(base_dir, 'magic.mgc')
 
 import uuid
 import re
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from models import db, Admin, Pitch, Reservation, BlockedSlot
+from models import db, Admin, Pitch, Reservation, BlockedSlot, LoginAttempt
 from dotenv import load_dotenv
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
@@ -66,9 +67,12 @@ for folder in [UPLOAD_FOLDER, PITCH_IMAGES_FOLDER]:
 db.init_app(app)
 csrf = CSRFProtect(app)
 
+# ── GÜVENLİK: Rate limiter — Redis varsa kullan, yoksa memory ──
+_redis_url = os.getenv('REDIS_URL', 'memory://')
 limiter = Limiter(
-    get_remote_address, app=app,
-    storage_uri="memory://",
+    get_remote_address,
+    app=app,
+    storage_uri=_redis_url,
     default_limits=["500 per day", "100 per hour"]
 )
 
@@ -81,6 +85,49 @@ login_manager.login_message_category = 'warning'
 @login_manager.user_loader
 def load_user(user_id):
     return Admin.query.get(int(user_id))
+
+
+# ─── BRUTE-FORCE KORUMA ────────────────────────────────────────────
+
+LOCKOUT_ATTEMPTS = 5   # Bu kadar başarısız denemeden sonra kilitle
+LOCKOUT_MINUTES  = 15  # Bu kadar dakika kilitli kal
+
+
+def is_account_locked(username, ip):
+    """Kullanıcı adı VEYA IP bazında kilitlenme kontrolü."""
+    cutoff = datetime.utcnow() - timedelta(minutes=LOCKOUT_MINUTES)
+
+    fails_by_username = LoginAttempt.query.filter(
+        LoginAttempt.username    == username,
+        LoginAttempt.attempted_at > cutoff,
+        LoginAttempt.success     == False   # noqa: E712
+    ).count()
+
+    fails_by_ip = LoginAttempt.query.filter(
+        LoginAttempt.ip_address  == ip,
+        LoginAttempt.attempted_at > cutoff,
+        LoginAttempt.success     == False   # noqa: E712
+    ).count()
+
+    return fails_by_username >= LOCKOUT_ATTEMPTS or fails_by_ip >= LOCKOUT_ATTEMPTS
+
+
+def record_attempt(username, ip, success):
+    """Giriş denemesini veritabanına kaydet."""
+    db.session.add(LoginAttempt(
+        ip_address=ip,
+        username=username,
+        attempted_at=datetime.utcnow(),
+        success=success
+    ))
+    db.session.commit()
+
+
+def cleanup_old_attempts():
+    """1 saatten eski denemeleri temizle (DB şişmemesi için)."""
+    cutoff = datetime.utcnow() - timedelta(hours=1)
+    LoginAttempt.query.filter(LoginAttempt.attempted_at < cutoff).delete()
+    db.session.commit()
 
 
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────
@@ -187,7 +234,6 @@ def index():
 
 @app.route('/busy_slots')
 def busy_slots():
-    """Rezervasyon ve manuel kilit kontrolü — ikisini birden döner."""
     pitch_id = request.args.get('pitch_id')
     date_str  = request.args.get('date')
     try:
@@ -273,15 +319,34 @@ def reserve():
 
 
 @app.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("3 per minute, 10 per hour, 20 per day")  # Sıkılaştırıldı
 def admin_login():
     if current_user.is_authenticated:
         return redirect(url_for('admin_dashboard'))
+
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '')
+        username   = request.form.get('username', '').strip()
+        password   = request.form.get('password', '')
+        ip_address = request.remote_addr
+
+        # Periyodik temizlik: her istekte %10 olasılıkla eski kayıtları sil
+        if random.random() < 0.1:
+            try:
+                cleanup_old_attempts()
+            except Exception:
+                pass
+
+        # ── DB tabanlı brute-force kontrolü (curl ile atlatılamaz) ──
+        if is_account_locked(username, ip_address):
+            flash(
+                f'Çok fazla başarısız deneme. {LOCKOUT_MINUTES} dakika sonra tekrar deneyin.',
+                'danger'
+            )
+            return render_template('login.html')
+
         admin = Admin.query.filter_by(username=username).first()
         if admin and check_password_hash(admin.password_hash, password):
+            record_attempt(username, ip_address, success=True)
             login_user(admin, remember=False)
             flash('Yonetici paneline hos geldiniz.', 'success')
             next_page = request.args.get('next')
@@ -289,7 +354,9 @@ def admin_login():
                 return redirect(next_page)
             return redirect(url_for('admin_dashboard'))
         else:
+            record_attempt(username, ip_address, success=False)
             flash('Kullanici adi veya sifre hatali!', 'danger')
+
     return render_template('login.html')
 
 
@@ -305,8 +372,8 @@ def logout():
 @app.route('/admin')
 @login_required
 def admin_dashboard():
-    pitches      = Pitch.query.all()
-    reservations = Reservation.query.order_by(Reservation.created_at.desc()).all()
+    pitches       = Pitch.query.all()
+    reservations  = Reservation.query.order_by(Reservation.created_at.desc()).all()
     blocked_slots = BlockedSlot.query.order_by(BlockedSlot.date.asc(), BlockedSlot.time_slot.asc()).all()
     return render_template('admin.html',
                            pitches=pitches,
@@ -329,8 +396,7 @@ def block_slot():
         flash('Saha, tarih ve saat dilimi secmelisiniz!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
-    added = 0
-    skipped = 0
+    added = 0; skipped = 0
     for pitch_id in pitch_ids:
         for date_str in dates:
             try:
@@ -342,8 +408,7 @@ def block_slot():
                     pitch_id=pitch_id, date=date_obj, time_slot=time_slot
                 ).first()
                 if existing:
-                    skipped += 1
-                    continue
+                    skipped += 1; continue
                 db.session.add(BlockedSlot(
                     pitch_id=pitch_id, date=date_obj,
                     time_slot=time_slot, reason=reason
@@ -501,7 +566,6 @@ with app.app_context():
 
 
 if __name__ == '__main__':
-    # Production'da debug kesinlikle False — .env'den FLASK_DEBUG okumayız
     is_debug = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
     if os.getenv('FLASK_ENV') == 'production':
         is_debug = False

@@ -24,15 +24,14 @@ class Pitch(db.Model):
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Integer, nullable=False)
     
-    # İlişkilerin hepsi tek bir yerde toplandı
-    reservations = db.relationship('Reservation', backref='pitch', lazy=True, cascade='all, delete-orphan')
-    images = db.relationship('PitchImage', backref='pitch', lazy=True, cascade='all, delete-orphan')
-    blocked_slots = db.relationship('BlockedSlot', backref='pitch', lazy=True, cascade='all, delete-orphan')
+    reservations  = db.relationship('Reservation',  backref='pitch', lazy=True, cascade='all, delete-orphan')
+    images        = db.relationship('PitchImage',   backref='pitch', lazy=True, cascade='all, delete-orphan')
+    blocked_slots = db.relationship('BlockedSlot',  backref='pitch', lazy=True, cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Pitch {self.name}>'
 
-# SAHA RESİMLERİ TABLOSU
+# 3. SAHA RESİMLERİ TABLOSU
 class PitchImage(db.Model):
     __tablename__ = 'pitch_images'
     
@@ -41,36 +40,50 @@ class PitchImage(db.Model):
     image_filename = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# 3. REZERVASYON TABLOSU
+# 4. REZERVASYON TABLOSU
 class Reservation(db.Model):
     __tablename__ = 'reservations'
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     pitch_id = db.Column(db.Integer, db.ForeignKey('pitches.id'), nullable=False)
     
-    date = db.Column(db.Date, nullable=False)
-    time_slot = db.Column(db.String(20), nullable=False)
-    customer_name = db.Column(db.String(100), nullable=False)
-    customer_phone = db.Column(db.String(15), nullable=False)
-    customer_email = db.Column(db.String(120), nullable=False)
+    date             = db.Column(db.Date,    nullable=False)
+    time_slot        = db.Column(db.String(20),  nullable=False)
+    customer_name    = db.Column(db.String(100), nullable=False)
+    customer_phone   = db.Column(db.String(15),  nullable=False)
+    customer_email   = db.Column(db.String(120), nullable=False)
     receipt_filename = db.Column(db.String(255), nullable=False)
     
-    status = db.Column(db.String(20), default='Pending', nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status     = db.Column(db.String(20), default='Pending', nullable=False)
+    created_at = db.Column(db.DateTime,   default=datetime.utcnow)
 
     def __repr__(self):
         return f'<Reservation {self.date} {self.time_slot} - {self.status}>'
 
-# 4. KİLİTLİ SLOT TABLOSU
+# 5. KİLİTLİ SLOT TABLOSU
 class BlockedSlot(db.Model):
     __tablename__ = 'blocked_slots'
     
-    id = db.Column(db.Integer, primary_key=True)
+    id       = db.Column(db.Integer, primary_key=True)
     pitch_id = db.Column(db.Integer, db.ForeignKey('pitches.id'), nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    time_slot = db.Column(db.String(20), nullable=False)
-    reason = db.Column(db.String(200), nullable=False, default='Bahar Şenlikleri Sebebiyle Sahamız kullanılamamaktadır.')
+    date     = db.Column(db.Date,    nullable=False)
+    time_slot = db.Column(db.String(20),  nullable=False)
+    reason   = db.Column(db.String(200),  nullable=False,
+                         default='Bahar Şenlikleri Sebebiyle Sahamız kullanılamamaktadır.')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return f'<BlockedSlot {self.date} {self.time_slot} pitch={self.pitch_id}>'
+
+# 6. GİRİŞ DENEMELERİ TABLOSU (Brute-Force koruması)
+class LoginAttempt(db.Model):
+    __tablename__ = 'login_attempts'
+
+    id           = db.Column(db.Integer,     primary_key=True)
+    ip_address   = db.Column(db.String(45),  nullable=False)
+    username     = db.Column(db.String(50))
+    attempted_at = db.Column(db.DateTime,    default=datetime.utcnow)
+    success      = db.Column(db.Boolean,     default=False)
+
+    def __repr__(self):
+        return f'<LoginAttempt {self.ip_address} {self.attempted_at} success={self.success}>'
