@@ -396,6 +396,7 @@ input[type="date"].form-control {
                 <input type="hidden" name="pitch_id"  id="hPitchId">
                 <input type="hidden" name="date"       id="hDate">
                 <input type="hidden" name="time_slot"  id="hSlot">
+                <input type="hidden" name="g-recaptcha-response" id="gRecaptchaReserve">
 
                 <!-- ── 1. Kişi Bilgileri ── -->
                 <div class="section-head"><i class="fas fa-user"></i> Kişi Bilgileri</div>
@@ -606,7 +607,22 @@ function checkStep3() {
 
 function submitReservation() {
     fillHidden();
-    if(confirm('Rezervasyon talebinizi göndermek istiyor musunuz?')) document.getElementById('reserveForm').submit();
+    var siteKey = '{{ recaptcha_site_key|default("") }}';
+    if (!siteKey) {
+        // Geliştirme ortamı: key yoksa direkt gönder
+        if (confirm('Rezervasyon talebinizi göndermek istiyor musunuz?')) {
+            document.getElementById('reserveForm').submit();
+        }
+        return;
+    }
+    if (confirm('Rezervasyon talebinizi göndermek istiyor musunuz?')) {
+        grecaptcha.ready(function() {
+            grecaptcha.execute(siteKey, {action: 'reserve'}).then(function(token) {
+                document.getElementById('gRecaptchaReserve').value = token;
+                document.getElementById('reserveForm').submit();
+            });
+        });
+    }
 }
 
 function formatDate(str) {
@@ -635,4 +651,8 @@ document.addEventListener('DOMContentLoaded',function(){
     ['fName','fEmail'].forEach(function(id){var el=document.getElementById(id);if(el){el.addEventListener('input',checkStep3);}});
 });
 </script>
+
+{% if recaptcha_site_key %}
+<script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}"></script>
+{% endif %}
 {% endblock %}

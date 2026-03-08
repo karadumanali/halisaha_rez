@@ -12,10 +12,15 @@ if hasattr(os, 'add_dll_directory'):
 os.environ['PATH']  = base_dir + os.pathsep + os.environ['PATH']
 os.environ['MAGIC'] = os.path.join(base_dir, 'magic.mgc')
 
+import logging
+import requests as http_requests
+
+logger = logging.getLogger(__name__)
+
 import uuid
 import re
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
@@ -56,7 +61,7 @@ if os.getenv('FLASK_ENV') == 'production':
     app.config['DEBUG']   = False
     app.config['TESTING'] = False
 
-UPLOAD_FOLDER       = 'static/uploads/receipts'
+UPLOAD_FOLDER       = 'uploads/receipts'   # static/ DIŞINDA — doğrudan URL ile erişilemez
 PITCH_IMAGES_FOLDER = 'static/uploads/pitches'
 app.config['UPLOAD_FOLDER']       = UPLOAD_FOLDER
 app.config['PITCH_IMAGES_FOLDER'] = PITCH_IMAGES_FOLDER
@@ -159,6 +164,36 @@ def safe_redirect(next_url, fallback):
         if not parsed.netloc and not parsed.scheme and next_url.startswith('/'):
             return redirect(next_url)
     return redirect(fallback)
+
+
+# ─── reCAPTCHA v3 DOĞRULAMA ──────────────────────────────────────
+
+RECAPTCHA_SECRET  = os.getenv('RECAPTCHA_SECRET_KEY', '')
+RECAPTCHA_SITE    = os.getenv('RECAPTCHA_SITE_KEY', '')
+RECAPTCHA_MIN_SCORE = 0.5   # 0.0 (bot) — 1.0 (insan), 0.5 güvenli eşik
+
+def verify_recaptcha(token, action='submit'):
+    """Google reCAPTCHA v3 token doğrular.
+    SECRET_KEY yoksa (geliştirme ortamı) doğrulamayı atla."""
+    if not RECAPTCHA_SECRET:
+        return True   # Lokalde .env'de key yoksa engelleme
+    if not token:
+        return False
+    try:
+        resp = http_requests.post(
+            'https://www.google.com/recaptcha/api/siteverify',
+            data={'secret': RECAPTCHA_SECRET, 'response': token},
+            timeout=5
+        )
+        data = resp.json()
+        return (
+            data.get('success') is True
+            and data.get('score', 0) >= RECAPTCHA_MIN_SCORE
+            and data.get('action', '') == action
+        )
+    except Exception:
+        logger.warning("reCAPTCHA doğrulama isteği başarısız.")
+        return True   # Servis erişilemezse kullanıcıyı engelleme
 
 
 # ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────
@@ -267,7 +302,8 @@ VALID_SLOTS = [
 def index():
     pitches    = Pitch.query.all()
     today_date = datetime.now().date().isoformat()
-    return render_template('index.html', pitches=pitches, today_date=today_date)
+    return render_template('index.html', pitches=pitches, today_date=today_date,
+                           recaptcha_site_key=RECAPTCHA_SITE)
 
 
 @app.route('/busy_slots')
@@ -296,6 +332,11 @@ def busy_slots():
 @app.route('/reserve', methods=['POST'])
 @limiter.limit("3 per minute")
 def reserve():
+    # ── reCAPTCHA v3 kontrolü ──
+    if not verify_recaptcha(request.form.get('g-recaptcha-response', ''), action='reserve'):
+        flash('Bot doğrulaması başarısız. Lütfen tekrar deneyin.', 'danger')
+        return redirect(url_for('index'))
+
     pitch_id      = request.form.get('pitch_id')
     date_str      = request.form.get('date')
     time_slot     = request.form.get('time_slot')
@@ -383,6 +424,11 @@ def admin_login():
         return redirect(url_for('admin_dashboard'))
 
     if request.method == 'POST':
+        # ── reCAPTCHA v3 kontrolü ──
+        if not verify_recaptcha(request.form.get('g-recaptcha-response', ''), action='login'):
+            flash('Bot doğrulaması başarısız. Lütfen tekrar deneyin.', 'danger')
+            return render_template('login.html', recaptcha_site_key=RECAPTCHA_SITE)
+
         username   = request.form.get('username', '').strip()
         password   = request.form.get('password', '')
         ip_address = request.remote_addr
@@ -392,7 +438,7 @@ def admin_login():
                 f'Çok fazla başarısız deneme. {LOCKOUT_MINUTES} dakika sonra tekrar deneyin.',
                 'danger'
             )
-            return render_template('login.html')
+            return render_template('login.html', recaptcha_site_key=RECAPTCHA_SITE)
 
         admin = Admin.query.filter_by(username=username).first()
         if admin and check_password_hash(admin.password_hash, password):
@@ -404,7 +450,7 @@ def admin_login():
             record_attempt(username, ip_address, success=False)
             flash('Kullanici adi veya sifre hatali!', 'danger')
 
-    return render_template('login.html')
+    return render_template('login.html', recaptcha_site_key=RECAPTCHA_SITE)
 
 
 @app.route('/logout')
@@ -586,6 +632,18 @@ def update_logo():
     return redirect(url_for('admin_dashboard'))
 
 
+# ─── DEKONT ERİŞİM KORUMASI ──────────────────────────────────────
+# Dekontlar static/ dışında olduğu için URL ile doğrudan erişilemez.
+# Sadece giriş yapmış yönetici görebilir.
+
+@app.route('/admin/receipt/<filename>')
+@login_required
+def view_receipt(filename):
+    # Path traversal koruması: sadece dosya adı, dizin geçişi yok
+    safe_name = os.path.basename(filename)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], safe_name)
+
+
 # ─── AFTER REQUEST: Cache + Güvenlik Header'ları ─────────────────
 
 @app.after_request
@@ -625,7 +683,7 @@ def apply_security_headers(response):
 
 with app.app_context():
     db.create_all()
-    print("✅ Veritabani tablolari kontrol edildi (Eksikler olusturuldu).")
+    logger.info("Veritabani tablolari kontrol edildi.")
 
     admin_var_mi = Admin.query.filter_by(username='yonetici').first()
     if not admin_var_mi:
@@ -634,9 +692,9 @@ with app.app_context():
         yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
         db.session.add(yeni_admin)
         db.session.commit()
-        print("👑 Ilk yonetici hesabi basariyla eklendi!")
+        logger.info("Ilk yonetici hesabi olusturuldu.")   # Şifre ASLA loglanmaz
     else:
-        print("⚡ Yonetici zaten mevcut, yeni admin olusturulmadi.")
+        logger.info("Yonetici zaten mevcut.")
 
 
 if __name__ == '__main__':

@@ -1,225 +1,248 @@
 {% extends "layout.html" %}
+
 {% block body %}
 <style>
-.login-page {
-    display: flex; align-items: center; justify-content: center;
-    min-height: calc(100vh - 180px); padding: 24px 16px;
+.login-wrap {
+    min-height: 72vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 16px;
 }
-.login-box { width: 100%; max-width: 440px; }
 
-.login-heading { text-align: center; margin-bottom: 24px; }
-.login-heading h1 {
-    font-size: clamp(1.9rem, 5vw, 2.2rem); font-weight: 800;
-    color: var(--ink); letter-spacing: -0.025em; line-height: 1.2; margin-bottom: 6px;
-}
-.login-heading p { font-size: 1rem; color: var(--gray-400); font-weight: 500; }
-
-.login-stripe {
-    height: 4px;
-    background: linear-gradient(90deg, var(--teal-dk), var(--teal-lt));
-    border-radius: var(--r) var(--r) 0 0;
-}
 .login-card {
-    border-top-left-radius: 0 !important;
-    border-top-right-radius: 0 !important;
-    padding: 32px 28px 26px !important;
+    width: 100%;
+    max-width: 420px;
+    background: var(--white);
+    border: 2px solid var(--mint-mid);
+    border-radius: var(--r);
+    box-shadow: 0 8px 40px rgba(14,168,116,0.13), 0 2px 12px rgba(0,0,0,0.08);
+    overflow: hidden;
 }
 
-.login-avatar {
-    width: 62px; height: 62px; border-radius: 50%;
-    background: var(--teal-pale); border: 2.5px solid var(--mint-mid);
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 26px;
+.login-header {
+    padding: 28px 32px 22px;
+    background: linear-gradient(135deg, var(--teal-pale) 0%, #f0fdf8 100%);
+    border-bottom: 1.5px solid var(--mint-mid);
+    text-align: center;
 }
-.login-avatar i { color: var(--teal); font-size: 1.6rem; }
+.login-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--teal); color: var(--white);
+    font-size: 0.68rem; font-weight: 800;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 12px; border-radius: 20px; margin-bottom: 10px;
+}
+.login-title {
+    font-size: 1.45rem; font-weight: 800;
+    color: var(--ink); margin: 0; letter-spacing: -0.025em;
+}
+.login-sub {
+    font-size: 0.82rem; color: var(--gray-400);
+    margin-top: 4px; font-weight: 500;
+}
 
-.form-label { font-size: 0.95rem !important; font-weight: 700 !important; color: var(--gray-700) !important; }
-.form-control { font-size: 1rem !important; padding: 13px 14px !important; }
+.login-body { padding: 28px 32px 24px; }
 
-.inp-wrap { position: relative; }
-.inp-icon {
-    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+.form-label {
+    font-size: 0.82rem; font-weight: 700;
+    color: var(--gray-600); display: block; margin-bottom: 6px;
+}
+.form-control {
+    width: 100%; padding: 11px 14px;
+    border: 1.5px solid var(--gray-300);
+    border-radius: var(--r-sm);
+    font-size: 0.93rem; font-family: var(--font);
+    color: var(--ink); background: var(--white);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+}
+.form-control:focus {
+    outline: none;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(14,168,116,0.15);
+}
+
+.input-icon-wrap { position: relative; }
+.input-icon-wrap .form-control { padding-left: 42px; }
+.input-icon {
+    position: absolute; left: 14px; top: 50%;
+    transform: translateY(-50%);
     color: var(--gray-400); font-size: 0.85rem; pointer-events: none;
-    transition: color 0.15s; z-index: 1;
 }
-.inp-wrap:focus-within .inp-icon { color: var(--teal); }
-.inp-wrap .form-control { padding-left: 42px !important; }
-.inp-wrap.has-eye .form-control { padding-right: 46px !important; }
-.pw-eye {
-    position: absolute; right: 0; top: 0; width: 46px; height: 100%;
-    background: none; border: none; padding: 0; cursor: pointer;
-    color: var(--gray-400); font-size: 0.85rem; transition: color 0.15s;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 0 var(--r-sm) var(--r-sm) 0;
-    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+
+.password-wrap { position: relative; }
+.password-wrap .form-control { padding-right: 44px; }
+.toggle-pw {
+    position: absolute; right: 12px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    color: var(--gray-400); font-size: 0.88rem; padding: 4px;
+    transition: color 0.15s;
 }
-.pw-eye:hover { color: var(--teal); }
+.toggle-pw:hover { color: var(--teal); }
+
+.mb-4 { margin-bottom: 18px; }
+.mb-5 { margin-bottom: 24px; }
 
 .btn-login {
-    width: 100%; min-height: 54px; padding: 14px;
-    background: var(--teal); color: var(--white);
-    font-size: 1.05rem; font-weight: 800; border-radius: var(--r-sm);
-    border: none; cursor: pointer; transition: all 0.18s;
-    display: flex; align-items: center; justify-content: center; gap: 9px;
-    margin-top: 8px; font-family: var(--font);
-    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    width: 100%;
+    background: var(--teal);
+    color: var(--white);
+    border: none; border-radius: var(--r-sm);
+    padding: 13px;
+    font-size: 0.97rem; font-weight: 800;
+    font-family: var(--font);
+    cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    letter-spacing: -0.01em;
 }
-.btn-login:hover:not(:disabled) {
-    background: var(--teal-dk); transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(14,168,116,0.35);
-}
-.btn-login:active:not(:disabled) { transform: translateY(0); }
-.btn-login:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.btn-login:hover { background: var(--teal-dk); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(14,168,116,0.35); }
+.btn-login:active { transform: translateY(0); }
+.btn-login:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
 
-.attempt-bar {
-    display: none; align-items: center; gap: 8px;
-    background: var(--warning-bg); border: 1.5px solid var(--warning-bd);
-    border-radius: var(--r-sm); padding: 11px 14px; margin-bottom: 16px;
-    font-size: 0.9rem; color: var(--warning-tx); flex-wrap: wrap;
+.login-footer {
+    padding: 14px 32px;
+    border-top: 1.5px solid var(--gray-200);
+    background: var(--gray-50);
+    text-align: center;
 }
-.attempt-bar.show { display: flex; }
-.dots { display: flex; gap: 5px; align-items: center; }
-.dot  { width: 10px; height: 10px; border-radius: 50%; background: var(--warning-bd); transition: background 0.2s; }
-.dot.used { background: var(--danger); }
+.back-link {
+    font-size: 0.82rem; color: var(--gray-400);
+    text-decoration: none; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 5px;
+    transition: color 0.15s;
+}
+.back-link:hover { color: var(--teal); }
 
-.lockout-bar {
-    display: none; align-items: center; gap: 10px;
-    background: var(--danger-bg); border: 1.5px solid #fed7d7;
-    border-radius: var(--r-sm); padding: 12px 14px; margin-bottom: 16px;
-    font-size: 0.9rem; color: var(--danger-tx);
+/* reCAPTCHA küçük bildirim */
+.recaptcha-notice {
+    font-size: 0.7rem; color: var(--gray-400);
+    text-align: center; margin-top: 14px; line-height: 1.5;
 }
-.lockout-bar.show { display: flex; }
-.lockout-bar > i  { flex-shrink: 0; }
-.lcd { font-weight: 800; font-size: 1rem; min-width: 22px; display: inline-block; }
+.recaptcha-notice a { color: var(--teal); text-decoration: none; }
+.recaptcha-notice a:hover { text-decoration: underline; }
 
-input::-ms-reveal, input::-ms-clear { display: none !important; }
-input::-webkit-credentials-auto-fill-button { visibility: hidden !important; }
-input:-webkit-autofill, input:-webkit-autofill:focus {
-    -webkit-box-shadow: 0 0 0 40px #fff inset !important;
-    transition: background-color 5000s ease-in-out 0s;
-}
-@media (max-width: 400px) { .login-card { padding: 24px 18px 20px !important; } }
+/* reCAPTCHA rozetini küçült / sağ alta sabitle */
+.grecaptcha-badge { visibility: hidden !important; }
 </style>
 
-<div class="login-page">
-<div class="login-box">
+<div class="login-wrap">
+    <div class="login-card">
 
-    <div class="login-heading">
-        <h1>AYBÜ Halı Saha Rezervasyon Sistemi</h1>
-        <p>Yönetici girişi yapın</p>
-    </div>
-
-    <div class="login-stripe"></div>
-    <div class="card login-card">
-
-        <div class="login-avatar">
-            <i class="fas fa-user-shield"></i>
+        <div class="login-header">
+            <div class="login-badge"><i class="fas fa-shield-alt"></i> Yönetici Girişi</div>
+            <h1 class="login-title">Hoş Geldiniz</h1>
+            <p class="login-sub">Devam etmek için giriş yapın</p>
         </div>
 
-        <div class="lockout-bar" id="lockoutBar" role="alert" aria-live="assertive">
-            <i class="fas fa-lock"></i>
-            <div>Çok fazla başarısız deneme. <span class="lcd" id="lcdNum">30</span> saniye bekleyin.</div>
+        <div class="login-body">
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }} mb-4" role="alert">
+                    <i class="fas fa-{% if category == 'danger' %}exclamation-circle{% elif category == 'success' %}check-circle{% else %}info-circle{% endif %}"></i>
+                    {{ message }}
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('admin_login') }}" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <!-- reCAPTCHA v3 token — JS tarafından doldurulur -->
+                <input type="hidden" name="g-recaptcha-response" id="gRecaptchaLogin">
+
+                <div class="mb-4">
+                    <label class="form-label" for="username">Kullanıcı Adı</label>
+                    <div class="input-icon-wrap">
+                        <i class="fas fa-user input-icon"></i>
+                        <input type="text" id="username" name="username"
+                               class="form-control" required
+                               autocomplete="username"
+                               placeholder="Kullanıcı adınızı girin">
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="form-label" for="password">Şifre</label>
+                    <div class="input-icon-wrap password-wrap">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input type="password" id="password" name="password"
+                               class="form-control" required
+                               autocomplete="current-password"
+                               placeholder="Şifrenizi girin">
+                        <button type="button" class="toggle-pw" onclick="togglePw()"
+                                aria-label="Şifreyi göster/gizle">
+                            <i class="fas fa-eye" id="pwEyeIcon"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-login" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                </button>
+
+                {% if recaptcha_site_key %}
+                <p class="recaptcha-notice">
+                    Bu site reCAPTCHA ile korunmaktadır.
+                    <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Gizlilik Politikası</a>
+                    ve
+                    <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Kullanım Koşulları</a> geçerlidir.
+                </p>
+                {% endif %}
+            </form>
         </div>
 
-        <!-- <div class="attempt-bar" id="attemptBar" role="alert" aria-live="polite">
-            <i class="fas fa-exclamation-triangle"></i>
-            <span>Başarısız denemeler:</span>
-            <div class="dots" aria-hidden="true">
-                <div class="dot" id="d1"></div><div class="dot" id="d2"></div>
-                <div class="dot" id="d3"></div><div class="dot" id="d4"></div>
-                <div class="dot" id="d5"></div>
-            </div>
-        </div> -->
+        <div class="login-footer">
+            <a href="{{ url_for('index') }}" class="back-link">
+                <i class="fas fa-arrow-left"></i> Rezervasyon Sayfasına Dön
+            </a>
+        </div>
 
-        <form id="loginForm" action="/login" method="POST" autocomplete="off" novalidate>
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-            <div class="mb-4">
-                <label class="form-label" for="uInp">
-                    <i class="fas fa-user"></i> Kullanıcı Adı
-                </label>
-                <div class="inp-wrap">
-                    <input type="text" id="uInp" name="username"
-                           class="form-control" required minlength="4" maxlength="50"
-                           placeholder="Kullanıcı adınızı girin"
-                           autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="off">
-                    <i class="fas fa-user inp-icon"></i>
-                </div>
-            </div>
-
-            <div class="mb-4">
-                <label class="form-label" for="pInp">
-                    <i class="fas fa-lock"></i> Parola
-                </label>
-                <div class="inp-wrap has-eye">
-                    <input type="password" id="pInp" name="password"
-                           class="form-control" required minlength="6" maxlength="128"
-                           placeholder="Parolanızı girin" autocomplete="new-password">
-                    <i class="fas fa-lock inp-icon"></i>
-                    <button type="button" class="pw-eye" id="pwEye" tabindex="-1" aria-label="Parolayı göster/gizle">
-                        <i class="fas fa-eye" id="pwIcon"></i>
-                    </button>
-                </div>
-            </div>
-
-            <button type="submit" id="loginBtn" class="btn-login" disabled aria-disabled="true">
-                <i class="fas fa-sign-in-alt"></i> Giriş Yap
-            </button>
-        </form>
     </div>
-</div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    var uInp=document.getElementById('uInp'), pInp=document.getElementById('pInp');
-    var loginBtn=document.getElementById('loginBtn');
-    var pwEye=document.getElementById('pwEye'), pwIcon=document.getElementById('pwIcon');
-    var lockoutBar=document.getElementById('lockoutBar'), lcdNum=document.getElementById('lcdNum');
-    var attemptBar=document.getElementById('attemptBar');
-    var dots=['d1','d2','d3','d4','d5'].map(function(id){return document.getElementById(id);});
-    var MAX=5, LOCK=30;
+function togglePw() {
+    var inp  = document.getElementById('password');
+    var icon = document.getElementById('pwEyeIcon');
+    if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        inp.type = 'password';
+        icon.className = 'fas fa-eye';
+    }
+}
 
-    pwEye.addEventListener('click',function(){
-        var show=pInp.type==='password'; pInp.type=show?'text':'password';
-        pwIcon.className=show?'fas fa-eye-slash':'fas fa-eye'; pInp.focus();
+// reCAPTCHA site key — Jinja if/endif yerine JS değişkeni (VS Code uyumlu)
+var RECAPTCHA_SITE_KEY = '{{ recaptcha_site_key|default("") }}';
+
+if (RECAPTCHA_SITE_KEY) {
+    // Form submit'i yakala — önce reCAPTCHA token al, sonra gönder
+    document.querySelector('form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var form = this;
+        var btn  = document.getElementById('loginBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Doğrulanıyor...';
+
+        grecaptcha.ready(function() {
+            grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'login'}).then(function(token) {
+                document.getElementById('gRecaptchaLogin').value = token;
+                form.submit();
+            }).catch(function() {
+                form.submit();
+            });
+        });
     });
-
-    function refresh(){
-        var ok=uInp.value.trim().length>=4&&pInp.value.trim().length>=6&&!isLocked();
-        loginBtn.disabled=!ok; loginBtn.setAttribute('aria-disabled',String(!ok));
-    }
-    uInp.addEventListener('input',refresh); pInp.addEventListener('input',refresh);
-
-    function getN(){return parseInt(sessionStorage.getItem('_lt')||'0');}
-    function getLock(){return parseInt(sessionStorage.getItem('_lu')||'0');}
-    function isLocked(){return Date.now()<getLock();}
-
-    function drawDots(){
-        var n=getN(); attemptBar.classList.toggle('show',n>0);
-        dots.forEach(function(d,i){d.className='dot'+(i<n?' used':'');});
-    }
-
-    function startLockdown(){
-        loginBtn.disabled=true; lockoutBar.classList.add('show');
-        var iv=setInterval(function(){
-            var rem=Math.ceil((getLock()-Date.now())/1000);
-            if(rem<=0){clearInterval(iv);sessionStorage.setItem('_lt','0');lockoutBar.classList.remove('show');drawDots();refresh();}
-            else{lcdNum.textContent=rem;}
-        },500);
-    }
-
-    /* Başarılı giriş olduysa sayacı sıfırla */
-    if(document.querySelector('.alert-success')){
-        sessionStorage.setItem('_lt','0'); sessionStorage.removeItem('_lu');
-    }
-
-    document.getElementById('loginForm').addEventListener('submit',function(){
-        var n=getN()+1; sessionStorage.setItem('_lt',n);
-        if(n>=MAX) sessionStorage.setItem('_lu',Date.now()+LOCK*1000);
-    });
-
-    drawDots(); if(isLocked()) startLockdown(); refresh();
-});
+}
 </script>
+
+{% if recaptcha_site_key %}
+<script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}"></script>
+{% endif %}
+
 {% endblock %}
