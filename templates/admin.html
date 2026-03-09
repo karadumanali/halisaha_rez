@@ -90,6 +90,12 @@
     display: flex; align-items: center; gap: 8px;
     box-shadow: var(--sh-xs);
 }
+.stat-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+}
 .stat-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; flex-shrink: 0; }
 .stat-icon.pending  { background: #fef9c3; color: #854d0e; }
 .stat-icon.approved { background: var(--teal-pale); color: var(--teal-dk); }
@@ -457,7 +463,7 @@
 }
 @media (max-width: 600px) {
     .res-card-body { grid-template-columns: repeat(2, 1fr); }
-    .sidebar-stats { grid-template-columns: repeat(4, 1fr); }
+    .stat-cards-grid { grid-template-columns: repeat(2, 1fr); } /* Mobilde 4 yerine 2 sütun olsun */
 }
 </style>
 
@@ -526,7 +532,7 @@
             </div>
 
             <!-- İstatistik çipleri — sadece bu panelde görünür -->
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;">
+            <div class="stat-cards-grid">
                 <div class="stat-chip">
                     <div class="stat-icon pending"><i class="fas fa-hourglass-half"></i></div>
                     <div><div class="stat-num">{{ pending_count }}</div><div class="stat-lbl">Bekliyor</div></div>
