@@ -141,8 +141,9 @@ jobs:
           target: 'http://127.0.0.1:5000'
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a -j'
-          fail_action: false   # Açık bulunsa bile workflow'u durdurma, rapor ver
+          fail_action: false
           allow_issue_writing: false
+          artifact_name: 'zap-baseline-report'
 
       - name: Flask'ı durdur
         if: always()
@@ -150,14 +151,6 @@ jobs:
           if [ -f flask.pid ]; then
             kill $(cat flask.pid) 2>/dev/null || true
           fi
-
-      - name: ZAP raporunu artifact olarak kaydet
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: zap-report
-          path: report_html.html
-          retention-days: 30
 
 
   # ══════════════════════════════════════════════
