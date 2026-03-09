@@ -52,7 +52,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SESSION_PERMANENT']              = False
 app.config['SESSION_COOKIE_HTTPONLY']        = True
 app.config['SESSION_COOKIE_SAMESITE']        = 'Lax'
-app.config['SESSION_COOKIE_SECURE']          = os.getenv('FLASK_ENV') == 'production'  # Prod: HTTPS zorunlu, local: HTTP çalışır
+app.config['SESSION_COOKIE_SECURE']          = os.getenv('FLASK_ENV') == 'production'
 app.config['MAX_CONTENT_LENGTH']             = 5 * 1024 * 1024
 
 # ── GÜVENLİK: Production ortamında DEBUG kesinlikle False ──
@@ -95,24 +95,20 @@ def load_user(user_id):
 # ─── AYLIK OTOMATİK TEMİZLİK (APScheduler) ───────────────────────
 
 def monthly_cleanup():
-    """Her ayın 1'inde gece 03:00'te çalışır.
-    1 aydan eski LoginAttempt kayıtlarını siler."""
     with app.app_context():
         cutoff = datetime.utcnow() - timedelta(days=30)
         deleted = LoginAttempt.query.filter(
             LoginAttempt.attempted_at < cutoff
         ).delete()
         db.session.commit()
-        print(f"[Scheduler] Aylık temizlik tamamlandı — {deleted} eski kayıt silindi. ({datetime.utcnow().isoformat()})")
+        logger.info(f"Aylık temizlik: {deleted} eski kayıt silindi.")
 
 
 scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
 scheduler.add_job(
     monthly_cleanup,
     trigger='cron',
-    day=1,
-    hour=3,
-    minute=0,
+    day=1, hour=3, minute=0,
     id='monthly_login_cleanup',
     replace_existing=True
 )
@@ -127,28 +123,23 @@ LOCKOUT_MINUTES  = 15
 
 def is_account_locked(username, ip):
     cutoff = datetime.utcnow() - timedelta(minutes=LOCKOUT_MINUTES)
-
     fails_by_username = LoginAttempt.query.filter(
-        LoginAttempt.username    == username,
-        LoginAttempt.attempted_at > cutoff,
-        LoginAttempt.success     == False   # noqa: E712
+        LoginAttempt.username     == username,
+        LoginAttempt.attempted_at  > cutoff,
+        LoginAttempt.success      == False  # noqa: E712
     ).count()
-
     fails_by_ip = LoginAttempt.query.filter(
         LoginAttempt.ip_address   == ip,
         LoginAttempt.attempted_at  > cutoff,
-        LoginAttempt.success      == False   # noqa: E712
+        LoginAttempt.success      == False  # noqa: E712
     ).count()
-
     return fails_by_username >= LOCKOUT_ATTEMPTS or fails_by_ip >= LOCKOUT_ATTEMPTS
 
 
 def record_attempt(username, ip, success):
     db.session.add(LoginAttempt(
-        ip_address=ip,
-        username=username,
-        attempted_at=datetime.utcnow(),
-        success=success
+        ip_address=ip, username=username,
+        attempted_at=datetime.utcnow(), success=success
     ))
     db.session.commit()
 
@@ -156,7 +147,6 @@ def record_attempt(username, ip, success):
 # ─── GÜVENLİ YÖNLENDİRME ─────────────────────────────────────────
 
 def safe_redirect(next_url, fallback):
-    """Open Redirect koruması: sadece relative path kabul et."""
     if next_url:
         parsed = urlparse(next_url)
         if not parsed.netloc and not parsed.scheme and next_url.startswith('/'):
@@ -166,15 +156,13 @@ def safe_redirect(next_url, fallback):
 
 # ─── reCAPTCHA v3 DOĞRULAMA ──────────────────────────────────────
 
-RECAPTCHA_SECRET  = os.getenv('RECAPTCHA_SECRET_KEY', '')
-RECAPTCHA_SITE    = os.getenv('RECAPTCHA_SITE_KEY', '')
-RECAPTCHA_MIN_SCORE = 0.5   # 0.0 (bot) — 1.0 (insan), 0.5 güvenli eşik
+RECAPTCHA_SECRET    = os.getenv('RECAPTCHA_SECRET_KEY', '')
+RECAPTCHA_SITE      = os.getenv('RECAPTCHA_SITE_KEY', '')
+RECAPTCHA_MIN_SCORE = 0.5
 
 def verify_recaptcha(token, action='submit'):
-    """Google reCAPTCHA v3 token doğrular.
-    SECRET_KEY yoksa (geliştirme ortamı) doğrulamayı tamamen atla."""
     if not RECAPTCHA_SECRET:
-        return True   # Lokalde key yoksa her zaman geç
+        return True
     if not token:
         return False
     try:
@@ -191,20 +179,18 @@ def verify_recaptcha(token, action='submit'):
         )
     except Exception:
         logger.warning("reCAPTCHA doğrulama isteği başarısız.")
-        return True   # Servis erişilemezse kullanıcıyı engelleme
+        return True
 
 
 # ─── MIME TESPİTİ (saf Python — DLL/libmagic gerektirmez) ────────
 
-# Dosya imzaları (magic bytes) — Windows ve Linux'ta çalışır
 _MAGIC_BYTES = {
-    b'\xff\xd8\xff':          'image/jpeg',
-    b'\x89PNG\r\n\x1a\n':    'image/png',
-    b'%PDF':                  'application/pdf',
+    b'\xff\xd8\xff':       'image/jpeg',
+    b'\x89PNG\r\n\x1a\n': 'image/png',
+    b'%PDF':               'application/pdf',
 }
 
 def detect_mime(file_bytes: bytes) -> str:
-    """İlk baytlara bakarak MIME tipini döner. Tanınamazsa '' döner."""
     for sig, mime in _MAGIC_BYTES.items():
         if file_bytes.startswith(sig):
             return mime
@@ -297,7 +283,7 @@ def send_admin_notification(customer_name, date, time_slot):
         with smtplib.SMTP('smtp.gmail.com', 587) as s:
             s.starttls(); s.login(sender_email, sender_password); s.send_message(msg)
     except Exception as e:
-        print(f"Mail hatasi: {e}")
+        logger.warning(f"Mail hatasi: {e}")
 
 
 def send_customer_approval_email(customer_email, customer_name, pitch_name, date, time_slot):
@@ -314,7 +300,7 @@ def send_customer_approval_email(customer_email, customer_name, pitch_name, date
         with smtplib.SMTP('smtp.gmail.com', 587) as s:
             s.starttls(); s.login(sender_email, sender_password); s.send_message(msg)
     except Exception as e:
-        print(f"Mail hatasi: {e}")
+        logger.warning(f"Mail hatasi: {e}")
 
 
 # ─── SABİTLER ────────────────────────────────────────────────────
@@ -349,7 +335,7 @@ def busy_slots():
     busy_records = Reservation.query.filter_by(
         pitch_id=pitch_id, date=date_obj
     ).filter(Reservation.status.in_(['Pending', 'Approved'])).all()
-    busy_dict = {r.time_slot: r.status for r in busy_records}
+    busy_dict    = {r.time_slot: r.status for r in busy_records}
 
     blocked      = BlockedSlot.query.filter_by(pitch_id=pitch_id, date=date_obj).all()
     blocked_dict = {b.time_slot: b.reason for b in blocked}
@@ -360,7 +346,13 @@ def busy_slots():
 @app.route('/reserve', methods=['POST'])
 @limiter.limit("3 per minute")
 def reserve():
-    # ── reCAPTCHA v3 kontrolü ──
+    # ── 1. Honeypot: bot tespiti ──
+    if request.form.get('website', ''):
+        logger.warning(f"Honeypot tetiklendi — IP: {request.remote_addr}")
+        flash('Rezervasyon talebiniz alindi! Yonetici onayindan sonra kesinlesecektir.', 'success')
+        return redirect(url_for('index'))
+
+    # ── 2. reCAPTCHA v3 kontrolü ──
     if not verify_recaptcha(request.form.get('g-recaptcha-response', ''), action='reserve'):
         flash('Bot doğrulaması başarısız. Lütfen tekrar deneyin.', 'danger')
         return redirect(url_for('index'))
@@ -487,6 +479,39 @@ def logout():
     logout_user()
     session.clear()
     flash('Guvenli cikis yapildi.', 'info')
+    return redirect(url_for('admin_login'))
+
+
+@app.route('/admin/change_password', methods=['POST'])
+@login_required
+def change_password():
+    current_pw = request.form.get('current_password', '')
+    new_pw     = request.form.get('new_password', '')
+    confirm_pw = request.form.get('confirm_password', '')
+
+    if not check_password_hash(current_user.password_hash, current_pw):
+        flash('Mevcut şifreniz yanlış!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    if len(new_pw) < 8:
+        flash('Yeni şifre en az 8 karakter olmalıdır!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    if new_pw != confirm_pw:
+        flash('Yeni şifreler eşleşmiyor!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    if current_pw == new_pw:
+        flash('Yeni şifre mevcut şifreden farklı olmalıdır!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    from werkzeug.security import generate_password_hash
+    current_user.password_hash = generate_password_hash(new_pw, method='pbkdf2:sha256')
+    db.session.commit()
+
+    logout_user()
+    session.clear()
+    flash('Şifreniz başarıyla değiştirildi. Lütfen yeni şifrenizle giriş yapın.', 'success')
     return redirect(url_for('admin_login'))
 
 
@@ -662,8 +687,6 @@ def update_logo():
 
 
 # ─── DEKONT ERİŞİM KORUMASI ──────────────────────────────────────
-# Dekontlar static/ dışında olduğu için URL ile doğrudan erişilemez.
-# Sadece giriş yapmış yönetici görebilir.
 
 @app.route('/admin/receipt/<filename>')
 @login_required
@@ -676,14 +699,12 @@ def view_receipt(filename):
 
 @app.after_request
 def apply_security_headers(response):
-    # ── Cache engelleme ──
     if response.status_code == 200 and response.content_type and \
        response.content_type.startswith('text/html'):
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
         response.headers["Pragma"]        = "no-cache"
         response.headers["Expires"]       = "0"
 
-    # ── Güvenlik header'ları ──
     response.headers['X-Frame-Options']        = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-XSS-Protection']       = '1; mode=block'
@@ -691,21 +712,20 @@ def apply_security_headers(response):
     response.headers['Permissions-Policy']     = 'camera=(), microphone=(), geolocation=()'
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+        "script-src 'self' https://cdn.jsdelivr.net https://www.google.com "
+        "https://www.gstatic.com 'unsafe-inline'; "
         "style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
         "https://fonts.googleapis.com 'unsafe-inline'; "
         "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
         "img-src 'self' data:; "
-        "connect-src 'self'"
+        "connect-src 'self'; "
+        "frame-src https://www.google.com"
     )
 
-    # HSTS: sadece production/HTTPS ortamında gönder
     if not app.debug:
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
 
-    # Sunucu versiyon bilgisini gizle
     response.headers.pop('Server', None)
-
     return response
 
 
@@ -720,7 +740,7 @@ with app.app_context():
         yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
         db.session.add(yeni_admin)
         db.session.commit()
-        logger.info("Ilk yonetici hesabi olusturuldu.")   # Şifre ASLA loglanmaz
+        logger.info("Ilk yonetici hesabi olusturuldu.")
     else:
         logger.info("Yonetici zaten mevcut.")
 

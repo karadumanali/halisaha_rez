@@ -72,7 +72,6 @@
 .step-panel { display: none; }
 .step-panel.active { display: block; }
 
-/* Panel başlığı */
 .panel-head {
     padding: 26px 26px 0;
     border-bottom: none;
@@ -97,7 +96,6 @@
 .summary-item .s-label { font-weight: 700; color: var(--teal-dk); margin-right: 4px; }
 .summary-item .s-val   { color: var(--ink); font-weight: 600; }
 
-/* ── Bölüm etiketi ── */
 .date-label {
     font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em;
     text-transform: uppercase; color: var(--teal-dk);
@@ -105,7 +103,6 @@
 }
 .date-label i { color: var(--teal); font-size: 0.8rem; }
 
-/* Date input */
 input[type="date"].form-control {
     font-size: 1rem !important;
     padding: 13px 14px !important;
@@ -144,7 +141,6 @@ input[type="date"].form-control {
     cursor: pointer; transition: all 0.18s; background: var(--white);
     -webkit-tap-highlight-color: transparent; touch-action: manipulation;
 }
-/* Müsait olanlar için tasarım */
 .slot-item.available:hover {
     border-color: var(--teal); background: var(--teal-pale);
     transform: translateY(-1px); box-shadow: var(--sh-sm);
@@ -154,13 +150,10 @@ input[type="date"].form-control {
     box-shadow: 0 0 0 3px rgba(14,168,116,0.18), var(--sh-sm);
     transform: translateY(-1px);
 }
-/* Kilitli/Dolu olanlar için yeni zarif tasarım */
 .slot-item.locked {
-    background: #f8fafc; border: 1.5px dashed #cbd5e1; cursor: pointer; 
+    background: #f8fafc; border: 1.5px dashed #cbd5e1; cursor: pointer;
 }
-.slot-item.locked:hover {
-    background: #f1f5f9; border-color: #94a3b8;
-}
+.slot-item.locked:hover { background: #f1f5f9; border-color: #94a3b8; }
 
 .slot-time { font-weight: 700; font-size: 1rem; color: var(--ink); }
 .slot-item.locked .slot-time { color: #64748b; }
@@ -170,12 +163,11 @@ input[type="date"].form-control {
     padding: 5px 14px; border-radius: 20px;
     display: flex; align-items: center; gap: 5px;
 }
-/* Sadece Kilitli, Dolu ve Müsait rozetleri olacak */
-.slot-badge.badge-locked        { background: #e2e8f0; color: #475569; }
-.slot-badge.badge-busy          { background: #fee2e2; color: #b91c1c; }
-.slot-badge.badge-pending       { background: #fef9c3; color: #854d0e; }
-.slot-badge.badge-available     { background: var(--teal-pale); color: var(--teal-dk); }
-.slot-badge.badge-selected      { background: var(--teal); color: var(--white); }
+.slot-badge.badge-locked    { background: #e2e8f0; color: #475569; }
+.slot-badge.badge-busy      { background: #fee2e2; color: #b91c1c; }
+.slot-badge.badge-pending   { background: #fef9c3; color: #854d0e; }
+.slot-badge.badge-available { background: var(--teal-pale); color: var(--teal-dk); }
+.slot-badge.badge-selected  { background: var(--teal); color: var(--white); }
 
 /* ── IBAN kutusu ── */
 .iban-box {
@@ -192,7 +184,6 @@ input[type="date"].form-control {
     color: var(--ink); font-family: monospace; word-break: break-all;
     letter-spacing: 0.05em;
 }
-
 .iban-notice {
     background: var(--warning-bg); border: 1.5px solid var(--warning-bd);
     border-radius: var(--r-sm); padding: 12px 16px; margin-bottom: 22px;
@@ -201,7 +192,6 @@ input[type="date"].form-control {
 }
 .iban-notice i { flex-shrink: 0; margin-top: 2px; }
 
-/* Bölüm başlığı */
 .section-head {
     display: flex; align-items: center; gap: 9px;
     font-size: 1.05rem; font-weight: 800; color: var(--ink);
@@ -210,7 +200,6 @@ input[type="date"].form-control {
 .section-head i { color: var(--teal); }
 .section-head:first-of-type { margin-top: 0; }
 
-/* Form label */
 .form-label { font-size: 0.95rem !important; font-weight: 700 !important; }
 .form-control { font-size: 0.97rem !important; padding: 13px 14px !important; }
 
@@ -240,7 +229,6 @@ input[type="date"].form-control {
     margin-top: 8px; display: none; align-items: center; gap: 6px;
 }
 
-/* Telefon mesajı */
 .phone-msg { font-size: 0.85rem; margin-top: 5px; display: none; }
 .phone-msg.show { display: block; }
 .phone-msg.ok  { color: var(--teal-dk); font-weight: 600; }
@@ -277,12 +265,10 @@ input[type="date"].form-control {
 .btn-next:active:not(:disabled) { transform: translateY(0); }
 .btn-next:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
 
-/* Boş durum */
 .empty-state { text-align: center; padding: 60px 20px; color: var(--gray-400); }
 .empty-state i { font-size: 3rem; color: var(--gray-300); margin-bottom: 16px; display: block; }
 .empty-state p { font-size: 1rem; }
 
-/* Responsive */
 @media (max-width: 480px) {
     .panel-head  { padding: 20px 18px 0; }
     .panel-body  { padding: 18px 18px; }
@@ -337,7 +323,6 @@ input[type="date"].form-control {
             <div class="date-label"><i class="fas fa-calendar-alt"></i> Tarih</div>
             <input type="date" id="selDate" class="form-control"
                    min="{{ today_date }}" required aria-label="Rezervasyon tarihi">
-
             <div class="date-label" style="margin-top:22px;">
                 <i class="fas fa-futbol"></i> Saha Seçin
             </div>
@@ -397,10 +382,13 @@ input[type="date"].form-control {
                 <input type="hidden" name="date"       id="hDate">
                 <input type="hidden" name="time_slot"  id="hSlot">
                 <input type="hidden" name="g-recaptcha-response" id="gRecaptchaReserve">
+                <!-- ── HONEYPOT: İnsan görmez, bot doldurur → sessizce reddedilir ── -->
+                <div style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;" aria-hidden="true">
+                    <input type="text" name="website" tabindex="-1" autocomplete="off">
+                </div>
 
                 <!-- ── 1. Kişi Bilgileri ── -->
                 <div class="section-head"><i class="fas fa-user"></i> Kişi Bilgileri</div>
-
                 <div class="mb-3">
                     <label class="form-label" for="fName">Ad Soyad *</label>
                     <input type="text" id="fName" name="customer_name"
@@ -434,7 +422,6 @@ input[type="date"].form-control {
 
                 <!-- ── 3. Dekont Yükleme ── -->
                 <div class="section-head"><i class="fas fa-upload"></i> Dekont Yükleme</div>
-
                 <div class="upload-zone" id="uploadZone">
                     <input type="file" name="receipt" id="fReceipt"
                            accept=".pdf,.jpg,.jpeg,.png" required
@@ -462,8 +449,8 @@ input[type="date"].form-control {
 
 <script>
 var state = { step:1, pitchId:null, pitchName:null, date:null, slot:null };
-var busySlots = {}; // ARTIK ARRAY DEĞİL SÖZLÜK (OBJECT) KULLANIYORUZ
-var blockedSlots = {}; // { 'slot': 'sebep' }
+var busySlots = {};
+var blockedSlots = {};
 var SLOTS = ['16:00 - 17:00','17:00 - 18:00','18:00 - 19:00','19:00 - 20:00','20:00 - 21:00','21:00 - 22:00','22:00 - 23:00'];
 
 function goStep(n) {
@@ -513,36 +500,29 @@ function renderSlots() {
     document.getElementById('btn2Next').disabled=true;
     var now=new Date(), selDate=new Date(state.date+'T00:00:00');
     var isToday=selDate.toDateString()===now.toDateString();
-    
+
     SLOTS.forEach(function(slot){
         var startHour=parseInt(slot.split(':')[0]);
         var isPast=isToday&&startHour<=now.getHours();
-        
-        // DURUM KONTROLÜ BURADA YAPILIYOR
-        var slotStatus = busySlots[slot]; // 'Pending', 'Approved' veya tanımsız
+        var slotStatus = busySlots[slot];
         var isApproved = (slotStatus === 'Approved');
         var isPending  = (slotStatus === 'Pending');
         var blockReason=blockedSlots[slot]||null;
-        
-        // Saat geçmişse, onaylanmışsa, bekliyorsa veya admin kilitlediyse seçime kapat.
         var locked = isPast || isApproved || isPending || blockReason !== null;
-        
+
         var div=document.createElement('div');
         div.className='slot-item '+(locked?'locked':'available');
-        
+
         if(!locked){
-            // Müsait ise standart tıklama
             div.setAttribute('role','radio'); div.setAttribute('aria-checked','false'); div.setAttribute('tabindex','0');
             div.onclick=function(){selectSlot(div,slot);};
             div.onkeydown=function(e){if(e.key==='Enter'||e.key===' ')selectSlot(div,slot);};
         } else if (blockReason !== null) {
-            // Admin Kilitlediyse Uyarı Ver
             div.onclick = function() {
                 alert('Bu saat dilimi şu sebeple kilitlidir:\n\n👉 ' + blockReason);
             };
         }
 
-        // TASARIM - HANGİ ROZET GÖZÜKECEK?
         var badgeClass, badgeText;
         if (blockReason) {
             badgeClass = 'badge-locked';
@@ -609,7 +589,6 @@ function submitReservation() {
     fillHidden();
     var siteKey = '{{ recaptcha_site_key|default("") }}';
     if (!siteKey) {
-        // Geliştirme ortamı: key yoksa direkt gönder
         if (confirm('Rezervasyon talebinizi göndermek istiyor musunuz?')) {
             document.getElementById('reserveForm').submit();
         }
