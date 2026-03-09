@@ -539,7 +539,7 @@ def admin_login():
         if admin and check_password_hash(admin.password_hash, password):
             record_attempt(username, ip_address, success=True)
             login_user(admin, remember=False)
-            flash('Yonetici paneline hos geldiniz.', 'success')
+            
             return safe_redirect(request.args.get('next'), url_for('admin_dashboard'))
         else:
             record_attempt(username, ip_address, success=False)
