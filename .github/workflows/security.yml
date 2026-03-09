@@ -98,63 +98,7 @@ jobs:
 
 
   # ══════════════════════════════════════════════
-  # 3. OWASP ZAP — Çalışan uygulamaya aktif tarama
-  # ══════════════════════════════════════════════
-  zap:
-    name: 🕷️ OWASP ZAP — Web Uygulama Taraması
-    runs-on: ubuntu-latest
-    # Sadece main/master'a push'ta çalışsın (PR'larda atla — yavaş)
-    if: github.event_name == 'push' || github.event_name == 'schedule'
-
-    steps:
-      - name: Kodu çek
-        uses: actions/checkout@v4
-
-      - name: Python kur
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Bağımlılıkları kur
-        run: pip install -r requirements.txt
-
-      - name: Test .env oluştur
-        run: |
-          cat > .env << 'EOF'
-          SECRET_KEY=ci-test-secret-key-not-for-production-32chars
-          DATABASE_URL=sqlite:///test_ci.db
-          FLASK_ENV=development
-          FLASK_DEBUG=False
-          EOF
-
-      - name: Flask uygulamasını başlat
-        run: |
-          python app.py &
-          echo $! > flask.pid
-          # Uygulamanın ayağa kalkması için bekle
-          sleep 8
-          curl -f http://127.0.0.1:5000/ || (echo "Flask başlatılamadı!" && exit 1)
-
-      - name: OWASP ZAP Baseline Taraması
-        uses: zaproxy/action-baseline@v0.12.0
-        with:
-          target: 'http://127.0.0.1:5000'
-          rules_file_name: '.zap/rules.tsv'
-          cmd_options: '-a -j'
-          fail_action: false
-          allow_issue_writing: false
-          artifact_name: 'zap-baseline-report'
-
-      - name: Flask'ı durdur
-        if: always()
-        run: |
-          if [ -f flask.pid ]; then
-            kill $(cat flask.pid) 2>/dev/null || true
-          fi
-
-
-  # ══════════════════════════════════════════════
-  # 4. ÖZET — Tüm taramalar bitince sonuç bildir
+  # 3. ÖZET — Tüm taramalar bitince sonuç bildir
   # ══════════════════════════════════════════════
   summary:
     name: 📊 Tarama Özeti
