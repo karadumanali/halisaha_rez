@@ -154,6 +154,81 @@ def safe_redirect(next_url, fallback):
     return redirect(fallback)
 
 
+# ─── IP KISITLAMA (Kampüs / İzinli IP'ler) ───────────────────────
+
+def _load_allowed_ips() -> list:
+    """
+    .env'deki ALLOWED_ADMIN_IPS değişkenini okur.
+    Birden fazla IP virgülle ayrılır:
+        ALLOWED_ADMIN_IPS=193.140.x.x,10.0.0.1,127.0.0.1
+    Boşsa kısıtlama KAPALI (geliştirme kolaylığı).
+    """
+    raw = os.getenv('ALLOWED_ADMIN_IPS', '')
+    return [ip.strip() for ip in raw.split(',') if ip.strip()]
+
+
+def get_real_ip() -> str:
+    """
+    Proxy/load-balancer arkasında gerçek IP'yi döner.
+    X-Forwarded-For başlığı varsa ilk IP'yi alır.
+    """
+    forwarded = request.headers.get('X-Forwarded-For', '')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.remote_addr or ''
+
+
+def is_ip_allowed(ip: str, allowed: list) -> bool:
+    """
+    Tam IP eşleşmesi VEYA CIDR blok kontrolü.
+    Örnek: 193.140.0.0/16 tüm kampüs bloğunu kapsar.
+    """
+    import ipaddress
+    if not allowed:
+        return True   # Liste boşsa herkese açık (geliştirme modu)
+    try:
+        client = ipaddress.ip_address(ip)
+        for entry in allowed:
+            try:
+                if '/' in entry:
+                    if client in ipaddress.ip_network(entry, strict=False):
+                        return True
+                else:
+                    if client == ipaddress.ip_address(entry):
+                        return True
+            except ValueError:
+                continue
+    except ValueError:
+        pass
+    return False
+
+
+@app.before_request
+def restrict_admin_by_ip():
+    """
+    /login ve /admin/* path'lerine sadece izinli IP'lerden erişim.
+    ALLOWED_ADMIN_IPS boşsa kısıtlama devrede değil.
+    """
+    allowed_ips = _load_allowed_ips()
+    if not allowed_ips:
+        return   # Kısıtlama kapalı
+
+    admin_paths = ('/login', '/admin')
+    if not any(request.path.startswith(p) for p in admin_paths):
+        return   # Admin dışı sayfalara dokunma
+
+    client_ip = get_real_ip()
+    if not is_ip_allowed(client_ip, allowed_ips):
+        logger.warning(
+            f"Engellendi — yetkisiz IP: {client_ip} → {request.path}"
+        )
+        return (
+            "<h2>Erişim Engellendi</h2>"
+            "<p>Bu sayfaya yalnızca yetkili ağdan erişilebilir.</p>",
+            403
+        )
+
+
 # ─── reCAPTCHA v3 DOĞRULAMA ──────────────────────────────────────
 
 RECAPTCHA_SECRET    = os.getenv('RECAPTCHA_SECRET_KEY', '')
