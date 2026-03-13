@@ -49,7 +49,8 @@ if not _secret:
 app.config['SECRET_KEY']                     = _secret
 app.config['SQLALCHEMY_DATABASE_URI']        = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SESSION_PERMANENT']              = False
+app.config['SESSION_PERMANENT']              = True
+app.config['PERMANENT_SESSION_LIFETIME']     = timedelta(minutes=30)
 app.config['SESSION_COOKIE_HTTPONLY']        = True
 app.config['SESSION_COOKIE_SAMESITE']        = 'Lax'
 app.config['SESSION_COOKIE_SECURE']          = os.getenv('FLASK_ENV') == 'production'
@@ -285,10 +286,8 @@ def save_secure_receipt(file):
     file.seek(0)
     mime_type = detect_mime(file_content)
     if not mime_type:
-        logger.warning("MIME tespit edilemedi, uzantıya göre devam ediliyor.")
-        ext_guess = secure_filename(file.filename).rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
-        mime_map  = {'pdf': 'application/pdf', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png'}
-        mime_type = mime_map.get(ext_guess, '')
+        logger.warning("MIME tespit edilemedi, dosya reddedildi.")
+        return None
 
     ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png'}
     ALLOWED_PDF         = {'application/pdf'}
