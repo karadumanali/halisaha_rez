@@ -22,7 +22,7 @@ import re
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory
 from werkzeug.utils import secure_filename
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import db, Admin, Pitch, Reservation, BlockedSlot, LoginAttempt
 from dotenv import load_dotenv
@@ -385,6 +385,8 @@ VALID_SLOTS = [
     '19:00 - 20:00', '20:00 - 21:00', '21:00 - 22:00', '22:00 - 23:00'
 ]
 
+DUMMY_HASH = generate_password_hash("__dummy_never_matches__")
+
 # ─── ROTALAR ─────────────────────────────────────────────────────
 
 @app.route('/')
@@ -536,10 +538,14 @@ def admin_login():
             return render_template('login.html', recaptcha_site_key=RECAPTCHA_SITE)
 
         admin = Admin.query.filter_by(username=username).first()
-        if admin and check_password_hash(admin.password_hash, password):
+
+        # ── Timing attack koruması ──
+        hash_to_check = admin.password_hash if admin else DUMMY_HASH
+        password_ok   = check_password_hash(hash_to_check, password)
+
+        if admin and password_ok:
             record_attempt(username, ip_address, success=True)
             login_user(admin, remember=False)
-            
             return safe_redirect(request.args.get('next'), url_for('admin_dashboard'))
         else:
             record_attempt(username, ip_address, success=False)
@@ -580,7 +586,7 @@ def change_password():
         flash('Yeni şifre mevcut şifreden farklı olmalıdır!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
-    from werkzeug.security import generate_password_hash
+    
     current_user.password_hash = generate_password_hash(new_pw, method='pbkdf2:sha256')
     db.session.commit()
 
@@ -810,7 +816,7 @@ with app.app_context():
 
     admin_var_mi = Admin.query.filter_by(username='yonetici').first()
     if not admin_var_mi:
-        from werkzeug.security import generate_password_hash
+        
         hashed_password = generate_password_hash("halisaha123", method='pbkdf2:sha256')
         yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
         db.session.add(yeni_admin)
