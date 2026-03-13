@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block body %}
-<style nonce="{{ csp_nonce }}">
+<style>
 /* Admin sayfasında container'ı genişlet */
 .site-container { max-width: 1400px !important; }
 /* ══════════════════════════════════════════════════
@@ -897,7 +897,7 @@
     </div><!-- /admin-content -->
 </div><!-- /admin-layout -->
 
-<script nonce="{{ csp_nonce }}">
+<script>
 /* ── TAB SİSTEMİ ── */
 function switchTab(name, el) {
     document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });

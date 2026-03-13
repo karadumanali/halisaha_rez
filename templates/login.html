@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block body %}
-<style nonce="{{ csp_nonce }}">
+<style>
 .login-wrap {
     min-height: 72vh;
     display: flex;
@@ -195,8 +195,7 @@
     </div>
 </div>
 
-<script nonce="{{ csp_nonce }}">
-
+<script>
 function togglePw() {
     var inp  = document.getElementById('password');
     var icon = document.getElementById('pwEyeIcon');
@@ -234,8 +233,7 @@ if (RECAPTCHA_SITE_KEY) {
 </script>
 
 {% if recaptcha_site_key %}
-<script nonce="{{ csp_nonce }}" src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}"></script>
-
+<script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}"></script>
 {% endif %}
 
 {% endblock %}
