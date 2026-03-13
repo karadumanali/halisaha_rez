@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 import uuid
 import re
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory, g
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
@@ -203,6 +203,12 @@ def is_ip_allowed(ip: str, allowed: list) -> bool:
         pass
     return False
 
+
+import secrets
+
+@app.before_request
+def generate_nonce():
+    g.csp_nonce = secrets.token_hex(16)
 
 @app.before_request
 def restrict_admin_by_ip():
@@ -790,16 +796,17 @@ def apply_security_headers(response):
     response.headers['X-XSS-Protection']       = '1; mode=block'
     response.headers['Referrer-Policy']        = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy']     = 'camera=(), microphone=(), geolocation=()'
+    nonce = g.get('csp_nonce', '')
     response.headers['Content-Security-Policy'] = (
-        "default-src 'self'; "
-        "script-src 'self' https://cdn.jsdelivr.net https://www.google.com "
-        "https://www.gstatic.com 'unsafe-inline'; "
-        "style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
-        "https://fonts.googleapis.com 'unsafe-inline'; "
-        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
-        "img-src 'self' data:; "
-        "connect-src 'self'; "
-        "frame-src https://www.google.com"
+        f"default-src 'self'; "
+        f"script-src 'self' https://cdn.jsdelivr.net https://www.google.com "
+        f"https://www.gstatic.com 'nonce-{nonce}'; "
+        f"style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
+        f"https://fonts.googleapis.com 'nonce-{nonce}'; "
+        f"font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+        f"img-src 'self' data:; "
+        f"connect-src 'self'; "
+        f"frame-src https://www.google.com"
     )
 
     if not app.debug:
@@ -808,6 +815,10 @@ def apply_security_headers(response):
     response.headers.pop('Server', None)
     return response
 
+
+@app.context_processor
+def inject_nonce():
+    return dict(csp_nonce=g.get('csp_nonce', ''))
 
 with app.app_context():
     db.create_all()
