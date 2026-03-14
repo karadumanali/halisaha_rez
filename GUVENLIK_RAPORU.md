@@ -1,502 +1,161 @@
-# Halı Saha Rezervasyon Sistemi - Güvenlik Zafiyet Raporu
+# AYBÜ Hali Saha Rezervasyon Sistemi - Guvenlik Analiz Raporu
 
-**Tarih:** 2026-03-08
-**Kapsam:** Tam kaynak kodu analizi (app.py, models.py, setup_db.py, templates)
-**Yöntem:** Statik kod analizi (white-box)
-
----
-
-## KRİTİK (Critical)
-
-### 1. Brute Force Koruması Yalnızca Client-Side
-
-**Risk:** KRİTİK
-**Konum:** `templates/login.html` satır 194-219, `app.py` satır 274
-
-Giriş denemesi sınırlaması `sessionStorage` ile yapılıyor. Bu tamamen istemci tarafında olup, `curl`, `Burp Suite` veya herhangi bir HTTP istemcisiyle kolayca atlanır.
-
-```javascript
-// Sadece sessionStorage'da tutuluyor - kolayca bypass edilir
-function getN(){return parseInt(sessionStorage.getItem('_lt')||'0');}
-```
-
-Sunucu tarafında `@limiter.limit("5 per minute")` var ama:
-- **Dakikada 5 deneme** hala çok yüksek (saatte 300, günde 7200 deneme)
-- Rate limiter **in-memory** storage kullanıyor - sunucu restart'ında sıfırlanır
-- Gunicorn ile birden fazla worker kullanılırsa her worker'ın kendi belleği olur, limit paylaşılmaz
-
-**PoC:**
-```bash
-# Client-side koruma olmadan sonsuz deneme
-for i in $(seq 1 1000); do
-  curl -s -X POST http://target/login \
-    -d "username=yonetici&password=deneme${i}&csrf_token=TOKEN"
-done
-```
+**Tarih:** 2026-03-14
+**Kapsam:** Tum codebase (`app.py`, `models.py`, `setup_db.py`, templates, static, CI/CD)
+**Uygulama:** Flask 3.1.2 + PostgreSQL + Redis
 
 ---
 
-### 2. Hardcoded Varsayılan Kimlik Bilgileri
+## GENEL DEGERLENDIRME
 
-**Risk:** KRİTİK
-**Konum:** `app.py` satır 506, `setup_db.py` satır 15
-
-```python
-hashed_password = generate_password_hash("halisaha123", method='pbkdf2:sha256')
-yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
-```
-
-Varsayılan kullanıcı adı ve şifre kaynak kodda açık yazılı. Değiştirilmesi için UI'da bir mekanizma yok. Bu, GitHub'da public bir repoya push edilirse anında istismar edilebilir.
+Uygulama guvenlik acisindan **iyi seviyede** tasarlanmis. Brute force korumasi, CSRF, rate limiting, dosya upload guvenligi, SQL injection korumasi ve guvenlik header'lari duzgun uygulanmis. Ancak birkac onemli bulgu mevcut.
 
 ---
 
-### 3. SECRET_KEY Hardcoded Fallback
+## KRITIK BULGULAR
 
-**Risk:** KRİTİK
-**Konum:** `app.py` satır 38
+### 1. Hardcoded Varsayilan Admin Kimlik Bilgileri
 
-```python
-_secret = os.getenv('SECRET_KEY') or 'GECICI-DEV-KEY-CANLI-ORTAMDA-DEGISTIR-99887766'
-```
+| | |
+|---|---|
+| **Dosya** | `app.py:823-830`, `setup_db.py:15-18` |
+| **Risk** | YUKSEK |
+| **Detay** | Kullanici adi `yonetici`, sifre `halisaha123` kaynak kodda acik metin olarak bulunuyor. Uygulama ilk calistiginda bu kimlik bilgileriyle otomatik admin hesabi olusturuluyor. |
+| **Etki** | Kaynak koda erisen herkes varsayilan sifreyi bilir. Sifre degistirilmemisse dogrudan admin paneline erisim saglanir. |
+| **Oneri** | Ilk calistirmada rastgele sifre uretip konsola/log'a yazdirmak veya environment variable'dan almak. |
 
-`.env` dosyası yoksa veya `SECRET_KEY` tanımlı değilse, bilinen bir sabit anahtar kullanılıyor. Bu anahtarla:
-- Session cookie'leri taklit edilebilir (session forgery)
-- CSRF token'ları üretilebilir
-- Admin olarak giriş yapılabilir
+### 2. CSP'de `unsafe-inline` Kullanimi
 
----
-
-## YÜKSEK (High)
-
-### 4. Hesap Kilitleme Mekanizması Yok
-
-**Risk:** YÜKSEK
-**Konum:** `app.py` satır 273-291
-
-Sunucu tarafında başarısız giriş denemelerini takip eden ve belirli bir eşikten sonra hesabı kilitleyen bir mekanizma yok. Rate limit atlandığında (örn. farklı IP'ler, sunucu restart) sınırsız deneme yapılabilir.
+| | |
+|---|---|
+| **Dosya** | `app.py:793-803` |
+| **Risk** | YUKSEK |
+| **Detay** | Content Security Policy'de hem `script-src` hem `style-src` direktiflerinde `'unsafe-inline'` var. Bu, CSP'nin XSS'e karsi sagladigi korumayi buyuk olcude zayiflatir. |
+| **Oneri** | Nonce tabanli CSP'ye gecilmeli. Inline script ve style'lar harici dosyalara tasinmali veya nonce attribute ile isaretlenmeli. |
 
 ---
 
-### 5. Open Redirect Zafiyeti
+## ORTA SEVIYE BULGULAR
 
-**Risk:** YÜKSEK
-**Konum:** `app.py` satır 285-287
+### 3. Tek Admin Kullanici / Rol Tabanli Erisim Yok
 
-```python
-next_page = request.args.get('next')
-if next_page and next_page.startswith('/'):
-    return redirect(next_page)
-```
+| | |
+|---|---|
+| **Dosya** | `models.py:9-17` |
+| **Risk** | ORTA |
+| **Detay** | Sistemde tek bir admin kullanici tipi var. Farkli yetki seviyeleri (orn: sadece goruntuleme, sadece onay) tanimlanamiyoyr. |
+| **Etki** | Admin sifresi ele gecirilirse tum sistem fonksiyonlarina erisim saglanir. |
+| **Oneri** | Birden fazla admin ve rol sistemi (RBAC) dusunulebilir. |
 
-`startswith('/')` kontrolü `//evil.com` gibi protocol-relative URL'leri engellemez:
+### 4. IP Kisitlamasi Varsayilan Olarak Kapali
 
-```
-http://target/login?next=//evil.com/phishing
-```
+| | |
+|---|---|
+| **Dosya** | `app.py:189` |
+| **Risk** | ORTA |
+| **Detay** | `ALLOWED_ADMIN_IPS` environment variable'i bos birakildiginda IP kisitlamasi tamamen devre disi kaliyor. |
+| **Oneri** | Production ortaminda bu degiskenin mutlaka ayarlandigindan emin olunmali. Bos oldugunda uyari log'lanmasi dusunulebilir. |
 
-Başarılı girişten sonra kullanıcı saldırganın sitesine yönlendirilir.
+### 5. Rate Limiter Storage Backend
 
----
-
-### 6. Eksik Güvenlik Header'ları
-
-**Risk:** YÜKSEK
-**Konum:** `layout.html`, `app.py`
-
-Aşağıdaki güvenlik header'ları eksik:
-- `Content-Security-Policy` — XSS koruması
-- `X-Frame-Options` / `frame-ancestors` — Clickjacking koruması
-- `X-Content-Type-Options: nosniff` — MIME sniffing koruması
-- `Strict-Transport-Security` — HTTPS zorlaması
-- `Referrer-Policy` — Bilgi sızıntısı
-- `Permissions-Policy` — Tarayıcı API kısıtlaması
+| | |
+|---|---|
+| **Dosya** | `app.py:77-83` |
+| **Risk** | ORTA |
+| **Detay** | Redis baglantisi saglanamazsa rate limiter `memory://` fallback'ine dusuyor. Multi-process deployment'ta (gunicorn workers) her worker kendi belleginde sayim tutar, bu da rate limiting'in etkinligini azaltir. |
+| **Oneri** | Production'da Redis'in calistigindan emin olunmali. |
 
 ---
 
-### 7. SESSION_COOKIE_SECURE Eksik
+## DUSUK SEVIYE BULGULAR
 
-**Risk:** YÜKSEK
-**Konum:** `app.py` satır 42-47
+### 6. SameSite Cookie Ayari
 
-```python
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-# SESSION_COOKIE_SECURE = True YOK!
-```
+| | |
+|---|---|
+| **Dosya** | `app.py:55` |
+| **Risk** | DUSUK |
+| **Detay** | `SameSite='Lax'` kullaniliyor. `Strict` daha guvenli olur ancak bazi kullanim senaryolarini kisitlayabilir. |
 
-HTTPS kullanılsa bile cookie'ler HTTP üzerinden de gönderilebilir. Man-in-the-middle saldırısıyla session çalınabilir.
+### 7. X-XSS-Protection Header'i Deprecated
 
----
+| | |
+|---|---|
+| **Dosya** | `app.py:790` |
+| **Risk** | DUSUK |
+| **Detay** | `X-XSS-Protection: 1; mode=block` header'i modern tarayicilarda artik desteklenmiyor. CSP zaten bu korumayi sagliyor. |
+| **Oneri** | Kaldirilabilir veya `0` olarak ayarlanabilir. |
 
-## ORTA (Medium)
+### 8. Custom Hata Sayfalari Yok
 
-### 8. time_slot Doğrulaması Eksik
-
-**Risk:** ORTA
-**Konum:** `app.py` satır 210
-
-```python
-time_slot = request.form.get('time_slot')
-```
-
-`time_slot` değeri sunucu tarafındaki `SLOTS` listesine karşı doğrulanmıyor. Saldırgan rastgele string gönderebilir ve veritabanına beklenmeyen veriler kaydedilir.
-
----
-
-### 9. pitch_id Tür Doğrulaması Eksik
-
-**Risk:** ORTA
-**Konum:** `app.py` satır 208, 185
-
-`pitch_id` integer olarak doğrulanmıyor. Geçersiz değerler veritabanı sorgularında hatalara neden olabilir.
+| | |
+|---|---|
+| **Risk** | DUSUK |
+| **Detay** | Custom 404/500 error handler'lari tanimlanmamis. Debug modunda Flask varsayilan hata sayfalari stack trace gosterebilir. |
+| **Etki** | Production'da `DEBUG=False` oldugu surece sorun yok. |
 
 ---
 
-### 10. Rate Limiter In-Memory Storage
+## BRUTE FORCE ANALIZI
 
-**Risk:** ORTA
-**Konum:** `app.py` satır 63-67
+### Mevcut Korumalar
 
-```python
-limiter = Limiter(
-    get_remote_address, app=app,
-    storage_uri="memory://",
-    ...
-)
-```
+| Mekanizma | Detay | Dosya |
+|-----------|-------|-------|
+| Rate Limiting | `/login`: 3/dk, 10/saat, 20/gun | `app.py:517` |
+| Hesap Kilitleme | 5 basarisiz deneme → 15 dk kilit (IP + kullanici adi bazli) | `app.py:119-145` |
+| Timing Attack Korumasi | Olmayan kullanicilar icin dummy hash karsilastirmasi | `app.py:387, 541-543` |
+| reCAPTCHA v3 | Login ve rezervasyon formlarinda bot korumasi (skor >= 0.5) | `app.py:239-258` |
+| Honeypot | Gizli `website` alani bot tespiti icin | `app.py:426-429` |
+| IP Whitelist | Admin sayfalari icin opsiyonel IP kisitlamasi (CIDR destekli) | `app.py:158-230` |
+| Login Attempt Logging | Tum giris denemeleri DB'de kayit altinda | `models.py:79-89` |
+| Aylik Temizlik | 30 gunden eski login kayitlari otomatik siliniyor | `app.py:98-116` |
 
-- Sunucu restart'ında tüm limitler sıfırlanır
-- Birden fazla Gunicorn worker'da limitler paylaşılmaz
-- Redis veya benzeri harici storage kullanılmalı
+### Degerlendirme
 
----
-
-### 11. customer_name Sanitizasyonu Eksik
-
-**Risk:** ORTA
-**Konum:** `app.py` satır 211
-
-`customer_name` yalnızca form'dan alınıp doğrudan veritabanına yazılıyor. Uzunluk kontrolü, özel karakter kontrolü yok. Model'de `String(100)` limiti DB seviyesinde var ama uygulama seviyesinde doğrulama eksik.
+Brute force korumasi **kapsamli ve cok katmanli**. Rate limiting + hesap kilitleme + reCAPTCHA + IP kisitlamasi birlikte calisarak guclu bir savunma hatti olusturuyor. Bu alanda ek aksiyon gerekmiyor.
 
 ---
 
-### 12. Bilgi Sızıntısı - Konsol Çıktıları
+## GUVENLIK KONTROL LISTESI
 
-**Risk:** ORTA
-**Konum:** `app.py` satır 32-34, `setup_db.py` satır 19
-
-```python
-print("TEST - SECRET_KEY:", "BULUNDU" if os.getenv('SECRET_KEY') else "BULUNAMADI!")
-```
-
-```python
-print("Yönetici hesabı eklendi! (Kullanıcı adı: yonetici, Şifre: halisaha123)")
-```
-
-Üretim ortamında log dosyalarına kimlik bilgileri yazılıyor.
-
----
-
-### 13. Yüklenen Dekontlara Doğrudan Erişim
-
-**Risk:** ORTA
-**Konum:** `app.py` satır 50
-
-`static/uploads/receipts/` klasörü Flask'in statik dosya sunucusu tarafından doğrudan erişilebilir. Dosya adları UUID olsa da, bilinen bir UUID ile herhangi biri ödeme dekontuna erişebilir. Kimlik doğrulama kontrolü yok.
+| Kategori | Durum | Notlar |
+|----------|:-----:|--------|
+| SQL Injection | KORUNUYOR | SQLAlchemy ORM, raw SQL yok |
+| XSS | KORUNUYOR | Jinja2 auto-escape aktif |
+| CSRF | KORUNUYOR | Flask-WTF CSRFProtect, tum POST formlarda token var |
+| Dosya Upload | KORUNUYOR | Magic bytes + extension whitelist + UUID rename + PIL reprocess |
+| Path Traversal | KORUNUYOR | `os.path.basename()` + `send_from_directory()` |
+| Open Redirect | KORUNUYOR | `safe_redirect()` fonksiyonu scheme/netloc kontrolu yapiyor |
+| Command Injection | KORUNUYOR | `subprocess`, `os.system()` kullanilmiyor |
+| Session Guvenligi | KORUNUYOR | HttpOnly, SameSite, 30dk timeout, Secure (prod) |
+| Sifre Hashleme | KORUNUYOR | pbkdf2:sha256 |
+| HTTPS / HSTS | KORUNUYOR | Production'da HSTS header'i aktif |
+| Security Headers | KORUNUYOR | X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy |
+| Gizli Bilgi Yonetimi | KORUNUYOR | `.env` dosyasi, `.gitignore`'da, `os.getenv()` kullanimi |
+| CI/CD Guvenlik Taramasi | KORUNUYOR | Bandit + Safety otomatik tarama (`security.yml`) |
+| Rate Limiting | KORUNUYOR | Global (500/gun, 100/saat) + endpoint bazli limitler |
+| Input Validation | KORUNUYOR | Isim, telefon, email, tarih, saat, fiyat dogrulamasi |
 
 ---
 
-## DÜŞÜK (Low)
+## ONCELIKLI AKSIYON PLANI
 
-### 14. Duplicate Fonksiyon Tanımı
+### Hemen Yapilmasi Gerekenler
+1. Hardcoded admin sifresini kaldir → Environment variable veya rastgele uretim
+2. CSP'den `unsafe-inline` kaldir → Nonce tabanli sisteme gec
 
-**Konum:** `app.py` satır 475-491
+### Kisa Vadede Yapilmasi Gerekenler
+3. IP kisitlamasi bosken production'da uyari log'la
+4. Rate limiter'in Redis'e bagli oldugunu dogrula (production)
+5. Custom 404/500 hata sayfalari ekle
 
-`anti_cache` fonksiyonu iki kez tanımlanmış. İkincisi birincisini ezer. İşlevsel sorun yok ama kod kalitesi sorunu.
-
----
-
-### 15. Duplicate `if __name__` Bloğu
-
-**Konum:** `app.py` satır 515-522
-
-İki kez tanımlı. İkincisi ilkini ezer.
-
----
-
-### 16. setup_db.py `drop_all()` Riski
-
-**Konum:** `setup_db.py` satır 7
-
-```python
-db.drop_all()
-```
-
-Yanlışlıkla çalıştırılırsa tüm veriler silinir. Üretim ortamında bu dosya erişilebilir olmamalı.
+### Uzun Vadede Dusunulecekler
+6. Rol tabanli erisim kontrolu (RBAC)
+7. `X-XSS-Protection` header'ini kaldir/guncelle
 
 ---
 
-### 17. Şifre Değiştirme Mekanizması Yok
+## SONUC
 
-Admin panelinde şifre değiştirme özelliği bulunmuyor. Varsayılan şifre sonsuza dek kullanılmaya devam eder.
-
----
-
-### 18. Stored XSS Potansiyeli - blockReason
-
-**Konum:** `templates/index.html` satır 540
-
-```javascript
-alert('Bu saat dilimi şu sebeple kilitlidir:\n\n' + blockReason);
-```
-
-`blockReason` admin tarafından giriliyor ve `alert()` içinde kullanılıyor. Admin hesabı ele geçirilirse zararlı içerik eklenebilir.
-
----
-
-## ÖZET TABLOSU
-
-| # | Zafiyet | Seviye | OWASP Kategori |
-|---|---------|--------|----------------|
-| 1 | Brute Force - Client-Side Koruma | KRİTİK | A07:2021 - Identification & Auth |
-| 2 | Hardcoded Kimlik Bilgileri | KRİTİK | A07:2021 - Identification & Auth |
-| 3 | SECRET_KEY Hardcoded Fallback | KRİTİK | A02:2021 - Cryptographic Failures |
-| 4 | Hesap Kilitleme Yok | YÜKSEK | A07:2021 - Identification & Auth |
-| 5 | Open Redirect | YÜKSEK | A01:2021 - Broken Access Control |
-| 6 | Eksik Güvenlik Header'ları | YÜKSEK | A05:2021 - Security Misconfiguration |
-| 7 | SESSION_COOKIE_SECURE Eksik | YÜKSEK | A05:2021 - Security Misconfiguration |
-| 8 | time_slot Doğrulama Eksik | ORTA | A03:2021 - Injection |
-| 9 | pitch_id Tür Doğrulama Eksik | ORTA | A03:2021 - Injection |
-| 10 | Rate Limiter In-Memory | ORTA | A05:2021 - Security Misconfiguration |
-| 11 | customer_name Sanitizasyonu | ORTA | A03:2021 - Injection |
-| 12 | Konsol Bilgi Sızıntısı | ORTA | A09:2021 - Security Logging |
-| 13 | Dekontlara Açık Erişim | ORTA | A01:2021 - Broken Access Control |
-| 14-18 | Çeşitli düşük seviye bulgular | DÜŞÜK | Çeşitli |
-
----
-
-## OLUMLU BULGULAR
-
-Uygulamada doğru yapılmış güvenlik önlemleri:
-
-- CSRF koruması aktif (Flask-WTF CSRFProtect)
-- Şifreler pbkdf2:sha256 ile hashleniyor
-- Dosya yüklemelerinde MIME type + extension çift doğrulama
-- UUID ile dosya adı randomizasyonu (path traversal önlenir)
-- SQLAlchemy ORM kullanımı (SQL injection koruması)
-- Jinja2 auto-escaping (XSS koruması)
-- SESSION_COOKIE_HTTPONLY aktif
-- SESSION_COOKIE_SAMESITE = 'Lax'
-- Pillow ile görsel yeniden işleme (image bomb koruması)
-- MAX_CONTENT_LENGTH limiti (5MB)
-
----
-
----
----
-
-# BÖLÜM 2: PENETRASYON TESTİ RAPORU
-
-**Tarih:** 2026-03-08
-**Hedef:** `http://127.0.0.1:5000`
-**Yöntem:** Dinamik analiz (black-box / gray-box) — curl ile aktif test
-
----
-
-## TEST 1: BRUTE FORCE / RATE LIMITING — /login
-
-**Komut:**
-```bash
-# CSRF token al
-curl -c jar GET /login → csrf_token parse
-# 12 ardışık login denemesi
-curl -b jar POST /login -d "csrf_token=...&username=yonetici&password=wrongN" (x12)
-```
-
-**Sonuç:**
-- Deneme 1-2: HTTP 200 (hatalı giriş mesajı)
-- Deneme 3-12: HTTP 429 (rate limit devreye girdi)
-- GET isteği de sayaça dahil edildiğinden, beklenen 5 yerine ~2 POST'tan sonra kilitlendi
-
-**Karar: PASS** — Sunucu tarafı rate limiting çalışıyor (ancak GET istekleri de sayılıyor).
-
----
-
-## TEST 2: OPEN REDIRECT — /login?next=
-
-**Komut:**
-```bash
-curl -D- POST "http://target/login?next=//evil.com" \
-  -d "csrf_token=...&username=yonetici&password=halisaha123"
-```
-
-**Sonuç:**
-- `next=//evil.com` → **HTTP 302, Location: //evil.com** — DOGRULANDI
-- `next=/\evil.com` → HTTP 400 (engellendi)
-
-**Kök neden** (app.py satır 288):
-```python
-if next_page and next_page.startswith('/'):
-    return redirect(next_page)
-```
-`//evil.com` kontrolü geçer çünkü `/` ile başlar. Tarayıcılar bunu protocol-relative URL olarak yorumlar.
-
-**Karar: FAIL — OPEN REDIRECT ZAFİYETİ DOĞRULANDI**
-
----
-
-## TEST 3: CSRF TOKEN DOĞRULAMA
-
-**Komut:**
-```bash
-curl POST /reserve (csrf_token yok)
-curl POST /reserve -d "csrf_token=SAHTE_TOKEN_12345&..."
-```
-
-**Sonuç:**
-- Token eksik: HTTP 400 — "The CSRF token is missing."
-- Geçersiz token: HTTP 400 — "The CSRF session token is missing."
-
-**Karar: PASS** — Flask-WTF CSRFProtect düzgün çalışıyor.
-
----
-
-## TEST 4: INPUT VALIDATION — /reserve
-
-| Girdi | Doğrulama | Durum |
-|-------|-----------|-------|
-| customer_phone | Regex `^05\d{9}$` | PASS |
-| customer_email | Regex kontrolü | PASS |
-| date | strptime + geçmiş tarih kontrolü | PASS |
-| receipt dosyası | MIME type + uzantı + yeniden işleme | PASS |
-| **pitch_id** | **YOK — doğrudan DB'ye gider** | **FAIL** |
-| **time_slot** | **Format kontrolü yok** | **FAIL** |
-| **customer_name** | **Uzunluk/sanitizasyon yok** | **FAIL** |
-
-- `time_slot="99:99 - 100:00"` → HTTP 302 (kabul edildi, doğrulama hatası yok)
-- `pitch_id="abc"` → HTTP 500 (DB hatası)
-- `customer_name="<script>alert(1)</script>"` → Veritabanına ham olarak kaydedilir (Jinja2 auto-escape çıktıda korur)
-- 250 karakterlik `customer_name` → Uzunluk kontrolü olmadan kabul edildi
-
-**Karar: FAIL** — pitch_id, time_slot ve customer_name doğrulamaları eksik.
-
----
-
-## TEST 5: DİZİN ERİŞİM TESTİ
-
-**Komut:**
-```bash
-curl http://target/static/uploads/receipts/
-curl http://target/static/uploads/pitches/
-```
-
-**Sonuç:** Her ikisi de HTTP 404 — dizin listeleme kapalı.
-
-**Karar: PASS** — Dizin taraması engellenmiş. UUID dosya adları tahmin edilmeyi zorlaştırıyor.
-
----
-
-## TEST 6: SESSION GÜVENLİĞİ
-
-**Cookie analizi:**
-```
-Set-Cookie: session=...; HttpOnly; Path=/; SameSite=Lax
-```
-
-| Özellik | Mevcut | Durum |
-|---------|--------|-------|
-| HttpOnly | Evet | PASS |
-| SameSite=Lax | Evet | PASS |
-| **Secure** | **Hayır** | **FAIL** |
-| Path=/ | Evet | OK |
-
-**Karar: PARTIAL FAIL** — `Secure` flag eksik. Cookie HTTP üzerinden de gönderilir.
-
----
-
-## TEST 7: GÜVENLİK HEADER'LARI
-
-**GET / yanıt header'ları:**
-```
-Server: Werkzeug/3.0.4 Python/3.8.12
-Cache-Control: no-cache, no-store, must-revalidate, max-age=0
-```
-
-| Header | Mevcut | Durum |
-|--------|--------|-------|
-| X-Frame-Options | **EKSİK** | **FAIL** (clickjacking riski) |
-| X-Content-Type-Options | **EKSİK** | **FAIL** (MIME sniffing riski) |
-| Content-Security-Policy | **EKSİK** | **FAIL** |
-| Strict-Transport-Security | **EKSİK** | **FAIL** |
-| Referrer-Policy | **EKSİK** | **FAIL** |
-| Permissions-Policy | **EKSİK** | **FAIL** |
-| Server (versiyon ifşası) | Var | **FAIL** (bilgi sızıntısı) |
-| Cache-Control | Var | PASS |
-
-**Karar: FAIL** — Tüm standart güvenlik header'ları eksik. Sunucu versiyonu ifşa ediliyor.
-
----
-
-## TEST 8: BİLGİ İFŞASI (Information Disclosure)
-
-| Test | Sonuç | Durum |
-|------|-------|-------|
-| GET /admin (auth yok) | 302 → /login | PASS |
-| Var olmayan route | 404 genel sayfa | PASS |
-| /busy_slots geçersiz pitch_id | **500 + TAM STACK TRACE** | **CRITICAL FAIL** |
-| /console endpoint | **HTTP 200 — Etkileşimli Python konsolu** | **CRITICAL FAIL** |
-
-**KRİTİK BULGU:** `FLASK_DEBUG=True` olduğunda Werkzeug interaktif debugger etkinleşir:
-- Hata sayfalarında tam SQL sorguları, tablo/sütun adları, dosya yolları görünür
-- **`/console` endpoint'inden kimlik doğrulaması olmadan Python kodu çalıştırılabilir (RCE)**
-- Debugger secret'ı hata sayfasında açık: `SECRET = "ZKP1hLwtQC8ooI8Lz8sl"`
-
-**Karar: CRITICAL FAIL** — Debug mode üretimde açık olmamalı. RCE riski var.
-
----
-
-## TEST 9: RATE LIMITING — /reserve
-
-**Yapılandırma:** `3 per minute` (app.py satır 208)
-
-**Sonuç:** 3 istekten sonra HTTP 429 döndü.
-
-**Karar: PASS** — Rate limiting çalışıyor.
-
----
-
-## TEST 10: BUSY SLOTS API — /busy_slots
-
-| Test | URL | Durum | Sonuç |
-|------|-----|-------|-------|
-| SQL injection | `?pitch_id=1 OR 1=1` | **500** | Stack trace + debugger |
-| Non-integer | `?pitch_id=abc` | **500** | Stack trace + debugger |
-| SQL injection #2 | `?pitch_id=1';DROP TABLE--` | **500** | Stack trace + debugger |
-| Geçersiz tarih | `?pitch_id=1&date=NOT-A-DATE` | 200 | Boş JSON |
-| Parametre yok | `/busy_slots` | 200 | Boş JSON |
-| Negatif id | `?pitch_id=-1` | 200 | Boş JSON |
-
-**Not:** SQLAlchemy parameterized query kullandığı için gerçek SQL injection (veri çalma/değiştirme) **mümkün değil**. Ancak doğrulama eksikliği debugger'ı tetikleyen hatalara yol açıyor.
-
-**Karar: FAIL** — pitch_id input doğrulaması yok, hata sayfaları bilgi sızdırıyor.
-
----
-
-## PENETRASYON TESTİ GENEL SONUÇ TABLOSU
-
-| # | Önem | Bulgu | Konum |
-|---|------|-------|-------|
-| 1 | **KRİTİK** | Werkzeug interaktif debugger (RCE) | `FLASK_DEBUG=True`, `/console` |
-| 2 | **KRİTİK** | Debugger secret hata sayfalarında ifşa | 500 hata yanıtları |
-| 3 | **YÜKSEK** | Open redirect `//evil.com` ile bypass | app.py satır 288 |
-| 4 | **YÜKSEK** | Stack trace + SQL sorgu ifşası | /busy_slots geçersiz girdi |
-| 5 | **ORTA** | Tüm güvenlik header'ları eksik | Tüm yanıtlar |
-| 6 | **ORTA** | Sunucu versiyon ifşası | `Server: Werkzeug/3.0.4 Python/3.8.12` |
-| 7 | **ORTA** | pitch_id / time_slot doğrulama eksik | /reserve, /busy_slots |
-| 8 | **DÜŞÜK** | Session cookie Secure flag eksik | Set-Cookie header |
-
-**Geçen Testler:** CSRF koruması, rate limiting (login + reserve), dizin taraması engeli, admin erişim kontrolü, dosya yükleme doğrulaması.
-
----
-
-*Bu rapor yetkili penetrasyon testi kapsamında hazırlanmıştır. Tüm testler yerel ortamda (127.0.0.1) gerçekleştirilmiştir.*
+Uygulama OWASP Top 10'un buyuk cogunluguna karsi korunmus durumda. Brute force korumasi ozellikle cok katmanli ve guclu. **En kritik iki aksiyon**: hardcoded admin sifresinin kaldirilmasi ve CSP'deki `unsafe-inline`'in giderilmesi. Bu iki duzeltme yapildiginda uygulama guvenlik seviyesi production icin yeterli olacaktir.
