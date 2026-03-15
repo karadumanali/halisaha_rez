@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 
 {% block body %}
-<style>
+<style nonce="{{ g.csp_nonce }}">
 .login-wrap {
     min-height: 72vh;
     display: flex;
@@ -138,7 +138,16 @@
 
         <div class="login-body">
 
-            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }} mb-4" role="alert">
+                    <i class="fas fa-{% if category == 'danger' %}exclamation-circle{% elif category == 'success' %}check-circle{% else %}info-circle{% endif %}"></i>
+                    {{ message }}
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
 
             <form method="POST" action="{{ url_for('admin_login') }}" novalidate>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -195,7 +204,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ g.csp_nonce }}">
 function togglePw() {
     var inp  = document.getElementById('password');
     var icon = document.getElementById('pwEyeIcon');

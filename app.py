@@ -10,9 +10,9 @@ if hasattr(os, 'add_dll_directory'):
     os.add_dll_directory(base_dir)
 
 os.environ['PATH'] = base_dir + os.pathsep + os.environ['PATH']
-# python-magic artık kullanılmıyor — saf Python ile MIME tespiti yapılıyor
 
 import logging
+import secrets
 import requests as http_requests
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 import uuid
 import re
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory, g
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
@@ -31,13 +31,11 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from apscheduler.schedulers.background import BackgroundScheduler
 
-# .env yükle
 dotenv_path = os.path.join(base_dir, '.env')
 load_dotenv(dotenv_path)
 
 app = Flask(__name__)
 
-# ── GÜVENLİK: SECRET_KEY zorunludur, fallback/hardcoded değer YOK ──
 _secret = os.getenv('SECRET_KEY')
 if not _secret:
     raise RuntimeError(
@@ -56,7 +54,6 @@ app.config['SESSION_COOKIE_SAMESITE']        = 'Lax'
 app.config['SESSION_COOKIE_SECURE']          = os.getenv('FLASK_ENV') == 'production'
 app.config['MAX_CONTENT_LENGTH']             = 5 * 1024 * 1024
 
-# ── GÜVENLİK: Production ortamında DEBUG kesinlikle False ──
 if os.getenv('FLASK_ENV') == 'production':
     app.config['DEBUG']   = False
     app.config['TESTING'] = False
@@ -73,7 +70,6 @@ for folder in [UPLOAD_FOLDER, PITCH_IMAGES_FOLDER]:
 db.init_app(app)
 csrf = CSRFProtect(app)
 
-# ── GÜVENLİK: Rate limiter — Redis varsa kullan, yoksa memory ──
 _redis_url = os.getenv('REDIS_URL', 'memory://')
 limiter = Limiter(
     get_remote_address,
@@ -93,7 +89,7 @@ def load_user(user_id):
     return Admin.query.get(int(user_id))
 
 
-# ─── AYLIK OTOMATİK TEMİZLİK (APScheduler) ───────────────────────
+# ─── AYLIK OTOMATİK TEMİZLİK ─────────────────────────────────────
 
 def monthly_cleanup():
     with app.app_context():
@@ -155,24 +151,14 @@ def safe_redirect(next_url, fallback):
     return redirect(fallback)
 
 
-# ─── IP KISITLAMA (Kampüs / İzinli IP'ler) ───────────────────────
+# ─── IP KISITLAMA ─────────────────────────────────────────────────
 
 def _load_allowed_ips() -> list:
-    """
-    .env'deki ALLOWED_ADMIN_IPS değişkenini okur.
-    Birden fazla IP virgülle ayrılır:
-        ALLOWED_ADMIN_IPS=193.140.x.x,10.0.0.1,127.0.0.1
-    Boşsa kısıtlama KAPALI (geliştirme kolaylığı).
-    """
     raw = os.getenv('ALLOWED_ADMIN_IPS', '')
     return [ip.strip() for ip in raw.split(',') if ip.strip()]
 
 
 def get_real_ip() -> str:
-    """
-    Proxy/load-balancer arkasında gerçek IP'yi döner.
-    X-Forwarded-For başlığı varsa ilk IP'yi alır.
-    """
     forwarded = request.headers.get('X-Forwarded-For', '')
     if forwarded:
         return forwarded.split(',')[0].strip()
@@ -180,13 +166,9 @@ def get_real_ip() -> str:
 
 
 def is_ip_allowed(ip: str, allowed: list) -> bool:
-    """
-    Tam IP eşleşmesi VEYA CIDR blok kontrolü.
-    Örnek: 193.140.0.0/16 tüm kampüs bloğunu kapsar.
-    """
     import ipaddress
     if not allowed:
-        return True   # Liste boşsa herkese açık (geliştirme modu)
+        return True
     try:
         client = ipaddress.ip_address(ip)
         for entry in allowed:
@@ -204,25 +186,26 @@ def is_ip_allowed(ip: str, allowed: list) -> bool:
     return False
 
 
+# ─── NONCE ÜRETİMİ — Her request'te yeni, rastgele token ─────────
+# Bu token; CSP header'ında ve template'lerdeki <script>/<style>
+# taglarında kullanılır. 'unsafe-inline' olmadan inline kod çalışır.
+
+@app.before_request
+def generate_csp_nonce():
+    g.csp_nonce = secrets.token_urlsafe(16)
+
+
 @app.before_request
 def restrict_admin_by_ip():
-    """
-    /login ve /admin/* path'lerine sadece izinli IP'lerden erişim.
-    ALLOWED_ADMIN_IPS boşsa kısıtlama devrede değil.
-    """
     allowed_ips = _load_allowed_ips()
     if not allowed_ips:
-        return   # Kısıtlama kapalı
-
+        return
     admin_paths = ('/login', '/admin')
     if not any(request.path.startswith(p) for p in admin_paths):
-        return   # Admin dışı sayfalara dokunma
-
+        return
     client_ip = get_real_ip()
     if not is_ip_allowed(client_ip, allowed_ips):
-        logger.warning(
-            f"Engellendi — yetkisiz IP: {client_ip} → {request.path}"
-        )
+        logger.warning(f"Engellendi — yetkisiz IP: {client_ip} → {request.path}")
         return (
             "<h2>Erişim Engellendi</h2>"
             "<p>Bu sayfaya yalnızca yetkili ağdan erişilebilir.</p>",
@@ -230,7 +213,7 @@ def restrict_admin_by_ip():
         )
 
 
-# ─── reCAPTCHA v3 DOĞRULAMA ──────────────────────────────────────
+# ─── reCAPTCHA v3 ────────────────────────────────────────────────
 
 RECAPTCHA_SECRET    = os.getenv('RECAPTCHA_SECRET_KEY', '')
 RECAPTCHA_SITE      = os.getenv('RECAPTCHA_SITE_KEY', '')
@@ -258,7 +241,7 @@ def verify_recaptcha(token, action='submit'):
         return True
 
 
-# ─── MIME TESPİTİ (saf Python — DLL/libmagic gerektirmez) ────────
+# ─── MIME TESPİTİ ─────────────────────────────────────────────────
 
 _MAGIC_BYTES = {
     b'\xff\xd8\xff':       'image/jpeg',
@@ -273,7 +256,7 @@ def detect_mime(file_bytes: bytes) -> str:
     return ''
 
 
-# ─── YARDIMCI FONKSİYONLAR ────────────────────────────────────────
+# ─── YARDIMCI FONKSİYONLAR ───────────────────────────────────────
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -422,13 +405,11 @@ def busy_slots():
 @app.route('/reserve', methods=['POST'])
 @limiter.limit("3 per minute")
 def reserve():
-    # ── 1. Honeypot: bot tespiti ──
     if request.form.get('website', ''):
         logger.warning(f"Honeypot tetiklendi — IP: {request.remote_addr}")
         flash('Rezervasyon talebiniz alindi! Yonetici onayindan sonra kesinlesecektir.', 'success')
         return redirect(url_for('index'))
 
-    # ── 2. reCAPTCHA v3 kontrolü ──
     if not verify_recaptcha(request.form.get('g-recaptcha-response', ''), action='reserve'):
         flash('Bot doğrulaması başarısız. Lütfen tekrar deneyin.', 'danger')
         return redirect(url_for('index'))
@@ -438,19 +419,16 @@ def reserve():
     time_slot     = request.form.get('time_slot')
     customer_name = request.form.get('customer_name', '').strip()
 
-    # ── Saat dilimi whitelist kontrolü ──
     if time_slot not in VALID_SLOTS:
         flash('Gecersiz saat dilimi!', 'danger')
         return redirect(url_for('index'))
 
-    # ── pitch_id integer kontrolü ──
     try:
         pitch_id = int(pitch_id)
     except (ValueError, TypeError):
         flash('Gecersiz saha!', 'danger')
         return redirect(url_for('index'))
 
-    # ── customer_name uzunluk kontrolü ──
     if not customer_name or len(customer_name) < 2 or len(customer_name) > 100:
         flash('Gecersiz isim! En az 2, en fazla 100 karakter olmalıdır.', 'danger')
         return redirect(url_for('index'))
@@ -520,7 +498,6 @@ def admin_login():
         return redirect(url_for('admin_dashboard'))
 
     if request.method == 'POST':
-        # ── reCAPTCHA v3 kontrolü ──
         if not verify_recaptcha(request.form.get('g-recaptcha-response', ''), action='login'):
             flash('Bot doğrulaması başarısız. Lütfen tekrar deneyin.', 'danger')
             return render_template('login.html', recaptcha_site_key=RECAPTCHA_SITE)
@@ -538,7 +515,7 @@ def admin_login():
 
         admin = Admin.query.filter_by(username=username).first()
 
-        # ── Timing attack koruması ──
+        # Timing attack koruması: kullanıcı bulunamasa da hash hesapla
         hash_to_check = admin.password_hash if admin else DUMMY_HASH
         password_ok   = check_password_hash(hash_to_check, password)
 
@@ -585,10 +562,8 @@ def change_password():
         flash('Yeni şifre mevcut şifreden farklı olmalıdır!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
-    
     current_user.password_hash = generate_password_hash(new_pw, method='pbkdf2:sha256')
     db.session.commit()
-
     logout_user()
     session.clear()
     flash('Şifreniz başarıyla değiştirildi. Lütfen yeni şifrenizle giriş yapın.', 'success')
@@ -607,8 +582,6 @@ def admin_dashboard():
                            blocked_slots=blocked_slots,
                            now=datetime.now())
 
-
-# ─── KİLİT ROUTE'LARI ─────────────────────────────────────────────
 
 @app.route('/admin/block_slot', methods=['POST'])
 @login_required
@@ -659,8 +632,6 @@ def unblock_slot(block_id):
     return redirect(url_for('admin_dashboard'))
 
 
-# ─── SAHA ROUTE'LARI ──────────────────────────────────────────────
-
 @app.route('/admin/add_pitch', methods=['POST'])
 @login_required
 def add_pitch():
@@ -703,8 +674,6 @@ def delete_pitch(pitch_id):
     return redirect(url_for('admin_dashboard'))
 
 
-# ─── REZERVASYON ROUTE'LARI ───────────────────────────────────────
-
 @app.route('/admin/status/<res_id>/<action>', methods=['POST'])
 @login_required
 def change_status(res_id, action):
@@ -722,8 +691,6 @@ def change_status(res_id, action):
     db.session.commit()
     return redirect(url_for('admin_dashboard'))
 
-
-# ─── GÖRSEL ROUTE'LAR ────────────────────────────────────────────
 
 @app.route('/admin/pitch/<int:pitch_id>/add_image', methods=['POST'])
 @login_required
@@ -766,8 +733,6 @@ def update_logo():
     return redirect(url_for('admin_dashboard'))
 
 
-# ─── DEKONT ERİŞİM KORUMASI ──────────────────────────────────────
-
 @app.route('/admin/receipt/<filename>')
 @login_required
 def view_receipt(filename):
@@ -790,16 +755,22 @@ def apply_security_headers(response):
     response.headers['X-XSS-Protection']       = '1; mode=block'
     response.headers['Referrer-Policy']        = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy']     = 'camera=(), microphone=(), geolocation=()'
+
+    # ── GÜVENLİK: 'unsafe-inline' kaldırıldı — nonce tabanlı CSP ──
+    # Her request'te üretilen g.csp_nonce, sadece nonce'u bilen
+    # <script>/<style> taglarının çalışmasına izin verir.
+    # Saldırganın enjekte ettiği inline kod nonce'u bilmediği için çalışmaz.
+    nonce = getattr(g, 'csp_nonce', '')
     response.headers['Content-Security-Policy'] = (
-        "default-src 'self'; "
-        "script-src 'self' https://cdn.jsdelivr.net https://www.google.com "
-        "https://www.gstatic.com 'unsafe-inline'; "
-        "style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
-        "https://fonts.googleapis.com 'unsafe-inline'; "
-        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
-        "img-src 'self' data:; "
-        "connect-src 'self'; "
-        "frame-src https://www.google.com"
+        f"default-src 'self'; "
+        f"script-src 'self' https://cdn.jsdelivr.net https://www.google.com "
+        f"https://www.gstatic.com 'nonce-{nonce}'; "
+        f"style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com "
+        f"https://fonts.googleapis.com 'nonce-{nonce}'; "
+        f"font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+        f"img-src 'self' data:; "
+        f"connect-src 'self'; "
+        f"frame-src https://www.google.com"
     )
 
     if not app.debug:
@@ -815,8 +786,7 @@ with app.app_context():
 
     admin_var_mi = Admin.query.filter_by(username='yonetici').first()
     if not admin_var_mi:
-        
-        hashed_password = generate_password_hash("halisaha123", method='pbkdf2:sha256')
+        hashed_password = generate_password_hash("degistir123", method='pbkdf2:sha256')
         yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
         db.session.add(yeni_admin)
         db.session.commit()
