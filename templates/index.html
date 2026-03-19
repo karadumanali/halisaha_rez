@@ -84,7 +84,7 @@
 
 .panel-body { padding: 22px 26px; }
 
-/* ── Özet kutusu ── */
+/* ── Özet kutusu (panel 2) ── */
 .summary-box {
     background: var(--teal-pale);
     border: 1.5px solid var(--mint-mid);
@@ -95,6 +95,35 @@
 .summary-item { font-size: 0.92rem; }
 .summary-item .s-label { font-weight: 700; color: var(--teal-dk); margin-right: 4px; }
 .summary-item .s-val   { color: var(--ink); font-weight: 600; }
+
+/* ── Rezervasyon Özeti Kartı (panel 3) ── */
+.res-summary-card {
+    background: var(--gray-50);
+    border: 2px solid var(--gray-200);
+    border-radius: var(--r-sm);
+    padding: 14px 18px;
+    margin-bottom: 22px;
+    color: var(--ink);
+}
+.res-summary-card .rs-header {
+    font-size: 0.72rem; font-weight: 800;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gray-400); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+}
+.res-summary-card .rs-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0 16px;
+}
+.res-summary-card .rs-field .rs-lbl {
+    font-size: 0.68rem; font-weight: 700;
+    color: var(--gray-400); text-transform: uppercase;
+    letter-spacing: 0.06em; display: block; margin-bottom: 3px;
+}
+.res-summary-card .rs-field .rs-val {
+    font-size: 0.95rem; font-weight: 700; color: var(--ink);
+}
 
 .date-label {
     font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em;
@@ -274,6 +303,7 @@ input[type="date"].form-control {
     .panel-body  { padding: 18px 18px; }
     .panel-footer{ padding: 14px 18px; }
     .summary-box { grid-template-columns: 1fr; }
+    .res-summary-card .rs-grid { grid-template-columns: repeat(2, 1fr); gap: 8px 16px; }
     .page-hero h1 { font-size: 1.8rem; }
 }
 @media (min-width: 600px) {
@@ -338,6 +368,7 @@ input[type="date"].form-control {
 
 <div class="card wizard-card">
 
+    <!-- ══ PANEL 1: Tarih & Saha ══ -->
     <div class="step-panel active" id="panel1">
         <div class="panel-head">
             <h2>Tarih &amp; Saha Seçimi</h2>
@@ -371,6 +402,7 @@ input[type="date"].form-control {
         </div>
     </div>
 
+    <!-- ══ PANEL 2: Saat Seçimi ══ -->
     <div class="step-panel" id="panel2">
         <div class="panel-head">
             <h2>Saat Dilimi Seçimi</h2>
@@ -392,12 +424,39 @@ input[type="date"].form-control {
         </div>
     </div>
 
+    <!-- ══ PANEL 3: Ödeme & Dekont ══ -->
     <div class="step-panel" id="panel3">
         <div class="panel-head">
             <h2>Ödeme &amp; Dekont</h2>
             <p>Bilgilerinizi girin ve ödeme dekontunu yükleyin</p>
         </div>
         <div class="panel-body">
+
+            <!-- ── Rezervasyon Özeti ── -->
+            <div class="res-summary-card">
+                <div class="rs-header">
+                    <i class="fas fa-receipt"></i> Rezervasyon Özeti
+                </div>
+                <div class="rs-grid">
+                    <div class="rs-field">
+                        <span class="rs-lbl">Saha</span>
+                        <span class="rs-val" id="sumPitch3">—</span>
+                    </div>
+                    <div class="rs-field">
+                        <span class="rs-lbl">Tarih</span>
+                        <span class="rs-val" id="sumDate3">—</span>
+                    </div>
+                    <div class="rs-field">
+                        <span class="rs-lbl">Saat</span>
+                        <span class="rs-val" id="sumSlot3">—</span>
+                    </div>
+                    <div class="rs-field">
+                        <span class="rs-lbl">Ücret</span>
+                        <span class="rs-val" id="sumPrice3">—</span>
+                    </div>
+                </div>
+            </div>
+
             <form id="reserveForm" action="/reserve" method="POST"
                   enctype="multipart/form-data" novalidate>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -405,10 +464,9 @@ input[type="date"].form-control {
                 <input type="hidden" name="date"       id="hDate">
                 <input type="hidden" name="time_slot"  id="hSlot">
                 <input type="hidden" name="g-recaptcha-response" id="gRecaptchaReserve">
-                <!-- ── HONEYPOT: İnsan görmez, bot doldurur → sessizce reddedilir ── -->
-                <div style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;" aria-hidden="true">
-                    <input type="text" name="website" tabindex="-1" autocomplete="off">
-                </div>
+
+                {# Honeypot — botlar için tuzak alan; type=hidden ile tamamen gizli #}
+                <input type="hidden" name="website" value="">
 
                 <!-- ── 1. Kişi Bilgileri ── -->
                 <div class="section-head"><i class="fas fa-user"></i> Kişi Bilgileri</div>
@@ -470,8 +528,18 @@ input[type="date"].form-control {
 </div>
 {% endif %}
 
+<!-- ── Kilit Sebebi Modal ── -->
+<div class="lock-modal-overlay" id="lockReasonModal" role="dialog" aria-modal="true" aria-labelledby="lockModalTitle">
+    <div class="lock-modal-box">
+        <div class="lock-modal-icon"><i class="fas fa-lock"></i></div>
+        <div class="lock-modal-title" id="lockModalTitle">Bu Slot Kilitli</div>
+        <div class="lock-modal-msg" id="lockReasonMsg"></div>
+        <button class="lock-modal-close" id="lockModalCloseBtn">Tamam</button>
+    </div>
+</div>
+
 <script nonce="{{ g.csp_nonce }}">
-var state = { step:1, pitchId:null, pitchName:null, date:null, slot:null };
+var state = { step:1, pitchId:null, pitchName:null, pitchPrice:null, date:null, slot:null };
 var busySlots = {};
 var blockedSlots = {};
 var SLOTS = ['16:00 - 17:00','17:00 - 18:00','18:00 - 19:00','19:00 - 20:00','20:00 - 21:00','21:00 - 22:00','22:00 - 23:00'];
@@ -487,14 +555,16 @@ function goStep(n) {
     });
     state.step=n;
     if(n===2) renderSlots();
-    if(n===3) fillHidden();
+    if(n===3) fillSummary3();
     window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function selectPitch(el) {
     document.querySelectorAll('.pitch-option').forEach(function(p){ p.classList.remove('selected'); p.setAttribute('aria-checked','false'); });
     el.classList.add('selected'); el.setAttribute('aria-checked','true');
-    state.pitchId=el.dataset.pitchId; state.pitchName=el.dataset.pitchName;
+    state.pitchId    = el.dataset.pitchId;
+    state.pitchName  = el.dataset.pitchName;
+    state.pitchPrice = el.dataset.pitchPrice;
     checkStep1();
 }
 
@@ -538,38 +608,45 @@ function renderSlots() {
 
         if(!locked){
             div.setAttribute('role','radio'); div.setAttribute('aria-checked','false'); div.setAttribute('tabindex','0');
-            div.onclick=function(){selectSlot(div,slot);};
-            div.onkeydown=function(e){if(e.key==='Enter'||e.key===' ')selectSlot(div,slot);};
+            div.addEventListener('click', function(){ selectSlot(div,slot); });
+            div.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' ') selectSlot(div,slot); });
         } else if (blockReason !== null) {
-            // XSS koruması: alert() yerine textContent kullanan modal
-            div.onclick = function() {
+            div.addEventListener('click', function() {
                 var modal = document.getElementById('lockReasonModal');
                 var msgEl = document.getElementById('lockReasonMsg');
-                msgEl.textContent = blockReason; // textContent = XSS güvenli
+                msgEl.textContent = blockReason;
                 modal.style.display = 'flex';
-            };
+            });
         }
 
-        var badgeClass, badgeText;
+        var badgeClass, badgeHTML;
         if (blockReason) {
             badgeClass = 'badge-locked';
-            badgeText = '<i class="fas fa-lock"></i> Kilitli';
+            badgeHTML  = '<i class="fas fa-lock"></i> Kilitli';
         } else if (isApproved) {
             badgeClass = 'badge-busy';
-            badgeText = '<i class="fas fa-times-circle"></i> Dolu';
+            badgeHTML  = '<i class="fas fa-times-circle"></i> Dolu';
         } else if (isPending) {
             badgeClass = 'badge-pending';
-            badgeText = '<i class="fas fa-hourglass-half"></i> Onay Bekliyor';
+            badgeHTML  = '<i class="fas fa-hourglass-half"></i> Onay Bekliyor';
         } else if (isPast) {
             badgeClass = 'badge-locked';
-            badgeText = '<i class="fas fa-history"></i> Süresi Geçti';
+            badgeHTML  = '<i class="fas fa-history"></i> Süresi Geçti';
         } else {
             badgeClass = 'badge-available';
-            badgeText = '<i class="fas fa-check"></i> Müsait';
+            badgeHTML  = '<i class="fas fa-check"></i> Müsait';
         }
 
-        div.innerHTML='<span class="slot-time">'+slot+'</span>'+
-            '<span class="slot-badge '+badgeClass+'">'+badgeText+'</span>';
+        var timeSpan  = document.createElement('span');
+        timeSpan.className = 'slot-time';
+        timeSpan.textContent = slot;
+
+        var badgeSpan = document.createElement('span');
+        badgeSpan.className = 'slot-badge ' + badgeClass;
+        badgeSpan.innerHTML = badgeHTML;
+
+        div.appendChild(timeSpan);
+        div.appendChild(badgeSpan);
         list.appendChild(div);
     });
 }
@@ -577,20 +654,40 @@ function renderSlots() {
 function selectSlot(el,slot) {
     document.querySelectorAll('.slot-item.available').forEach(function(s){
         s.classList.remove('selected'); s.setAttribute('aria-checked','false');
-        s.querySelector('.slot-badge').className='slot-badge badge-available';
-        s.querySelector('.slot-badge').innerHTML='<i class="fas fa-check"></i> Müsait';
+        var b = s.querySelector('.slot-badge');
+        b.className='slot-badge badge-available';
+        b.innerHTML='<i class="fas fa-check"></i> Müsait';
     });
     el.classList.add('selected'); el.setAttribute('aria-checked','true');
-    el.querySelector('.slot-badge').className='slot-badge badge-selected';
-    el.querySelector('.slot-badge').innerHTML='<i class="fas fa-check-circle"></i> Seçildi';
+    var b = el.querySelector('.slot-badge');
+    b.className='slot-badge badge-selected';
+    b.innerHTML='<i class="fas fa-check-circle"></i> Seçildi';
     state.slot=slot;
     document.getElementById('btn2Next').disabled=false;
 }
 
+function fillSummary3() {
+    /* hidden inputs */
+    document.getElementById('hPitchId').value = state.pitchId  || '';
+    document.getElementById('hDate').value    = state.date     || '';
+    document.getElementById('hSlot').value    = state.slot     || '';
+
+    /* özet kartı */
+    var p3pitch = document.getElementById('sumPitch3');
+    var p3date  = document.getElementById('sumDate3');
+    var p3slot  = document.getElementById('sumSlot3');
+    var p3price = document.getElementById('sumPrice3');
+    if(p3pitch) p3pitch.textContent = state.pitchName  || '—';
+    if(p3date)  p3date.textContent  = formatDate(state.date) || '—';
+    if(p3slot)  p3slot.textContent  = state.slot       || '—';
+    if(p3price) p3price.textContent = state.pitchPrice ? state.pitchPrice + ' ₺/sa' : '—';
+}
+
+/* fillHidden — form submit öncesi de çağrılır */
 function fillHidden() {
-    document.getElementById('hPitchId').value=state.pitchId;
-    document.getElementById('hDate').value=state.date;
-    document.getElementById('hSlot').value=state.slot;
+    document.getElementById('hPitchId').value = state.pitchId  || '';
+    document.getElementById('hDate').value    = state.date     || '';
+    document.getElementById('hSlot').value    = state.slot     || '';
 }
 
 function handleFile(inp) {
@@ -604,31 +701,29 @@ function handleFile(inp) {
 }
 
 function checkStep3() {
-    var name=(document.getElementById('fName')||{}).value||'';
-    var phone=(document.getElementById('fPhone')||{}).value||'';
-    var email=(document.getElementById('fEmail')||{}).value||'';
-    var file=document.getElementById('fReceipt');
-    var ok=name.trim().length>=2&&/^05\d{9}$/.test(phone.replace(/\s/g,''))&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&file&&file.files&&file.files[0];
+    var name  = (document.getElementById('fName')||{}).value||'';
+    var phone = (document.getElementById('fPhone')||{}).value||'';
+    var email = (document.getElementById('fEmail')||{}).value||'';
+    var file  = document.getElementById('fReceipt');
+    var ok    = name.trim().length>=2 && /^05\d{9}$/.test(phone.replace(/\s/g,'')) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && file && file.files && file.files[0];
     document.getElementById('btn3Submit').disabled=!ok;
 }
 
 function submitReservation() {
     fillHidden();
+    if (!confirm('Rezervasyon talebinizi göndermek istiyor musunuz?')) return;
+
     var siteKey = '{{ recaptcha_site_key|default("") }}';
     if (!siteKey) {
-        if (confirm('Rezervasyon talebinizi göndermek istiyor musunuz?')) {
-            document.getElementById('reserveForm').submit();
-        }
+        document.getElementById('reserveForm').submit();
         return;
     }
-    if (confirm('Rezervasyon talebinizi göndermek istiyor musunuz?')) {
-        grecaptcha.ready(function() {
-            grecaptcha.execute(siteKey, {action: 'reserve'}).then(function(token) {
-                document.getElementById('gRecaptchaReserve').value = token;
-                document.getElementById('reserveForm').submit();
-            });
+    grecaptcha.ready(function() {
+        grecaptcha.execute(siteKey, {action: 'reserve'}).then(function(token) {
+            document.getElementById('gRecaptchaReserve').value = token;
+            document.getElementById('reserveForm').submit();
         });
-    }
+    });
 }
 
 function formatDate(str) {
@@ -636,37 +731,39 @@ function formatDate(str) {
 }
 
 document.addEventListener('DOMContentLoaded',function(){
-    // ── Tarih değişimi ──
-    document.getElementById('selDate').addEventListener('change',checkStep1);
+    /* Tarih değişimi */
+    document.getElementById('selDate').addEventListener('change', checkStep1);
 
-    // ── Pitch seçimi (onclick/onkeydown HTML'den kaldırıldı) ──
+    /* Pitch seçimi */
     document.querySelectorAll('[data-action="selectPitch"]').forEach(function(el){
-        el.addEventListener('click', function(){ selectPitch(el); });
-        el.addEventListener('keydown', function(e){
-            if(e.key==='Enter'||e.key===' ') selectPitch(el);
-        });
+        el.addEventListener('click',   function(){ selectPitch(el); });
+        el.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' ') selectPitch(el); });
     });
 
-    // ── Butonlar ──
-    document.getElementById('btn1Next').addEventListener('click', function(){ goStep(2); });
-    document.getElementById('btn2Next').addEventListener('click', function(){ goStep(3); });
-    document.getElementById('btn3Submit').addEventListener('click', function(){ submitReservation(); });
-    document.getElementById('btnBack2').addEventListener('click', function(){ goStep(1); });
-    document.getElementById('btnBack3').addEventListener('click', function(){ goStep(2); });
+    /* Wizard butonları */
+    document.getElementById('btn1Next').addEventListener('click',  function(){ goStep(2); });
+    document.getElementById('btn2Next').addEventListener('click',  function(){ goStep(3); });
+    document.getElementById('btn3Submit').addEventListener('click', submitReservation);
+    document.getElementById('btnBack2').addEventListener('click',  function(){ goStep(1); });
+    document.getElementById('btnBack3').addEventListener('click',  function(){ goStep(2); });
 
-    // ── Dosya yükleme ──
+    /* Dosya yükleme */
     var fReceipt = document.getElementById('fReceipt');
     if(fReceipt){ fReceipt.addEventListener('change', function(){ handleFile(this); }); }
 
-    // ── Drag & drop ──
+    /* Drag & drop */
     var zone=document.getElementById('uploadZone');
     if(zone){
-        zone.addEventListener('dragover',function(e){e.preventDefault();zone.classList.add('dragover');});
-        zone.addEventListener('dragleave',function(){zone.classList.remove('dragover');});
-        zone.addEventListener('drop',function(e){e.preventDefault();zone.classList.remove('dragover');var inp=document.getElementById('fReceipt');inp.files=e.dataTransfer.files;handleFile(inp);});
+        zone.addEventListener('dragover',  function(e){ e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', function(){   zone.classList.remove('dragover'); });
+        zone.addEventListener('drop',      function(e){
+            e.preventDefault(); zone.classList.remove('dragover');
+            var inp=document.getElementById('fReceipt');
+            inp.files=e.dataTransfer.files; handleFile(inp);
+        });
     }
 
-    // ── Telefon doğrulama ──
+    /* Telefon doğrulama */
     var phone=document.getElementById('fPhone');
     if(phone){
         phone.addEventListener('input',function(){
@@ -678,7 +775,23 @@ document.addEventListener('DOMContentLoaded',function(){
             checkStep3();
         });
     }
-    ['fName','fEmail'].forEach(function(id){var el=document.getElementById(id);if(el){el.addEventListener('input',checkStep3);}});
+    ['fName','fEmail'].forEach(function(id){
+        var el=document.getElementById(id);
+        if(el){ el.addEventListener('input', checkStep3); }
+    });
+
+    /* Kilit modal kapat */
+    var lockModal    = document.getElementById('lockReasonModal');
+    var lockCloseBtn = document.getElementById('lockModalCloseBtn');
+    if(lockCloseBtn){ lockCloseBtn.addEventListener('click', function(){ lockModal.style.display='none'; }); }
+    if(lockModal){
+        lockModal.addEventListener('click', function(e){
+            if(e.target===lockModal) lockModal.style.display='none';
+        });
+    }
+    document.addEventListener('keydown', function(e){
+        if(e.key==='Escape' && lockModal && lockModal.style.display==='flex') lockModal.style.display='none';
+    });
 });
 </script>
 

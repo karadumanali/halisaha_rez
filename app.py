@@ -405,6 +405,7 @@ def busy_slots():
 @app.route('/reserve', methods=['POST'])
 @limiter.limit("3 per minute")
 def reserve():
+    # ── Honeypot: bot tespiti ──
     if request.form.get('website', ''):
         logger.warning(f"Honeypot tetiklendi — IP: {request.remote_addr}")
         flash('Rezervasyon talebiniz alindi! Yonetici onayindan sonra kesinlesecektir.', 'success')

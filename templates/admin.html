@@ -8,7 +8,6 @@
    ADMIN — Full-Width Sidebar Layout
 ══════════════════════════════════════════════════ */
 
-/* Sayfa padding'ini azalt — daha fazla alan */
 .site-main { padding: 20px 0 40px !important; }
 
 .admin-layout {
@@ -62,28 +61,7 @@
 .session-progress-fill { height: 100%; background: var(--teal-lt); border-radius: 2px; transition: width 1s linear; }
 #sessionWarnMsg { color: #f87171; font-weight: 700; font-size: 0.7rem; display: none; white-space: nowrap; }
 
-/* İstatistikler — sadece rezervasyon panelinde gösterilir, sidebar'da değil */
-.sidebar-stats { display: none; }
-
-/* Sidebar navigasyon */
-.sidebar-nav { padding: 8px 0; }
-.sidebar-nav-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 13px 20px;
-    font-size: 0.9rem; font-weight: 700;
-    color: var(--gray-600);
-    cursor: pointer;
-    transition: all 0.15s;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    border-left: 3px solid transparent;
-}
-.sidebar-nav-item:hover { color: var(--ink); background: var(--teal-pale); }
-.sidebar-nav-item.active {
-    color: var(--teal-dk);
-    background: var(--teal-pale);
-    border-left-color: var(--teal);
-}
+/* İstatistik kartları */
 .stat-chip {
     background: var(--white); border: 1.5px solid var(--gray-200);
     border-radius: var(--r-sm); padding: 10px 12px;
@@ -121,6 +99,26 @@
 }
 .nav-badge.warn   { background: #f59e0b; color: var(--white); }
 .nav-badge.purple { background: #7c3aed; color: var(--white); }
+
+/* Sidebar nav */
+.sidebar-nav { padding: 8px 0; }
+.sidebar-nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 20px;
+    font-size: 0.9rem; font-weight: 700;
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    border-left: 3px solid transparent;
+}
+.sidebar-nav-item:hover { color: var(--ink); background: var(--teal-pale); }
+.sidebar-nav-item.active {
+    color: var(--teal-dk);
+    background: var(--teal-pale);
+    border-left-color: var(--teal);
+}
 
 /* Çıkış */
 .sidebar-footer { padding: 12px; border-top: 1.5px solid var(--gray-200); background: var(--gray-50); }
@@ -278,7 +276,6 @@
     align-items: start;
 }
 
-/* Sebep + buton */
 .block-action-col { display: flex; flex-direction: column; gap: 10px; }
 
 .multi-pick-list {
@@ -463,7 +460,7 @@
 }
 @media (max-width: 600px) {
     .res-card-body { grid-template-columns: repeat(2, 1fr); }
-    .stat-cards-grid { grid-template-columns: repeat(2, 1fr); } /* Mobilde 4 yerine 2 sütun olsun */
+    .stat-cards-grid { grid-template-columns: repeat(2, 1fr); }
 }
 </style>
 
@@ -491,17 +488,18 @@
             <span id="sessionWarnMsg"><i class="fas fa-exclamation-triangle"></i> Sürüyor!</span>
         </div>
 
+        <!-- data-tab attribute ile tab yönlendirme — inline onclick YOK (CSP uyumu) -->
         <nav class="sidebar-nav" role="tablist">
-            <div class="sidebar-nav-item active" onclick="switchTab('rezervasyonlar',this)" role="tab">
+            <div class="sidebar-nav-item active" data-tab="rezervasyonlar" role="tab" tabindex="0">
                 <div class="nav-icon"><i class="fas fa-clipboard-list"></i></div>
                 <span>Rezervasyonlar</span>
                 {% if pending_count > 0 %}<span class="nav-badge warn">{{ pending_count }}</span>{% endif %}
             </div>
-            <div class="sidebar-nav-item" onclick="switchTab('sahalar',this)" role="tab">
+            <div class="sidebar-nav-item" data-tab="sahalar" role="tab" tabindex="0">
                 <div class="nav-icon"><i class="fas fa-futbol"></i></div>
                 <span>Sahalar</span>
             </div>
-            <div class="sidebar-nav-item" onclick="switchTab('kilitler',this)" role="tab">
+            <div class="sidebar-nav-item" data-tab="kilitler" role="tab" tabindex="0">
                 <div class="nav-icon"><i class="fas fa-lock"></i></div>
                 <span>Slot Kilitleri</span>
                 {% if blocked_count > 0 %}<span class="nav-badge purple">{{ blocked_count }}</span>{% endif %}
@@ -509,8 +507,7 @@
         </nav>
 
         <div class="sidebar-footer">
-            <a href="/logout" class="btn-logout"
-               onclick="return confirm('Oturumu kapatmak istiyor musunuz?')">
+            <a href="/logout" class="btn-logout" id="logoutBtn">
                 <i class="fas fa-sign-out-alt"></i> Çıkış Yap
             </a>
         </div>
@@ -531,7 +528,6 @@
                 </div>
             </div>
 
-            <!-- İstatistik çipleri — sadece bu panelde görünür -->
             <div class="stat-cards-grid">
                 <div class="stat-chip">
                     <div class="stat-icon pending"><i class="fas fa-hourglass-half"></i></div>
@@ -551,11 +547,12 @@
                 </div>
             </div>
 
+            <!-- Filtre butonları — data-filter ile, onclick YOK -->
             <div class="res-filter-row">
-                <button class="filter-btn active" onclick="filterRes('all',this)">Tümü ({{ reservations|length }})</button>
-                <button class="filter-btn" onclick="filterRes('Pending',this)">Bekliyor ({{ pending_count }})</button>
-                <button class="filter-btn" onclick="filterRes('Approved',this)">Onaylandı ({{ approved_count }})</button>
-                <button class="filter-btn" onclick="filterRes('Rejected',this)">Reddedildi ({{ rejected_count }})</button>
+                <button class="filter-btn active" data-filter="all">Tümü ({{ reservations|length }})</button>
+                <button class="filter-btn" data-filter="Pending">Bekliyor ({{ pending_count }})</button>
+                <button class="filter-btn" data-filter="Approved">Onaylandı ({{ approved_count }})</button>
+                <button class="filter-btn" data-filter="Rejected">Reddedildi ({{ rejected_count }})</button>
             </div>
 
             <div class="res-list">
@@ -602,17 +599,19 @@
                     </a>
                     {% if res.status == 'Pending' %}
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                        <form action="/admin/status/{{ res.id }}/approve" method="POST" class="d-inline">
+                        <!-- Onay formu — confirm JS'de addEventListener ile tetiklenir, onclick YOK -->
+                        <form action="/admin/status/{{ res.id }}/approve" method="POST" class="d-inline confirm-form"
+                              data-msg="Bu rezervasyonu ONAYLAMAK istiyor musunuz?&#10;&#10;Müşteriye onay e-postası gönderilecektir.">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn-approve"
-                                    onclick="return confirm('Bu rezervasyonu ONAYLAMAK istiyor musunuz?')">
+                            <button type="submit" class="btn-approve">
                                 <i class="fas fa-check"></i> Onayla
                             </button>
                         </form>
-                        <form action="/admin/status/{{ res.id }}/reject" method="POST" class="d-inline">
+                        <!-- Red formu -->
+                        <form action="/admin/status/{{ res.id }}/reject" method="POST" class="d-inline confirm-form"
+                              data-msg="Bu rezervasyonu REDDETMEK istiyor musunuz?&#10;&#10;Bu işlem geri alınamaz.">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn-reject"
-                                    onclick="return confirm('Bu rezervasyonu REDDETMEK istiyor musunuz?')">
+                            <button type="submit" class="btn-reject">
                                 <i class="fas fa-times"></i> Reddet
                             </button>
                         </form>
@@ -703,10 +702,10 @@
                                                     data-bs-target="#priceModal{{ pitch.id }}" title="Fiyat Güncelle">
                                                 <i class="fas fa-pen"></i> Fiyat
                                             </button>
-                                            <form action="/admin/delete_pitch/{{ pitch.id }}" method="POST" class="d-inline">
+                                            <form action="/admin/delete_pitch/{{ pitch.id }}" method="POST" class="d-inline confirm-form"
+                                                  data-msg="Bu saha silinecek. Emin misiniz?&#10;&#10;Sahaya bağlı rezervasyon varsa silinemez.">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit" class="btn-sm-danger"
-                                                        onclick="return confirm('Bu saha silinecek. Emin misiniz?')">
+                                                <button type="submit" class="btn-sm-danger">
                                                     <i class="fas fa-trash"></i> Sil
                                                 </button>
                                             </form>
@@ -770,7 +769,6 @@
                 </div>
             </div>
 
-            <!-- Kilitleme formu — tam genişlik, 4 sütun -->
             <div class="block-form-card">
                 <h3>
                     <i class="fas fa-lock"></i> Yeni Slot Kilitle
@@ -788,7 +786,7 @@
                             <label class="form-label"><i class="fas fa-futbol"></i> Saha <span class="multi-hint">(çoklu)</span></label>
                             <div class="multi-pick-list" id="pitchPicker">
                                 {% for pitch in pitches %}
-                                <div class="multi-pick-item" data-val="{{ pitch.id }}" onclick="togglePick(this,'pitch')">
+                                <div class="multi-pick-item" data-val="{{ pitch.id }}" data-pick-type="pitch">
                                     <i class="fas fa-futbol"></i> {{ pitch.name }}
                                     <i class="fas fa-check pick-check"></i>
                                 </div>
@@ -819,7 +817,7 @@
                             <div class="multi-pick-list" id="slotPicker">
                                 {% set slots = ['16:00 - 17:00','17:00 - 18:00','18:00 - 19:00','19:00 - 20:00','20:00 - 21:00','21:00 - 22:00','22:00 - 23:00'] %}
                                 {% for s in slots %}
-                                <div class="multi-pick-item" data-val="{{ s }}" onclick="togglePick(this,'slot')">
+                                <div class="multi-pick-item" data-val="{{ s }}" data-pick-type="slot">
                                     <i class="fas fa-clock"></i> {{ s }}
                                     <i class="fas fa-check pick-check"></i>
                                 </div>
@@ -833,7 +831,6 @@
                             <textarea id="bReason" name="reason" class="form-control"
                                       maxlength="150" rows="5"
                                       placeholder="Örn: Bahar Şenlikleri sebebiyle sahamız kullanılamamaktadır."
-                                      oninput="updateCharCount(this)"
                                       style="resize:vertical;min-height:110px;line-height:1.5;"></textarea>
                             <div style="text-align:right;font-size:0.72rem;color:var(--gray-400);margin-top:3px;">
                                 <span id="charCount">0</span>/150 karakter
@@ -842,7 +839,7 @@
                                 <i class="fas fa-info-circle"></i>
                                 <span id="blockSummaryText"></span>
                             </div>
-                            <button type="button" class="btn-purple" onclick="submitBlock()">
+                            <button type="button" class="btn-purple" id="btnSubmitBlock">
                                 <i class="fas fa-lock"></i> Kilitle
                             </button>
                         </div>
@@ -874,10 +871,10 @@
                             <span class="block-item-reason">
                                 <i class="fas fa-info-circle"></i> {{ block.reason }}
                             </span>
-                            <form action="/admin/unblock_slot/{{ block.id }}" method="POST" class="d-inline">
+                            <form action="/admin/unblock_slot/{{ block.id }}" method="POST" class="d-inline confirm-form"
+                                  data-msg="Bu kilidi kaldırmak istiyor musunuz?">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn-unblock"
-                                        onclick="return confirm('Bu kilidi kaldırmak istiyor musunuz?')">
+                                <button type="submit" class="btn-unblock">
                                     <i class="fas fa-unlock"></i> Kilidi Kaldır
                                 </button>
                             </form>
@@ -898,50 +895,96 @@
 </div><!-- /admin-layout -->
 
 <script nonce="{{ g.csp_nonce }}">
-/* ── TAB SİSTEMİ ── */
-function switchTab(name, el) {
-    document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
-    document.querySelectorAll('.sidebar-nav-item').forEach(function(b){ b.classList.remove('active'); });
-    document.getElementById('tab-' + name).classList.add('active');
-    el.classList.add('active');
+/* ══════════════════════════════════════════
+   TAB SİSTEMİ — data-tab attribute bazlı
+   inline onclick YOK → CSP uyumlu
+══════════════════════════════════════════ */
+function switchTab(name) {
+    document.querySelectorAll('.tab-panel').forEach(function(p){
+        p.classList.remove('active');
+    });
+    document.querySelectorAll('.sidebar-nav-item').forEach(function(b){
+        b.classList.remove('active');
+    });
+    var panel = document.getElementById('tab-' + name);
+    if (panel) panel.classList.add('active');
+    var activeBtn = document.querySelector('.sidebar-nav-item[data-tab="' + name + '"]');
+    if (activeBtn) activeBtn.classList.add('active');
 }
 
-/* ── REZERVASYON FİLTRESİ ── */
-function filterRes(status, btn) {
-    document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
-    btn.classList.add('active');
-    document.querySelectorAll('.res-card').forEach(function(card){
-        card.style.display = (status === 'all' || card.dataset.status === status) ? '' : 'none';
+/* ══════════════════════════════════════════
+   FORM ONAY DİYALOĞU — data-msg bazlı
+   inline onclick YOK → CSP uyumlu
+══════════════════════════════════════════ */
+function bindConfirmForms() {
+    document.querySelectorAll('.confirm-form').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            var msg = form.dataset.msg || 'Devam etmek istiyor musunuz?';
+            if (!confirm(msg)) {
+                e.preventDefault();
+            }
+        });
     });
 }
 
-/* ── OTURUM GERİ SAYIMI ── */
-(function () {
+/* ══════════════════════════════════════════
+   REZERVASYON FİLTRESİ — data-filter bazlı
+══════════════════════════════════════════ */
+function bindFilterBtns() {
+    document.querySelectorAll('.filter-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var status = btn.dataset.filter;
+            document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+            btn.classList.add('active');
+            document.querySelectorAll('.res-card').forEach(function(card){
+                card.style.display = (status === 'all' || card.dataset.status === status) ? '' : 'none';
+            });
+        });
+    });
+}
+
+/* ══════════════════════════════════════════
+   OTURUM GERİ SAYIMI
+══════════════════════════════════════════ */
+function initSessionTimer() {
     var TOTAL = 30 * 60, remaining = TOTAL;
     var valEl  = document.getElementById('sessionTimerVal');
     var fillEl = document.getElementById('sessionProgressFill');
     var warnEl = document.getElementById('sessionWarnMsg');
     function tick() {
         remaining--;
-        if (remaining <= 0) { alert('Oturumunuzun süresi doldu.'); window.location.href = '/logout'; return; }
+        if (remaining <= 0) {
+            alert('Oturumunuzun süresi doldu.');
+            window.location.href = '/logout';
+            return;
+        }
         var m = Math.floor(remaining / 60), s = remaining % 60;
-        valEl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        valEl.textContent  = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
         fillEl.style.width = ((remaining / TOTAL) * 100) + '%';
-        if (remaining <= 120)      { fillEl.style.background='#f87171'; warnEl.style.display='inline'; valEl.style.color='#f87171'; }
-        else if (remaining <= 300) { fillEl.style.background='#fbbf24'; }
+        if      (remaining <= 120) { fillEl.style.background = '#f87171'; warnEl.style.display = 'inline'; valEl.style.color = '#f87171'; }
+        else if (remaining <= 300) { fillEl.style.background = '#fbbf24'; }
         setTimeout(tick, 1000);
     }
     setTimeout(tick, 1000);
-})();
+}
 
-/* ══════════ KİLİTLEME FORMU ══════════ */
+/* ══════════════════════════════════════════
+   KİLİTLEME FORMU
+══════════════════════════════════════════ */
 var selPitches = [], selDates = [], selSlots = [];
 
-function togglePick(el, type) {
-    var val = el.dataset.val;
-    var arr = type === 'pitch' ? selPitches : selSlots;
-    var idx = arr.indexOf(val);
-    if (idx === -1) { arr.push(val); el.classList.add('selected'); }
+function bindPickItems() {
+    document.querySelectorAll('.multi-pick-item[data-pick-type]').forEach(function(el) {
+        el.addEventListener('click', function() { togglePick(el); });
+    });
+}
+
+function togglePick(el) {
+    var val  = el.dataset.val;
+    var type = el.dataset.pickType;
+    var arr  = type === 'pitch' ? selPitches : selSlots;
+    var idx  = arr.indexOf(val);
+    if (idx === -1) { arr.push(val);    el.classList.add('selected'); }
     else            { arr.splice(idx,1); el.classList.remove('selected'); }
     updateSummary();
 }
@@ -956,10 +999,10 @@ function initCal() {
     calYear = now.getFullYear(); calMonth = now.getMonth();
     renderCal();
     document.getElementById('calPrev').addEventListener('click', function(){
-        calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCal();
+        calMonth--; if(calMonth < 0){ calMonth = 11; calYear--; } renderCal();
     });
     document.getElementById('calNext').addEventListener('click', function(){
-        calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCal();
+        calMonth++; if(calMonth > 11){ calMonth = 0; calYear++; } renderCal();
     });
 }
 
@@ -970,7 +1013,7 @@ function renderCal() {
     DAYS_TR.forEach(function(d){
         var el = document.createElement('div'); el.className = 'cal-day-name'; el.textContent = d; grid.appendChild(el);
     });
-    var firstDay = new Date(calYear, calMonth, 1);
+    var firstDay   = new Date(calYear, calMonth, 1);
     var startOffset = (firstDay.getDay() + 6) % 7;
     var daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
     var today = new Date(); today.setHours(0,0,0,0);
@@ -978,7 +1021,7 @@ function renderCal() {
         var emp = document.createElement('div'); emp.className = 'cal-day cal-empty'; grid.appendChild(emp);
     }
     for (var d = 1; d <= daysInMonth; d++) {
-        var dayEl = document.createElement('div');
+        var dayEl   = document.createElement('div');
         var dayDate = new Date(calYear, calMonth, d);
         var dateStr = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
         dayEl.className = 'cal-day'; dayEl.textContent = d; dayEl.dataset.date = dateStr;
@@ -987,18 +1030,17 @@ function renderCal() {
         } else {
             if (dayDate.toDateString() === today.toDateString()) dayEl.classList.add('cal-today');
             if (selDates.indexOf(dateStr) !== -1) dayEl.classList.add('cal-selected');
-            dayEl.addEventListener('click', function(){ toggleDate(this); });
+            (function(el, ds){ el.addEventListener('click', function(){ toggleDate(el, ds); }); })(dayEl, dateStr);
         }
         grid.appendChild(dayEl);
     }
     renderDateTags();
 }
 
-function toggleDate(el) {
-    var dateStr = el.dataset.date;
+function toggleDate(el, dateStr) {
     var idx = selDates.indexOf(dateStr);
-    if (idx === -1) { selDates.push(dateStr); el.classList.add('cal-selected'); }
-    else            { selDates.splice(idx,1);  el.classList.remove('cal-selected'); }
+    if (idx === -1) { selDates.push(dateStr);    el.classList.add('cal-selected'); }
+    else            { selDates.splice(idx, 1);   el.classList.remove('cal-selected'); }
     renderDateTags(); updateSummary();
 }
 
@@ -1018,28 +1060,25 @@ function renderDateTags() {
     }
     selDates.slice().sort().forEach(function(ds){
         var parts = ds.split('-');
-        var tag = document.createElement('div'); tag.className = 'cal-tag';
-        tag.innerHTML = parts[2]+'.'+parts[1]+'.'+parts[0]+' <i class="fas fa-times"></i>';
-        tag.addEventListener('click', function(){ removeDate(ds); });
+        var tag   = document.createElement('div'); tag.className = 'cal-tag';
+        tag.textContent = parts[2]+'.'+parts[1]+'.'+parts[0]+' ';
+        var icon = document.createElement('i'); icon.className = 'fas fa-times';
+        tag.appendChild(icon);
+        (function(d){ tag.addEventListener('click', function(){ removeDate(d); }); })(ds);
         container.appendChild(tag);
     });
 }
 
 function updateSummary() {
-    var sumEl = document.getElementById('blockSummary');
+    var sumEl  = document.getElementById('blockSummary');
     var sumTxt = document.getElementById('blockSummaryText');
-    var total = selPitches.length * selDates.length * selSlots.length;
+    var total  = selPitches.length * selDates.length * selSlots.length;
     if (total > 0) {
         sumEl.style.display = 'flex';
-        sumTxt.textContent = selPitches.length+' saha × '+selDates.length+' tarih × '+selSlots.length+' saat = '+total+' slot kilitlenecek';
+        sumTxt.textContent  = selPitches.length+' saha × '+selDates.length+' tarih × '+selSlots.length+' saat = '+total+' slot kilitlenecek';
     } else {
         sumEl.style.display = 'none';
     }
-}
-
-function updateCharCount(el) {
-    var counter = document.getElementById('charCount');
-    if (counter) counter.textContent = el.value.length;
 }
 
 function submitBlock() {
@@ -1059,6 +1098,44 @@ function submitBlock() {
     document.getElementById('blockForm').submit();
 }
 
-document.addEventListener('DOMContentLoaded', function(){ initCal(); });
+/* Karakter sayacı */
+function bindCharCounter() {
+    var ta = document.getElementById('bReason');
+    var counter = document.getElementById('charCount');
+    if (ta && counter) {
+        ta.addEventListener('input', function(){ counter.textContent = ta.value.length; });
+    }
+}
+
+/* Çıkış onayı */
+function bindLogout() {
+    var btn = document.getElementById('logoutBtn');
+    if (btn) {
+        btn.addEventListener('click', function(e) {
+            if (!confirm('Oturumu kapatmak istiyor musunuz?')) e.preventDefault();
+        });
+    }
+}
+
+/* ══ DOMContentLoaded — tüm bağlamalar burada ══ */
+document.addEventListener('DOMContentLoaded', function() {
+    /* Tab navigasyon */
+    document.querySelectorAll('.sidebar-nav-item[data-tab]').forEach(function(el) {
+        el.addEventListener('click',   function(){ switchTab(el.dataset.tab); });
+        el.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' ') switchTab(el.dataset.tab); });
+    });
+
+    bindConfirmForms();
+    bindFilterBtns();
+    initSessionTimer();
+    bindPickItems();
+    initCal();
+    bindCharCounter();
+    bindLogout();
+
+    /* Kilitle butonu */
+    var btnBlock = document.getElementById('btnSubmitBlock');
+    if (btnBlock) btnBlock.addEventListener('click', submitBlock);
+});
 </script>
 {% endblock %}
