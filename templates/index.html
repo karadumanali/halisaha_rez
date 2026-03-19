@@ -357,8 +357,7 @@ input[type="date"].form-control {
                      data-pitch-id="{{ pitch.id }}"
                      data-pitch-name="{{ pitch.name }}"
                      data-pitch-price="{{ pitch.price }}"
-                     onclick="selectPitch(this)"
-                     onkeydown="if(event.key==='Enter'||event.key===' ')selectPitch(this)">
+                     data-action="selectPitch">
                     <div class="pitch-option-name">{{ pitch.name }}</div>
                     <div class="pitch-option-price">{{ pitch.price }} ₺/sa</div>
                 </div>
@@ -366,7 +365,7 @@ input[type="date"].form-control {
             </div>
         </div>
         <div class="panel-footer">
-            <button class="btn-next" id="btn1Next" disabled onclick="goStep(2)">
+            <button class="btn-next" id="btn1Next" disabled>
                 Devam Et <i class="fas fa-chevron-right"></i>
             </button>
         </div>
@@ -386,8 +385,8 @@ input[type="date"].form-control {
             <div class="slot-list" id="slotList" role="radiogroup" aria-label="Saat seçimi"></div>
         </div>
         <div class="panel-footer">
-            <button class="btn-back" onclick="goStep(1)"><i class="fas fa-chevron-left"></i> Geri</button>
-            <button class="btn-next" id="btn2Next" disabled onclick="goStep(3)">
+            <button class="btn-back" id="btnBack2"><i class="fas fa-chevron-left"></i> Geri</button>
+            <button class="btn-next" id="btn2Next" disabled>
                 Devam Et <i class="fas fa-chevron-right"></i>
             </button>
         </div>
@@ -449,7 +448,7 @@ input[type="date"].form-control {
                 <div class="upload-zone" id="uploadZone">
                     <input type="file" name="receipt" id="fReceipt"
                            accept=".pdf,.jpg,.jpeg,.png" required
-                           aria-label="Dekont dosyası seç" onchange="handleFile(this)">
+                           aria-label="Dekont dosyası seç">
                     <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
                     <div class="upload-main">Dekont dosyanızı yükleyin</div>
                     <div class="upload-sub">PDF veya resim — maks. 5 MB</div>
@@ -461,8 +460,8 @@ input[type="date"].form-control {
             </form>
         </div>
         <div class="panel-footer">
-            <button class="btn-back" onclick="goStep(2)"><i class="fas fa-chevron-left"></i> Geri</button>
-            <button class="btn-next" id="btn3Submit" disabled onclick="submitReservation()">
+            <button class="btn-back" id="btnBack3"><i class="fas fa-chevron-left"></i> Geri</button>
+            <button class="btn-next" id="btn3Submit" disabled>
                 Rezervasyonu Tamamla <i class="fas fa-check-circle"></i>
             </button>
         </div>
@@ -637,13 +636,37 @@ function formatDate(str) {
 }
 
 document.addEventListener('DOMContentLoaded',function(){
+    // ── Tarih değişimi ──
     document.getElementById('selDate').addEventListener('change',checkStep1);
+
+    // ── Pitch seçimi (onclick/onkeydown HTML'den kaldırıldı) ──
+    document.querySelectorAll('[data-action="selectPitch"]').forEach(function(el){
+        el.addEventListener('click', function(){ selectPitch(el); });
+        el.addEventListener('keydown', function(e){
+            if(e.key==='Enter'||e.key===' ') selectPitch(el);
+        });
+    });
+
+    // ── Butonlar ──
+    document.getElementById('btn1Next').addEventListener('click', function(){ goStep(2); });
+    document.getElementById('btn2Next').addEventListener('click', function(){ goStep(3); });
+    document.getElementById('btn3Submit').addEventListener('click', function(){ submitReservation(); });
+    document.getElementById('btnBack2').addEventListener('click', function(){ goStep(1); });
+    document.getElementById('btnBack3').addEventListener('click', function(){ goStep(2); });
+
+    // ── Dosya yükleme ──
+    var fReceipt = document.getElementById('fReceipt');
+    if(fReceipt){ fReceipt.addEventListener('change', function(){ handleFile(this); }); }
+
+    // ── Drag & drop ──
     var zone=document.getElementById('uploadZone');
     if(zone){
         zone.addEventListener('dragover',function(e){e.preventDefault();zone.classList.add('dragover');});
         zone.addEventListener('dragleave',function(){zone.classList.remove('dragover');});
         zone.addEventListener('drop',function(e){e.preventDefault();zone.classList.remove('dragover');var inp=document.getElementById('fReceipt');inp.files=e.dataTransfer.files;handleFile(inp);});
     }
+
+    // ── Telefon doğrulama ──
     var phone=document.getElementById('fPhone');
     if(phone){
         phone.addEventListener('input',function(){
