@@ -138,6 +138,24 @@ input[type="date"].form-control {
     cursor: pointer;
 }
 
+/* Tarih uyarı kutusu */
+.date-warn-box {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: var(--warning-bg);
+    border: 1.5px solid var(--warning-bd);
+    border-radius: var(--r-sm);
+    padding: 10px 14px;
+    margin-top: 10px;
+    font-size: 0.88rem;
+    color: var(--warning-tx);
+    font-weight: 600;
+}
+.date-warn-box.visible {
+    display: flex;
+}
+
 /* ── Saha kartları ── */
 .pitch-list { display: flex; flex-direction: column; gap: 10px; }
 .pitch-option {
@@ -378,6 +396,10 @@ input[type="date"].form-control {
             <div class="date-label"><i class="fas fa-calendar-alt"></i> Tarih</div>
             <input type="date" id="selDate" class="form-control"
                    min="{{ today_date }}" required aria-label="Rezervasyon tarihi">
+            <div id="dateWarnMsg" class="date-warn-box">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="dateWarnText"></span>
+            </div>
             <div class="date-label" style="margin-top:22px;">
                 <i class="fas fa-futbol"></i> Saha Seçin
             </div>
@@ -569,10 +591,42 @@ function selectPitch(el) {
 }
 
 function checkStep1() {
-    var date=document.getElementById('selDate').value;
-    var ok=date&&state.pitchId;
-    document.getElementById('btn1Next').disabled=!ok;
-    if(ok){state.date=date;fetchBusy();}
+    var dateInput = document.getElementById('selDate');
+    var warnBox   = document.getElementById('dateWarnMsg');
+    var warnText  = document.getElementById('dateWarnText');
+    var date = dateInput.value;
+
+    /* 1 aylık üst sınır hesapla */
+    var today   = new Date(); today.setHours(0,0,0,0);
+    var maxDate = new Date(today);
+    maxDate.setMonth(maxDate.getMonth() + 1);
+    /* max attribute'u JS ile set et (Jinja template render edildiğinde statik olur) */
+    dateInput.max = maxDate.toISOString().split('T')[0];
+
+    var dateValid = false;
+    if (date) {
+        var sel = new Date(date + 'T00:00:00');
+        if (sel < today) {
+            warnText.textContent = 'Geçmiş bir tarihe rezervasyon yapılamaz.';
+            warnBox.classList.add('visible');
+        } else if (sel > maxDate) {
+            var maxStr = maxDate.getDate().toString().padStart(2,'0') + '.'
+                       + (maxDate.getMonth()+1).toString().padStart(2,'0') + '.'
+                       + maxDate.getFullYear();
+            warnText.textContent = 'En fazla 1 ay ilerisine rezervasyon yapılabilir. (' + maxStr + ' tarihine kadar)';
+            warnBox.classList.add('visible');
+            dateInput.value = ''; /* seçimi temizle */
+        } else {
+            warnBox.classList.remove('visible');
+            dateValid = true;
+        }
+    } else {
+        warnBox.classList.remove('visible');
+    }
+
+    var ok = dateValid && state.pitchId;
+    document.getElementById('btn1Next').disabled = !ok;
+    if (ok) { state.date = date; fetchBusy(); }
 }
 
 function fetchBusy() {
@@ -731,6 +785,13 @@ function formatDate(str) {
 }
 
 document.addEventListener('DOMContentLoaded',function(){
+    /* Tarih max sınırını sayfa yüklenirken hemen ayarla */
+    (function() {
+        var maxDate = new Date();
+        maxDate.setMonth(maxDate.getMonth() + 1);
+        document.getElementById('selDate').max = maxDate.toISOString().split('T')[0];
+    })();
+
     /* Tarih değişimi */
     document.getElementById('selDate').addEventListener('change', checkStep1);
 

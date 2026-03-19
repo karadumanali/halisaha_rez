@@ -449,6 +449,8 @@ def reserve():
         date_obj     = datetime.strptime(date_str, '%Y-%m-%d').date()
         current_date = datetime.now().date()
         current_time = datetime.now().time()
+        max_date     = (datetime.now() + timedelta(days=31)).date()  # 1 aylık üst sınır
+
         if date_obj < current_date:
             flash('Gecmis bir tarihe rezervasyon yapilamaz!', 'danger')
             return redirect(url_for('index'))
