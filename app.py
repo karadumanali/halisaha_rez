@@ -186,9 +186,7 @@ def is_ip_allowed(ip: str, allowed: list) -> bool:
     return False
 
 
-# ─── NONCE ÜRETİMİ — Her request'te yeni, rastgele token ─────────
-# Bu token; CSP header'ında ve template'lerdeki <script>/<style>
-# taglarında kullanılır. 'unsafe-inline' olmadan inline kod çalışır.
+# ─── NONCE ÜRETİMİ ───────────────────────────────────────────────
 
 @app.before_request
 def generate_csp_nonce():
@@ -199,6 +197,10 @@ def generate_csp_nonce():
 def restrict_admin_by_ip():
     allowed_ips = _load_allowed_ips()
     if not allowed_ips:
+        logger.warning(
+            "GUVENLİK UYARISI: ALLOWED_ADMIN_IPS tanimlanmamis! "
+            "Admin paneli tum IP adreslerine acik."
+        )
         return
     admin_paths = ('/login', '/admin')
     if not any(request.path.startswith(p) for p in admin_paths):
@@ -449,11 +451,16 @@ def reserve():
         date_obj     = datetime.strptime(date_str, '%Y-%m-%d').date()
         current_date = datetime.now().date()
         current_time = datetime.now().time()
-        max_date     = (datetime.now() + timedelta(days=31)).date()  # 1 aylık üst sınır
+        max_date     = (datetime.now() + timedelta(days=31)).date()  # ← 1 AYLIK BACKEND LİMİTİ
 
         if date_obj < current_date:
             flash('Gecmis bir tarihe rezervasyon yapilamaz!', 'danger')
             return redirect(url_for('index'))
+
+        if date_obj > max_date:                                       # ← YENİ KONTROL
+            flash('En fazla 1 ay ilerisine rezervasyon yapilabilir!', 'danger')
+            return redirect(url_for('index'))
+
         if date_obj == current_date:
             start_time_str = time_slot.split(' - ')[0].strip()
             if datetime.strptime(start_time_str, '%H:%M').time() <= current_time:
@@ -518,7 +525,6 @@ def admin_login():
 
         admin = Admin.query.filter_by(username=username).first()
 
-        # Timing attack koruması: kullanıcı bulunamasa da hash hesapla
         hash_to_check = admin.password_hash if admin else DUMMY_HASH
         password_ok   = check_password_hash(hash_to_check, password)
 
@@ -755,14 +761,10 @@ def apply_security_headers(response):
 
     response.headers['X-Frame-Options']        = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-XSS-Protection']       = '0; mode=block'
+    response.headers['X-XSS-Protection']       = '0'
     response.headers['Referrer-Policy']        = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy']     = 'camera=(), microphone=(), geolocation=()'
 
-    # ── GÜVENLİK: 'unsafe-inline' kaldırıldı — nonce tabanlı CSP ──
-    # Her request'te üretilen g.csp_nonce, sadece nonce'u bilen
-    # <script>/<style> taglarının çalışmasına izin verir.
-    # Saldırganın enjekte ettiği inline kod nonce'u bilmediği için çalışmaz.
     nonce = getattr(g, 'csp_nonce', '')
     response.headers['Content-Security-Policy'] = (
         f"default-src 'self'; "
@@ -789,11 +791,22 @@ with app.app_context():
 
     admin_var_mi = Admin.query.filter_by(username='yonetici').first()
     if not admin_var_mi:
-        hashed_password = generate_password_hash("degistir123", method='pbkdf2:sha256')
+        # ─── GÜVENLİ İLK ŞİFRE ÜRETİMİ ─────────────────────────────
+        # Hardcoded şifre YOK — her kurulumda rastgele 16 karakterli
+        # şifre üretilir ve yalnızca sunucu log'una yazılır.
+        import string
+        alphabet  = string.ascii_letters + string.digits + "!@#$%^&*"
+        ilk_sifre = ''.join(secrets.choice(alphabet) for _ in range(16))
+        hashed_password = generate_password_hash(ilk_sifre, method='pbkdf2:sha256')
         yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
         db.session.add(yeni_admin)
         db.session.commit()
-        logger.info("Ilk yonetici hesabi olusturuldu.")
+        logger.info("=" * 55)
+        logger.info("  YENİ ADMİN HESABI OLUŞTURULDU")
+        logger.info(f"  Kullanıcı adı : yonetici")
+        logger.info(f"  Şifre         : {ilk_sifre}")
+        logger.info("  Giriş yapıp şifrenizi hemen değiştirin!")
+        logger.info("=" * 55)
     else:
         logger.info("Yonetici zaten mevcut.")
 
