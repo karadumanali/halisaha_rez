@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 import uuid
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory, g
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -86,14 +86,14 @@ login_manager.login_message_category = 'warning'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return Admin.query.get(int(user_id))
+    return db.session.get(Admin, int(user_id))
 
 
 # ─── AYLIK OTOMATİK TEMİZLİK ─────────────────────────────────────
 
 def monthly_cleanup():
     with app.app_context():
-        cutoff = datetime.utcnow() - timedelta(days=30)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
         deleted = LoginAttempt.query.filter(
             LoginAttempt.attempted_at < cutoff
         ).delete()
@@ -119,7 +119,7 @@ LOCKOUT_MINUTES  = 15
 
 
 def is_account_locked(username, ip):
-    cutoff = datetime.utcnow() - timedelta(minutes=LOCKOUT_MINUTES)
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=LOCKOUT_MINUTES)
     fails_by_username = LoginAttempt.query.filter(
         LoginAttempt.username     == username,
         LoginAttempt.attempted_at  > cutoff,
@@ -136,7 +136,7 @@ def is_account_locked(username, ip):
 def record_attempt(username, ip, success):
     db.session.add(LoginAttempt(
         ip_address=ip, username=username,
-        attempted_at=datetime.utcnow(), success=success
+        attempted_at=datetime.now(timezone.utc), success=success
     ))
     db.session.commit()
 
@@ -634,7 +634,7 @@ def block_slot():
 @app.route('/admin/unblock_slot/<int:block_id>', methods=['POST'])
 @login_required
 def unblock_slot(block_id):
-    block = BlockedSlot.query.get_or_404(block_id)
+    block = db.get_or_404(BlockedSlot, block_id)
     db.session.delete(block)
     db.session.commit()
     flash('Slot kilidi kaldirildi.', 'success')
@@ -658,7 +658,7 @@ def add_pitch():
 @app.route('/admin/update_pitch/<int:pitch_id>', methods=['POST'])
 @login_required
 def update_pitch(pitch_id):
-    pitch     = Pitch.query.get_or_404(pitch_id)
+    pitch     = db.get_or_404(Pitch, pitch_id)
     new_price = request.form.get('new_price', '')
     if new_price and new_price.isdigit():
         pitch.price = int(new_price)
@@ -672,7 +672,7 @@ def update_pitch(pitch_id):
 @app.route('/admin/delete_pitch/<int:pitch_id>', methods=['POST'])
 @login_required
 def delete_pitch(pitch_id):
-    pitch = Pitch.query.get_or_404(pitch_id)
+    pitch = db.get_or_404(Pitch, pitch_id)
     try:
         db.session.delete(pitch)
         db.session.commit()
@@ -686,7 +686,7 @@ def delete_pitch(pitch_id):
 @app.route('/admin/status/<res_id>/<action>', methods=['POST'])
 @login_required
 def change_status(res_id, action):
-    reservation = Reservation.query.get_or_404(res_id)
+    reservation = db.get_or_404(Reservation, res_id)
     if action == 'approve':
         reservation.status = 'Approved'
         send_customer_approval_email(
@@ -704,7 +704,7 @@ def change_status(res_id, action):
 @app.route('/admin/pitch/<int:pitch_id>/add_image', methods=['POST'])
 @login_required
 def add_pitch_image(pitch_id):
-    pitch = Pitch.query.get_or_404(pitch_id)
+    pitch = db.get_or_404(Pitch, pitch_id)
     from models import PitchImage
     saved_filename = save_secure_pitch_image(request.files.get('image'))
     if not saved_filename:
@@ -761,7 +761,7 @@ def apply_security_headers(response):
 
     response.headers['X-Frame-Options']        = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-XSS-Protection']       = '0'
+    response.headers['X-XSS-Protection']       = '0'                  # ← DEĞİŞTİRİLDİ (deprecated)
     response.headers['Referrer-Policy']        = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy']     = 'camera=(), microphone=(), geolocation=()'
 
