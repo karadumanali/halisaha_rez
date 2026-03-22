@@ -93,12 +93,24 @@ def load_user(user_id):
 
 def monthly_cleanup():
     with app.app_context():
-        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-        deleted = LoginAttempt.query.filter(
-            LoginAttempt.attempted_at < cutoff
+        # ── LoginAttempt: 30 günden eski kayıtları sil ──
+        login_cutoff  = datetime.now(timezone.utc) - timedelta(days=30)
+        deleted_login = LoginAttempt.query.filter(
+            LoginAttempt.attempted_at < login_cutoff
         ).delete()
+
+        # ── AuditLog: 365 günden eski kayıtları sil ──
+        audit_cutoff  = datetime.now(timezone.utc) - timedelta(days=365)
+        deleted_audit = AuditLog.query.filter(
+            AuditLog.created_at < audit_cutoff
+        ).delete()
+
         db.session.commit()
-        logger.info(f"Aylık temizlik: {deleted} eski kayıt silindi.")
+        logger.info(
+            f"Aylık temizlik tamamlandı: "
+            f"{deleted_login} login denemesi, "
+            f"{deleted_audit} denetim kaydı silindi."
+        )
 
 
 scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
