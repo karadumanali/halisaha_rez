@@ -446,6 +446,53 @@
 }
 .empty-state-sm i { font-size: 2rem; color: var(--gray-300); display: block; margin-bottom: 10px; }
 
+/* ── DENETİM KAYITLARI ── */
+.audit-list { display: flex; flex-direction: column; gap: 6px; }
+.audit-item {
+    display: grid;
+    grid-template-columns: 140px 130px 160px 1fr;
+    gap: 0 14px;
+    align-items: center;
+    background: var(--white);
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--r-sm);
+    padding: 11px 16px;
+    font-size: 0.85rem;
+    transition: background 0.12s;
+}
+.audit-item:hover { background: var(--gray-50); }
+.audit-time  { color: var(--gray-400); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.audit-admin { color: var(--teal-dk); font-weight: 800; }
+.audit-action {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 12px;
+    font-size: 0.75rem; font-weight: 800;
+    white-space: nowrap;
+}
+.audit-detail { color: var(--gray-600); font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Aksiyon renkleri */
+.action-giris           { background: #d0f5e8; color: #065f3e; }
+.action-cikis           { background: #f0f9ff; color: #0369a1; }
+.action-onayla          { background: #d0f5e8; color: #065f3e; }
+.action-reddet          { background: #fee2e2; color: #9b2c2c; }
+.action-saha            { background: #f3e8ff; color: #6b21a8; }
+.action-slot            { background: #fef9c3; color: #854d0e; }
+.action-sifre           { background: #ffedd5; color: #9a3412; }
+.action-logo            { background: #e0f2fe; color: #0369a1; }
+.action-diger           { background: var(--gray-100); color: var(--gray-600); }
+
+.audit-filter-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.audit-search {
+    flex: 1; min-width: 200px;
+    padding: 8px 14px;
+    border: 1.5px solid var(--gray-300);
+    border-radius: var(--r-sm);
+    font-size: 0.88rem; font-family: var(--font);
+    color: var(--ink);
+}
+.audit-search:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(14,168,116,0.15); }
+
 /* ── MOBİL ── */
 @media (max-width: 900px) {
     .admin-layout { flex-direction: column; }
@@ -461,6 +508,11 @@
 @media (max-width: 600px) {
     .res-card-body { grid-template-columns: repeat(2, 1fr); }
     .stat-cards-grid { grid-template-columns: repeat(2, 1fr); }
+    .audit-item { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .audit-detail { grid-column: 1 / -1; white-space: normal; }
+}
+@media (max-width: 900px) {
+    .audit-item { grid-template-columns: 120px 110px 140px 1fr; }
 }
 </style>
 
@@ -503,6 +555,10 @@
                 <div class="nav-icon"><i class="fas fa-lock"></i></div>
                 <span>Slot Kilitleri</span>
                 {% if blocked_count > 0 %}<span class="nav-badge purple">{{ blocked_count }}</span>{% endif %}
+            </div>
+            <div class="sidebar-nav-item" data-tab="denetim" role="tab" tabindex="0">
+                <div class="nav-icon"><i class="fas fa-history"></i></div>
+                <span>Denetim Kayıtları</span>
             </div>
         </nav>
 
@@ -891,6 +947,82 @@
 
         </div><!-- /tab-kilitler -->
 
+        <!-- ══ TAB 4: DENETİM KAYITLARI ══ -->
+        <div class="tab-panel" id="tab-denetim">
+
+            <div class="panel-heading">
+                <div class="panel-icon teal"><i class="fas fa-history"></i></div>
+                <div>
+                    <div class="panel-title">Denetim Kayıtları</div>
+                    <div class="panel-sub">Son 200 admin işlemi</div>
+                </div>
+            </div>
+
+            <div class="card" style="overflow:hidden;">
+                <div class="section-head-inline">
+                    <i class="fas fa-shield-alt" style="color:var(--teal)"></i>
+                    <h3>İşlem Geçmişi</h3>
+                    <span class="head-count">{{ audit_logs|length }} kayıt</span>
+                </div>
+                <div style="padding:16px;">
+                    <!-- Arama -->
+                    <div class="audit-filter-row">
+                        <input type="text" id="auditSearch" class="audit-search"
+                               placeholder="İşlem, kullanıcı veya detay ara...">
+                    </div>
+
+                    <!-- Başlık -->
+                    <div class="audit-item" style="background:var(--gray-50);border-color:var(--gray-300);margin-bottom:4px;">
+                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">Tarih / Saat</span>
+                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">Kullanıcı</span>
+                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">İşlem</span>
+                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">Detay</span>
+                    </div>
+
+                    <div class="audit-list" id="auditList">
+                    {% for log in audit_logs %}
+                    {% set action_map = {
+                        'admin_giris':           ('action-giris',  'fas fa-sign-in-alt',  'Giriş'),
+                        'admin_cikis':           ('action-cikis',  'fas fa-sign-out-alt', 'Çıkış'),
+                        'rezervasyon_onayla':    ('action-onayla', 'fas fa-check',        'Rezervasyon Onay'),
+                        'rezervasyon_reddet':    ('action-reddet', 'fas fa-times',        'Rezervasyon Red'),
+                        'saha_ekle':             ('action-saha',   'fas fa-plus',         'Saha Ekle'),
+                        'saha_fiyat_guncelle':   ('action-saha',   'fas fa-pen',          'Fiyat Güncelle'),
+                        'saha_sil':              ('action-reddet', 'fas fa-trash',        'Saha Sil'),
+                        'slot_kilitle':          ('action-slot',   'fas fa-lock',         'Slot Kilitle'),
+                        'slot_kilit_kaldir':     ('action-slot',   'fas fa-unlock',       'Kilit Kaldır'),
+                        'sifre_degistir':        ('action-sifre',  'fas fa-key',          'Şifre Değiştir'),
+                        'logo_guncelle':         ('action-logo',   'fas fa-image',        'Logo Güncelle'),
+                    } %}
+                    {% set meta = action_map.get(log.action, ('action-diger', 'fas fa-circle', log.action)) %}
+                    <div class="audit-item" data-search="{{ log.admin }} {{ log.action }} {{ log.detail }} {{ log.ip_address }}">
+                        <span class="audit-time">
+                            {{ log.created_at.strftime('%d.%m.%Y %H:%M') }}
+                        </span>
+                        <span class="audit-admin">
+                            <i class="fas fa-user" style="font-size:0.7rem;opacity:0.6;"></i>
+                            {{ log.admin }}
+                        </span>
+                        <span class="audit-action {{ meta[0] }}">
+                            <i class="{{ meta[1] }}"></i> {{ meta[2] }}
+                        </span>
+                        <span class="audit-detail" title="{{ log.detail }}">
+                            {{ log.detail or '—' }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <div class="empty-state-sm">
+                        <i class="fas fa-history"></i>
+                        Henüz hiç işlem kaydı yok.
+                    </div>
+                    {% endfor %}
+                    </div>
+
+                </div>
+            </div>
+
+        </div><!-- /tab-denetim -->
+
     </div><!-- /admin-content -->
 </div><!-- /admin-layout -->
 
@@ -1117,6 +1249,21 @@ function bindLogout() {
     }
 }
 
+/* ══════════════════════════════════════════
+   DENETİM KAYITLARI ARAMA
+══════════════════════════════════════════ */
+function bindAuditSearch() {
+    var input = document.getElementById('auditSearch');
+    if (!input) return;
+    input.addEventListener('input', function() {
+        var q = input.value.toLowerCase().trim();
+        document.querySelectorAll('#auditList .audit-item').forEach(function(row) {
+            var text = (row.dataset.search || '').toLowerCase();
+            row.style.display = (!q || text.includes(q)) ? '' : 'none';
+        });
+    });
+}
+
 /* ══ DOMContentLoaded — tüm bağlamalar burada ══ */
 document.addEventListener('DOMContentLoaded', function() {
     /* Tab navigasyon */
@@ -1132,6 +1279,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initCal();
     bindCharCounter();
     bindLogout();
+    bindAuditSearch();
 
     /* Kilitle butonu */
     var btnBlock = document.getElementById('btnSubmitBlock');

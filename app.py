@@ -24,7 +24,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
-from models import db, Admin, Pitch, Reservation, BlockedSlot, LoginAttempt
+from models import db, Admin, Pitch, Reservation, BlockedSlot, LoginAttempt, AuditLog
 from dotenv import load_dotenv
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
@@ -371,6 +371,26 @@ VALID_SLOTS = [
 
 DUMMY_HASH = generate_password_hash("__dummy_never_matches__")
 
+
+# ─── DENETİM KAYDI (AUDIT LOG) ───────────────────────────────────
+
+def audit(action: str, detail: str = ''):
+    """
+    Admin tarafından yapılan her önemli işlemi veritabanına kaydeder.
+    action : kısa işlem kodu  (ör: 'rezervasyon_onayla')
+    detail : ek bilgi         (ör: 'res_id=xxx müşteri=Ahmet')
+    """
+    try:
+        db.session.add(AuditLog(
+            admin      = current_user.username if current_user.is_authenticated else 'sistem',
+            ip_address = get_real_ip(),
+            action     = action,
+            detail     = detail[:500] if detail else ''
+        ))
+        db.session.commit()
+    except Exception as e:
+        logger.warning(f"Audit log yazılamadı: {e}")
+
 # ─── ROTALAR ─────────────────────────────────────────────────────
 
 @app.route('/')
@@ -531,6 +551,12 @@ def admin_login():
         if admin and password_ok:
             record_attempt(username, ip_address, success=True)
             login_user(admin, remember=False)
+            # Başarılı giriş logla (login_user'dan sonra current_user hazır)
+            db.session.add(AuditLog(
+                admin=username, ip_address=ip_address,
+                action='admin_giris', detail='Başarılı giriş'
+            ))
+            db.session.commit()
             return safe_redirect(request.args.get('next'), url_for('admin_dashboard'))
         else:
             record_attempt(username, ip_address, success=False)
@@ -542,6 +568,7 @@ def admin_login():
 @app.route('/logout')
 @login_required
 def logout():
+    audit('admin_cikis', 'Güvenli çıkış yapıldı')
     logout_user()
     session.clear()
     flash('Guvenli cikis yapildi.', 'info')
@@ -573,6 +600,7 @@ def change_password():
 
     current_user.password_hash = generate_password_hash(new_pw, method='pbkdf2:sha256')
     db.session.commit()
+    audit('sifre_degistir', 'Admin şifresi değiştirildi')
     logout_user()
     session.clear()
     flash('Şifreniz başarıyla değiştirildi. Lütfen yeni şifrenizle giriş yapın.', 'success')
@@ -585,10 +613,12 @@ def admin_dashboard():
     pitches       = Pitch.query.all()
     reservations  = Reservation.query.order_by(Reservation.created_at.desc()).all()
     blocked_slots = BlockedSlot.query.order_by(BlockedSlot.date.asc(), BlockedSlot.time_slot.asc()).all()
+    audit_logs    = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(200).all()
     return render_template('admin.html',
                            pitches=pitches,
                            reservations=reservations,
                            blocked_slots=blocked_slots,
+                           audit_logs=audit_logs,
                            now=datetime.now())
 
 
@@ -627,6 +657,10 @@ def block_slot():
     msg = f'{added} slot basariyla kilitlendi.'
     if skipped > 0:
         msg += f' ({skipped} slot zaten kilitliydi, atlandi.)'
+    if added > 0:
+        audit('slot_kilitle',
+              f'{added} slot kilitlendi | saha_ids={pitch_ids} '
+              f'| tarihler={dates} | saatler={time_slots} | sebep={reason}')
     flash(msg, 'success' if added > 0 else 'warning')
     return redirect(url_for('admin_dashboard'))
 
@@ -635,6 +669,9 @@ def block_slot():
 @login_required
 def unblock_slot(block_id):
     block = db.get_or_404(BlockedSlot, block_id)
+    audit('slot_kilit_kaldir',
+          f'saha={block.pitch.name} | tarih={block.date} '
+          f'| saat={block.time_slot} | sebep={block.reason}')
     db.session.delete(block)
     db.session.commit()
     flash('Slot kilidi kaldirildi.', 'success')
@@ -651,6 +688,7 @@ def add_pitch():
         return redirect(url_for('admin_dashboard'))
     db.session.add(Pitch(name=name, price=int(price)))
     db.session.commit()
+    audit('saha_ekle', f'saha={name} | fiyat={price} TL/sa')
     flash(f'"{name}" basariyla eklendi!', 'success')
     return redirect(url_for('admin_dashboard'))
 
@@ -661,8 +699,11 @@ def update_pitch(pitch_id):
     pitch     = db.get_or_404(Pitch, pitch_id)
     new_price = request.form.get('new_price', '')
     if new_price and new_price.isdigit():
+        old_price = pitch.price
         pitch.price = int(new_price)
         db.session.commit()
+        audit('saha_fiyat_guncelle',
+              f'saha={pitch.name} | eski={old_price} TL → yeni={new_price} TL')
         flash(f'"{pitch.name}" fiyati guncellendi: {pitch.price} TL', 'success')
     else:
         flash('Gecersiz ucret!', 'danger')
@@ -673,10 +714,12 @@ def update_pitch(pitch_id):
 @login_required
 def delete_pitch(pitch_id):
     pitch = db.get_or_404(Pitch, pitch_id)
+    pitch_name = pitch.name
     try:
         db.session.delete(pitch)
         db.session.commit()
-        flash(f'"{pitch.name}" silindi.', 'success')
+        audit('saha_sil', f'saha={pitch_name}')
+        flash(f'"{pitch_name}" silindi.', 'success')
     except Exception:
         db.session.rollback()
         flash('Bu sahaya ait rezervasyonlar var! Once onlari silin.', 'danger')
@@ -693,9 +736,17 @@ def change_status(res_id, action):
             reservation.customer_email, reservation.customer_name,
             reservation.pitch.name, reservation.date, reservation.time_slot
         )
+        audit('rezervasyon_onayla',
+              f'res_id={res_id} | müşteri={reservation.customer_name} '
+              f'| saha={reservation.pitch.name} | tarih={reservation.date} '
+              f'| saat={reservation.time_slot}')
         flash('Rezervasyon ONAYLANDI.', 'success')
     elif action == 'reject':
         reservation.status = 'Rejected'
+        audit('rezervasyon_reddet',
+              f'res_id={res_id} | müşteri={reservation.customer_name} '
+              f'| saha={reservation.pitch.name} | tarih={reservation.date} '
+              f'| saat={reservation.time_slot}')
         flash('Rezervasyon REDDEDILDI.', 'danger')
     db.session.commit()
     return redirect(url_for('admin_dashboard'))
@@ -738,6 +789,7 @@ def update_logo():
     except Exception:
         flash('Resim isleme hatasi!', 'danger')
         return redirect(url_for('admin_dashboard'))
+    audit('logo_guncelle', 'Site logosu değiştirildi')
     flash('Logo guncellendi!', 'success')
     return redirect(url_for('admin_dashboard'))
 
