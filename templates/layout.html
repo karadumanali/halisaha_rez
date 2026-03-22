@@ -183,7 +183,8 @@
         <div class="nav-inner">
             <a href="/" class="nav-home-link" title="Ana Sayfaya Dön">
                 <div class="nav-logo">
-                    <img src="{{ url_for('static', filename='uploads/receipts/site_logo.png') }}" alt="Logo"
+                    {# Logo static/uploads/ altında — web'e açık, doğru #}
+                    <img src="{{ url_for('static', filename='uploads/site_logo.png') }}" alt="Logo"
                          onerror="this.style.display='none'; this.parentElement.querySelector('.nav-logo-fb').style.display='flex';">
                     <div class="nav-logo-fb"><i class="fas fa-futbol"></i></div>
                 </div>

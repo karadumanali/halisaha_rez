@@ -563,9 +563,128 @@
         </nav>
 
         <div class="sidebar-footer">
+            <!-- Şifre Değiştir -->
+            <button type="button" id="btnChangePw"
+                    style="display:flex;align-items:center;justify-content:center;gap:7px;
+                           width:100%;background:transparent;color:var(--teal-dk);
+                           border:1.5px solid var(--mint-mid);border-radius:var(--r-sm);
+                           padding:9px;font-size:0.85rem;font-weight:700;cursor:pointer;
+                           transition:all 0.15s;font-family:var(--font);margin-bottom:8px;">
+                <i class="fas fa-key"></i> Şifre Değiştir
+            </button>
             <a href="/logout" class="btn-logout" id="logoutBtn">
                 <i class="fas fa-sign-out-alt"></i> Çıkış Yap
             </a>
+        </div>
+
+        <!-- ── Şifre Değiştir Modal ── -->
+        <div id="pwModal" style="display:none;position:fixed;inset:0;z-index:9999;
+             background:rgba(0,0,0,0.5);backdrop-filter:blur(3px);
+             align-items:center;justify-content:center;">
+            <div style="background:var(--white);border-radius:var(--r);
+                        padding:28px;max-width:420px;width:90%;
+                        box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+                    <div style="width:40px;height:40px;border-radius:10px;
+                                background:var(--teal-pale);color:var(--teal-dk);
+                                display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-key"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:1.1rem;font-weight:800;color:var(--ink);">Şifre Değiştir</div>
+                        <div style="font-size:0.78rem;color:var(--gray-400);">Güvenli bir şifre belirleyin</div>
+                    </div>
+                    <button id="btnClosePwModal"
+                            style="margin-left:auto;background:none;border:none;
+                                   cursor:pointer;color:var(--gray-400);font-size:1.2rem;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Şifre politikası bilgi kutusu -->
+                <div style="background:var(--teal-pale);border:1.5px solid var(--mint-mid);
+                            border-radius:var(--r-sm);padding:12px 14px;margin-bottom:18px;
+                            font-size:0.82rem;color:var(--teal-dk);">
+                    <div style="font-weight:800;margin-bottom:6px;">
+                        <i class="fas fa-shield-alt"></i> Şifre Gereksinimleri
+                    </div>
+                    <ul style="margin:0;padding-left:16px;line-height:1.8;">
+                        <li>En az <strong>10 karakter</strong></li>
+                        <li>En az <strong>1 büyük harf</strong> (A-Z)</li>
+                        <li>En az <strong>1 küçük harf</strong> (a-z)</li>
+                        <li>En az <strong>1 rakam</strong> (0-9)</li>
+                        <li>En az <strong>1 özel karakter</strong> (!@#$%^&* vb.)</li>
+                    </ul>
+                </div>
+
+                <form action="/admin/change_password" method="POST" id="pwForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div style="margin-bottom:14px;">
+                        <label style="font-size:0.85rem;font-weight:700;color:var(--gray-700);
+                                      display:block;margin-bottom:6px;">
+                            Mevcut Şifre
+                        </label>
+                        <input type="password" name="current_password" required
+                               style="width:100%;padding:11px 14px;border:1.5px solid var(--gray-300);
+                                      border-radius:var(--r-sm);font-size:0.93rem;font-family:var(--font);
+                                      color:var(--ink);box-sizing:border-box;"
+                               placeholder="Mevcut şifrenizi girin">
+                    </div>
+
+                    <div style="margin-bottom:14px;">
+                        <label style="font-size:0.85rem;font-weight:700;color:var(--gray-700);
+                                      display:block;margin-bottom:6px;">
+                            Yeni Şifre
+                        </label>
+                        <input type="password" name="new_password" id="newPwInput" required
+                               style="width:100%;padding:11px 14px;border:1.5px solid var(--gray-300);
+                                      border-radius:var(--r-sm);font-size:0.93rem;font-family:var(--font);
+                                      color:var(--ink);box-sizing:border-box;"
+                               placeholder="Yeni şifrenizi girin">
+                        <!-- Canlı güç göstergesi -->
+                        <div id="pwStrengthBar" style="height:4px;border-radius:2px;
+                             margin-top:6px;background:var(--gray-200);overflow:hidden;">
+                            <div id="pwStrengthFill" style="height:100%;width:0;
+                                 border-radius:2px;transition:all 0.3s;"></div>
+                        </div>
+                        <div id="pwStrengthText" style="font-size:0.75rem;margin-top:4px;
+                             font-weight:700;color:var(--gray-400);"></div>
+                    </div>
+
+                    <div style="margin-bottom:20px;">
+                        <label style="font-size:0.85rem;font-weight:700;color:var(--gray-700);
+                                      display:block;margin-bottom:6px;">
+                            Yeni Şifre (Tekrar)
+                        </label>
+                        <input type="password" name="confirm_password" id="confirmPwInput" required
+                               style="width:100%;padding:11px 14px;border:1.5px solid var(--gray-300);
+                                      border-radius:var(--r-sm);font-size:0.93rem;font-family:var(--font);
+                                      color:var(--ink);box-sizing:border-box;"
+                               placeholder="Yeni şifrenizi tekrar girin">
+                        <div id="pwMatchMsg" style="font-size:0.78rem;margin-top:5px;
+                             font-weight:700;display:none;"></div>
+                    </div>
+
+                    <div style="display:flex;gap:10px;">
+                        <button type="button" id="btnCancelPw"
+                                style="flex:1;padding:11px;background:var(--gray-100);
+                                       color:var(--gray-700);border:1.5px solid var(--gray-200);
+                                       border-radius:var(--r-sm);font-size:0.9rem;font-weight:700;
+                                       cursor:pointer;font-family:var(--font);">
+                            İptal
+                        </button>
+                        <button type="submit" id="btnPwSubmit"
+                                style="flex:2;padding:11px;background:var(--teal);
+                                       color:var(--white);border:none;
+                                       border-radius:var(--r-sm);font-size:0.9rem;font-weight:800;
+                                       cursor:pointer;font-family:var(--font);"
+                                disabled>
+                            <i class="fas fa-key"></i> Şifreyi Değiştir
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
 
     </aside>
@@ -1250,6 +1369,105 @@ function bindLogout() {
 }
 
 /* ══════════════════════════════════════════
+   ŞİFRE DEĞİŞTİR MODAL
+══════════════════════════════════════════ */
+function bindPasswordModal() {
+    var modal        = document.getElementById('pwModal');
+    var btnOpen      = document.getElementById('btnChangePw');
+    var btnClose     = document.getElementById('btnClosePwModal');
+    var btnCancel    = document.getElementById('btnCancelPw');
+    var newPwInput   = document.getElementById('newPwInput');
+    var confirmInput = document.getElementById('confirmPwInput');
+    var submitBtn    = document.getElementById('btnPwSubmit');
+    var matchMsg     = document.getElementById('pwMatchMsg');
+    var strengthFill = document.getElementById('pwStrengthFill');
+    var strengthText = document.getElementById('pwStrengthText');
+
+    if (!modal) return;
+
+    function openModal()  { modal.style.display = 'flex'; }
+    function closeModal() {
+        modal.style.display = 'none';
+        document.getElementById('pwForm').reset();
+        strengthFill.style.width = '0';
+        strengthText.textContent = '';
+        matchMsg.style.display = 'none';
+        submitBtn.disabled = true;
+    }
+
+    btnOpen.addEventListener('click',   openModal);
+    btnClose.addEventListener('click',  closeModal);
+    btnCancel.addEventListener('click', closeModal);
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.style.display === 'flex') closeModal();
+    });
+
+    /* Şifre gücü hesapla */
+    function calcStrength(pw) {
+        var score = 0;
+        if (pw.length >= 10) score++;
+        if (pw.length >= 14) score++;
+        if (/[A-Z]/.test(pw)) score++;
+        if (/[a-z]/.test(pw)) score++;
+        if (/\d/.test(pw)) score++;
+        if (/[!@#$%^&*()\-_=+\[\]{};:'",.<>?\/\|`~]/.test(pw)) score++;
+        return score;
+    }
+
+    function checkPolicy(pw) {
+        return (
+            pw.length >= 10 &&
+            /[A-Z]/.test(pw) &&
+            /[a-z]/.test(pw) &&
+            /\d/.test(pw) &&
+            /[!@#$%^&*()\-_=+\[\]{};:'",.<>?\/\|`~]/.test(pw)
+        );
+    }
+
+    function updateSubmitBtn() {
+        var pw      = newPwInput.value;
+        var confirm = confirmInput.value;
+        var valid   = checkPolicy(pw) && pw === confirm && confirm.length > 0;
+        submitBtn.disabled = !valid;
+    }
+
+    newPwInput.addEventListener('input', function() {
+        var pw    = newPwInput.value;
+        var score = calcStrength(pw);
+        var pct   = Math.min((score / 6) * 100, 100);
+        var color, label;
+        if      (score <= 2) { color = '#ef4444'; label = 'Çok Zayıf'; }
+        else if (score <= 3) { color = '#f97316'; label = 'Zayıf'; }
+        else if (score <= 4) { color = '#eab308'; label = 'Orta'; }
+        else if (score <= 5) { color = '#22c55e'; label = 'Güçlü'; }
+        else                  { color = '#16a34a'; label = 'Çok Güçlü'; }
+        strengthFill.style.width     = pct + '%';
+        strengthFill.style.background = color;
+        strengthText.textContent      = pw.length > 0 ? label : '';
+        strengthText.style.color      = color;
+        updateSubmitBtn();
+    });
+
+    confirmInput.addEventListener('input', function() {
+        var pw      = newPwInput.value;
+        var confirm = confirmInput.value;
+        if (!confirm) { matchMsg.style.display = 'none'; updateSubmitBtn(); return; }
+        matchMsg.style.display = 'block';
+        if (pw === confirm) {
+            matchMsg.textContent = '✓ Şifreler eşleşiyor';
+            matchMsg.style.color = 'var(--teal-dk)';
+        } else {
+            matchMsg.textContent = '✗ Şifreler eşleşmiyor';
+            matchMsg.style.color = 'var(--danger)';
+        }
+        updateSubmitBtn();
+    });
+}
+
+/* ══════════════════════════════════════════
    DENETİM KAYITLARI ARAMA
 ══════════════════════════════════════════ */
 function bindAuditSearch() {
@@ -1280,6 +1498,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bindCharCounter();
     bindLogout();
     bindAuditSearch();
+    bindPasswordModal();
 
     /* Kilitle butonu */
     var btnBlock = document.getElementById('btnSubmitBlock');

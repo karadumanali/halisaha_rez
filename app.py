@@ -58,13 +58,14 @@ if os.getenv('FLASK_ENV') == 'production':
     app.config['DEBUG']   = False
     app.config['TESTING'] = False
 
-UPLOAD_FOLDER       = os.path.join(base_dir, 'static', 'uploads', 'receipts')
+UPLOAD_FOLDER       = os.path.join(base_dir, 'uploads', 'receipts')  # static DIŞINDA — web'den doğrudan erişilemez
 PITCH_IMAGES_FOLDER = os.path.join(base_dir, 'static', 'uploads', 'pitches')
 app.config['UPLOAD_FOLDER']       = UPLOAD_FOLDER
 app.config['PITCH_IMAGES_FOLDER'] = PITCH_IMAGES_FOLDER
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
-for folder in [UPLOAD_FOLDER, PITCH_IMAGES_FOLDER]:
+LOGO_FOLDER = os.path.join(base_dir, 'static', 'uploads')
+for folder in [UPLOAD_FOLDER, PITCH_IMAGES_FOLDER, LOGO_FOLDER]:
     os.makedirs(folder, exist_ok=True)
 
 db.init_app(app)
@@ -384,6 +385,27 @@ VALID_SLOTS = [
 DUMMY_HASH = generate_password_hash("__dummy_never_matches__")
 
 
+# ─── ŞİFRE POLİTİKASI ────────────────────────────────────────────
+
+def validate_password(password: str) -> list:
+    """
+    Şifre politikasını kontrol eder.
+    Sorun varsa hata mesajlarının listesini döner, sorun yoksa boş liste.
+    """
+    errors = []
+    if len(password) < 10:
+        errors.append('En az 10 karakter olmalıdır.')
+    if not re.search(r'[A-Z]', password):
+        errors.append('En az 1 büyük harf (A-Z) içermelidir.')
+    if not re.search(r'[a-z]', password):
+        errors.append('En az 1 küçük harf (a-z) içermelidir.')
+    if not re.search(r'\d', password):
+        errors.append('En az 1 rakam (0-9) içermelidir.')
+    if not re.search(r'[!@#$%^&*()\-_=+\[\]{};:,./<>?\\|`~]', password):
+        errors.append('En az 1 özel karakter (!@#$%^&* vb.) içermelidir.')
+    return errors
+
+
 # ─── DENETİM KAYDI (AUDIT LOG) ───────────────────────────────────
 
 def audit(action: str, detail: str = ''):
@@ -598,16 +620,19 @@ def change_password():
         flash('Mevcut şifreniz yanlış!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
-    if len(new_pw) < 8:
-        flash('Yeni şifre en az 8 karakter olmalıdır!', 'danger')
-        return redirect(url_for('admin_dashboard'))
-
     if new_pw != confirm_pw:
         flash('Yeni şifreler eşleşmiyor!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
     if current_pw == new_pw:
         flash('Yeni şifre mevcut şifreden farklı olmalıdır!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    # Şifre politikası kontrolü
+    pw_errors = validate_password(new_pw)
+    if pw_errors:
+        for err in pw_errors:
+            flash(f'Şifre hatası: {err}', 'danger')
         return redirect(url_for('admin_dashboard'))
 
     current_user.password_hash = generate_password_hash(new_pw, method='pbkdf2:sha256')
@@ -792,7 +817,7 @@ def update_logo():
     if mime_type not in {'image/jpeg', 'image/png'} or not allowed_file(logo_file.filename):
         flash('Gecersiz dosya!', 'danger')
         return redirect(url_for('admin_dashboard'))
-    save_path = os.path.join(app.config['UPLOAD_FOLDER'], 'site_logo.png')
+    save_path = os.path.join(base_dir, 'static', 'uploads', 'site_logo.png')  # Logo public kalabilir
     try:
         with Image.open(logo_file) as img:
             img = img.convert("RGBA")
@@ -809,8 +834,16 @@ def update_logo():
 @app.route('/admin/receipt/<filename>')
 @login_required
 def view_receipt(filename):
+    # Güvenlik: sadece alfanümerik + uuid formatındaki dosya adlarına izin ver
     safe_name = os.path.basename(filename)
-    return send_from_directory(app.config['UPLOAD_FOLDER'], safe_name)
+    if not re.match(r'^[a-f0-9]{32}\.(pdf|jpg|jpeg|png)$', safe_name):
+        logger.warning(f"Geçersiz receipt isteği: {filename} — IP: {get_real_ip()}")
+        return ("Geçersiz dosya adı.", 400)
+    return send_from_directory(
+        app.config['UPLOAD_FOLDER'],
+        safe_name,
+        as_attachment=False  # Tarayıcıda görüntüle
+    )
 
 
 # ─── AFTER REQUEST: Cache + Güvenlik Header'ları ─────────────────
