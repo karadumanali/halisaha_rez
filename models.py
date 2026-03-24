@@ -16,6 +16,9 @@ class Admin(UserMixin, db.Model):
     id            = db.Column(db.Integer,     primary_key=True)
     username      = db.Column(db.String(50),  unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
+    session_token = db.Column(db.String(64),  nullable=True)
+    # session_token: her girişte yeni token üretilir
+    # Farklı cihazdan giriş yapılınca eski token değişir → eski oturum geçersiz olur
 
     def __repr__(self):
         return f'<Admin {self.username}>'

@@ -58,7 +58,7 @@ if os.getenv('FLASK_ENV') == 'production':
     app.config['DEBUG']   = False
     app.config['TESTING'] = False
 
-UPLOAD_FOLDER       = os.path.join(base_dir, 'uploads', 'receipts')  # static DIŞINDA — web'den doğrudan erişilemez
+UPLOAD_FOLDER       = os.path.join(base_dir, 'uploads', 'receipts')
 PITCH_IMAGES_FOLDER = os.path.join(base_dir, 'static', 'uploads', 'pitches')
 app.config['UPLOAD_FOLDER']       = UPLOAD_FOLDER
 app.config['PITCH_IMAGES_FOLDER'] = PITCH_IMAGES_FOLDER
@@ -87,20 +87,25 @@ login_manager.login_message_category = 'warning'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(Admin, int(user_id))
+    admin = db.session.get(Admin, int(user_id))
+    if admin is None:
+        return None
+    # ── Session token kontrolü: DB'deki token ile cookie'deki eşleşmeli ──
+    # Farklı cihazdan yeni giriş yapılmışsa eski session geçersiz olur
+    if session.get('session_token') != admin.session_token:
+        return None
+    return admin
 
 
 # ─── AYLIK OTOMATİK TEMİZLİK ─────────────────────────────────────
 
 def monthly_cleanup():
     with app.app_context():
-        # ── LoginAttempt: 30 günden eski kayıtları sil ──
         login_cutoff  = datetime.now(timezone.utc) - timedelta(days=30)
         deleted_login = LoginAttempt.query.filter(
             LoginAttempt.attempted_at < login_cutoff
         ).delete()
 
-        # ── AuditLog: 365 günden eski kayıtları sil ──
         audit_cutoff  = datetime.now(timezone.utc) - timedelta(days=365)
         deleted_audit = AuditLog.query.filter(
             AuditLog.created_at < audit_cutoff
@@ -388,10 +393,6 @@ DUMMY_HASH = generate_password_hash("__dummy_never_matches__")
 # ─── ŞİFRE POLİTİKASI ────────────────────────────────────────────
 
 def validate_password(password: str) -> list:
-    """
-    Şifre politikasını kontrol eder.
-    Sorun varsa hata mesajlarının listesini döner, sorun yoksa boş liste.
-    """
     errors = []
     if len(password) < 10:
         errors.append('En az 10 karakter olmalıdır.')
@@ -409,11 +410,6 @@ def validate_password(password: str) -> list:
 # ─── DENETİM KAYDI (AUDIT LOG) ───────────────────────────────────
 
 def audit(action: str, detail: str = ''):
-    """
-    Admin tarafından yapılan her önemli işlemi veritabanına kaydeder.
-    action : kısa işlem kodu  (ör: 'rezervasyon_onayla')
-    detail : ek bilgi         (ör: 'res_id=xxx müşteri=Ahmet')
-    """
     try:
         db.session.add(AuditLog(
             admin      = current_user.username if current_user.is_authenticated else 'sistem',
@@ -424,6 +420,7 @@ def audit(action: str, detail: str = ''):
         db.session.commit()
     except Exception as e:
         logger.warning(f"Audit log yazılamadı: {e}")
+
 
 # ─── ROTALAR ─────────────────────────────────────────────────────
 
@@ -459,7 +456,8 @@ def busy_slots():
 
 
 @app.route('/reserve', methods=['POST'])
-@limiter.limit("3 per minute")
+@limiter.limit("3 per minute")           # dakika bazlı — ani spam engeli
+@limiter.limit("10 per day")             # günlük IP bazlı — farklı form verileriyle denemeyi engeller
 def reserve():
     # ── Honeypot: bot tespiti ──
     if request.form.get('website', ''):
@@ -505,13 +503,13 @@ def reserve():
         date_obj     = datetime.strptime(date_str, '%Y-%m-%d').date()
         current_date = datetime.now().date()
         current_time = datetime.now().time()
-        max_date     = (datetime.now() + timedelta(days=31)).date()  # ← 1 AYLIK BACKEND LİMİTİ
+        max_date     = (datetime.now() + timedelta(days=31)).date()
 
         if date_obj < current_date:
             flash('Gecmis bir tarihe rezervasyon yapilamaz!', 'danger')
             return redirect(url_for('index'))
 
-        if date_obj > max_date:                                       # ← YENİ KONTROL
+        if date_obj > max_date:
             flash('En fazla 1 ay ilerisine rezervasyon yapilabilir!', 'danger')
             return redirect(url_for('index'))
 
@@ -584,11 +582,19 @@ def admin_login():
 
         if admin and password_ok:
             record_attempt(username, ip_address, success=True)
+
+            # ── Tek cihaz oturumu: yeni token üret, DB'ye yaz ──
+            # Eski oturumlar bu token eşleşmeyeceği için otomatik geçersiz olur
+            new_token = secrets.token_hex(32)
+            admin.session_token = new_token
+            db.session.commit()
+
             login_user(admin, remember=False)
-            # Başarılı giriş logla (login_user'dan sonra current_user hazır)
+            session['session_token'] = new_token
+
             db.session.add(AuditLog(
                 admin=username, ip_address=ip_address,
-                action='admin_giris', detail='Başarılı giriş'
+                action='admin_giris', detail=f'Başarılı giriş | IP: {ip_address}'
             ))
             db.session.commit()
             return safe_redirect(request.args.get('next'), url_for('admin_dashboard'))
@@ -603,6 +609,10 @@ def admin_login():
 @login_required
 def logout():
     audit('admin_cikis', 'Güvenli çıkış yapıldı')
+    # ── Session token'ı temizle — oturum tamamen geçersiz olur ──
+    if current_user.is_authenticated:
+        current_user.session_token = None
+        db.session.commit()
     logout_user()
     session.clear()
     flash('Guvenli cikis yapildi.', 'info')
@@ -628,7 +638,6 @@ def change_password():
         flash('Yeni şifre mevcut şifreden farklı olmalıdır!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
-    # Şifre politikası kontrolü
     pw_errors = validate_password(new_pw)
     if pw_errors:
         for err in pw_errors:
@@ -636,8 +645,10 @@ def change_password():
         return redirect(url_for('admin_dashboard'))
 
     current_user.password_hash = generate_password_hash(new_pw, method='pbkdf2:sha256')
+    # Şifre değişince tüm oturumları geçersiz kıl
+    current_user.session_token = None
     db.session.commit()
-    audit('sifre_degistir', 'Admin şifresi değiştirildi')
+    audit('sifre_degistir', 'Admin şifresi değiştirildi — tüm oturumlar sonlandırıldı')
     logout_user()
     session.clear()
     flash('Şifreniz başarıyla değiştirildi. Lütfen yeni şifrenizle giriş yapın.', 'success')
@@ -817,7 +828,7 @@ def update_logo():
     if mime_type not in {'image/jpeg', 'image/png'} or not allowed_file(logo_file.filename):
         flash('Gecersiz dosya!', 'danger')
         return redirect(url_for('admin_dashboard'))
-    save_path = os.path.join(base_dir, 'static', 'uploads', 'site_logo.png')  # Logo public kalabilir
+    save_path = os.path.join(base_dir, 'static', 'uploads', 'site_logo.png')
     try:
         with Image.open(logo_file) as img:
             img = img.convert("RGBA")
@@ -834,7 +845,6 @@ def update_logo():
 @app.route('/admin/receipt/<filename>')
 @login_required
 def view_receipt(filename):
-    # Güvenlik: sadece alfanümerik + uuid formatındaki dosya adlarına izin ver
     safe_name = os.path.basename(filename)
     if not re.match(r'^[a-f0-9]{32}\.(pdf|jpg|jpeg|png)$', safe_name):
         logger.warning(f"Geçersiz receipt isteği: {filename} — IP: {get_real_ip()}")
@@ -842,7 +852,7 @@ def view_receipt(filename):
     return send_from_directory(
         app.config['UPLOAD_FOLDER'],
         safe_name,
-        as_attachment=False  # Tarayıcıda görüntüle
+        as_attachment=False
     )
 
 
@@ -858,7 +868,7 @@ def apply_security_headers(response):
 
     response.headers['X-Frame-Options']        = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-XSS-Protection']       = '0'                  # ← DEĞİŞTİRİLDİ (deprecated)
+    response.headers['X-XSS-Protection']       = '0'
     response.headers['Referrer-Policy']        = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy']     = 'camera=(), microphone=(), geolocation=()'
 
@@ -888,9 +898,6 @@ with app.app_context():
 
     admin_var_mi = Admin.query.filter_by(username='yonetici').first()
     if not admin_var_mi:
-        # ─── GÜVENLİ İLK ŞİFRE ÜRETİMİ ─────────────────────────────
-        # Hardcoded şifre YOK — her kurulumda rastgele 16 karakterli
-        # şifre üretilir ve yalnızca sunucu log'una yazılır.
         import string
         alphabet  = string.ascii_letters + string.digits + "!@#$%^&*"
         ilk_sifre = ''.join(secrets.choice(alphabet) for _ in range(16))
