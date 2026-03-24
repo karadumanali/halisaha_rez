@@ -24,3 +24,6 @@ static/uploads/*
 !static/uploads/.gitkeep
 
 magic.mgc
+
+
+/uploads

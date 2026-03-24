@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AYBU Halı Saha Rezervasyon Sistemi</title>
+    <title>AYBÜ SKS Spor Tesisleri Rezervasyon Sistemi</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%230ea874'/%3E%3Ctext y='50' x='50' text-anchor='middle' dominant-baseline='middle' font-size='58' fill='white'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -179,21 +180,19 @@
 <body>
 
 <nav class="site-nav">
-    <div class="container site-container">
-        <div class="nav-inner">
-            <a href="/" class="nav-home-link" title="Ana Sayfaya Dön">
-                <div class="nav-logo">
-                    {# Logo static/uploads/ altında — web'e açık, doğru #}
-                    <img src="{{ url_for('static', filename='uploads/site_logo.png') }}" alt="Logo"
-                         onerror="this.style.display='none'; this.parentElement.querySelector('.nav-logo-fb').style.display='flex';">
-                    <div class="nav-logo-fb"><i class="fas fa-futbol"></i></div>
-                </div>
-                <div class="nav-brand">
-                    <div class="nav-brand-name">AYBÜ Halı Saha</div>
-                    <div class="nav-brand-sub">Rezervasyon Sistemi</div>
-                </div>
-            </a>
-        </div>
+    <div class="nav-inner" style="padding: 0 24px;">
+        <a href="/" class="nav-home-link" title="Ana Sayfaya Dön">
+            <div class="nav-logo">
+                {# Logo static/uploads/ altında — web'e açık, doğru #}
+                <img src="{{ url_for('static', filename='uploads/site_logo.png') }}" alt="Logo"
+                     onerror="this.style.display='none'; this.parentElement.querySelector('.nav-logo-fb').style.display='flex';">
+                <div class="nav-logo-fb"><i class="fas fa-futbol"></i></div>
+            </div>
+            <div class="nav-brand">
+                <div class="nav-brand-name">AYBÜ SKS Spor Tesisleri</div>
+                <div class="nav-brand-sub">Rezervasyon Sistemi</div>
+            </div>
+        </a>
     </div>
 </nav>
 
@@ -222,7 +221,7 @@
 <footer class="site-footer">
     <div class="container site-container">
         <div class="footer-inner">
-            <span>&copy; 2026 AYBÜ Spor &amp; Kültür</span>
+            <span>&copy; 2026 AYBÜ SKS Spor Tesisleri</span>
             <span class="footer-dot">·</span>
             <span class="footer-dot">·</span>
             <span>Tüm hakları saklıdır</span>
