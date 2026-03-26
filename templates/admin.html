@@ -1448,19 +1448,13 @@ function bindPasswordModal() {
     }
 
     function checkPolicy(pw) {
-        return (
-            pw.length >= 10 &&
-            /[A-Z]/.test(pw) &&
-            /[a-z]/.test(pw) &&
-            /\d/.test(pw) &&
-            /[!@#$%^&*()\-_=+\[\]{};:'",.<>?\/\|`~]/.test(pw)
-        );
+        return true;
     }
 
     function updateSubmitBtn() {
         var pw      = newPwInput.value;
         var confirm = confirmInput.value;
-        var valid   = checkPolicy(pw) && pw === confirm && confirm.length > 0;
+        var valid = pw.length > 0 && pw === confirm;
         submitBtn.disabled = !valid;
     }
 
