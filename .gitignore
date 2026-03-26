@@ -25,5 +25,10 @@ static/uploads/*
 
 magic.mgc
 
-
+# Yüklenen dosyalar
 /uploads
+/static/uploads/pitches
+
+
+# !! KRİTİK: Sabit şifre içeren kurulum betiği !!
+setup_db.py

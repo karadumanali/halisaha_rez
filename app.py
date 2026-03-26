@@ -90,8 +90,6 @@ def load_user(user_id):
     admin = db.session.get(Admin, int(user_id))
     if admin is None:
         return None
-    # ── Session token kontrolü: DB'deki token ile cookie'deki eşleşmeli ──
-    # Farklı cihazdan yeni giriş yapılmışsa eski session geçersiz olur
     if session.get('session_token') != admin.session_token:
         return None
     return admin
@@ -456,10 +454,9 @@ def busy_slots():
 
 
 @app.route('/reserve', methods=['POST'])
-@limiter.limit("3 per minute")           # dakika bazlı — ani spam engeli
-@limiter.limit("10 per day")             # günlük IP bazlı — farklı form verileriyle denemeyi engeller
+@limiter.limit("3 per minute")
+@limiter.limit("10 per day")
 def reserve():
-    # ── Honeypot: bot tespiti ──
     if request.form.get('website', ''):
         logger.warning(f"Honeypot tetiklendi — IP: {request.remote_addr}")
         flash('Rezervasyon talebiniz alindi! Yonetici onayindan sonra kesinlesecektir.', 'success')
@@ -583,8 +580,6 @@ def admin_login():
         if admin and password_ok:
             record_attempt(username, ip_address, success=True)
 
-            # ── Tek cihaz oturumu: yeni token üret, DB'ye yaz ──
-            # Eski oturumlar bu token eşleşmeyeceği için otomatik geçersiz olur
             new_token = secrets.token_hex(32)
             admin.session_token = new_token
             db.session.commit()
@@ -609,7 +604,6 @@ def admin_login():
 @login_required
 def logout():
     audit('admin_cikis', 'Güvenli çıkış yapıldı')
-    # ── Session token'ı temizle — oturum tamamen geçersiz olur ──
     if current_user.is_authenticated:
         current_user.session_token = None
         db.session.commit()
@@ -644,8 +638,10 @@ def change_password():
             flash(f'Şifre hatası: {err}', 'danger')
         return redirect(url_for('admin_dashboard'))
 
-    current_user.password_hash = generate_password_hash(new_pw, method='pbkdf2:sha256')
-    # Şifre değişince tüm oturumları geçersiz kıl
+    current_user.password_hash = generate_password_hash(
+        new_pw,
+        method='pbkdf2:sha256:600000'
+    )
     current_user.session_token = None
     db.session.commit()
     audit('sifre_degistir', 'Admin şifresi değiştirildi — tüm oturumlar sonlandırıldı')
@@ -896,23 +892,27 @@ with app.app_context():
     db.create_all()
     logger.info("Veritabani tablolari kontrol edildi.")
 
+    # ── B-01 DÜZELTMESİ: Sabit şifre kaldırıldı, rastgele üretim ────────────
     admin_var_mi = Admin.query.filter_by(username='yonetici').first()
     if not admin_var_mi:
-        import string
-        alphabet  = string.ascii_letters + string.digits + "!@#$%^&*"
-        ilk_sifre = ''.join(secrets.choice(alphabet) for _ in range(16))
-        hashed_password = generate_password_hash(ilk_sifre, method='pbkdf2:sha256')
+        import string as _string
+        _alfabe   = _string.ascii_letters + _string.digits + "!@#$%^&*"
+        ilk_sifre = ''.join(secrets.choice(_alfabe) for _ in range(20))
+        hashed_password = generate_password_hash(
+            ilk_sifre,
+            method='pbkdf2:sha256:600000'
+        )
         yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
         db.session.add(yeni_admin)
         db.session.commit()
-        logger.info("=" * 55)
+        logger.info("=" * 60)
         logger.info("  YENİ ADMİN HESABI OLUŞTURULDU")
-        logger.info(f"  Kullanıcı adı : yonetici")
+        logger.info("  Kullanıcı adı : yonetici")
         logger.info(f"  Şifre         : {ilk_sifre}")
-        logger.info("  Giriş yapıp şifrenizi hemen değiştirin!")
-        logger.info("=" * 55)
+        logger.info("  !! Giriş yapıp şifrenizi hemen değiştirin !!")
+        logger.info("=" * 60)
     else:
-        logger.info("Yonetici zaten mevcut.")
+        logger.info("Yonetici hesabi zaten mevcut, atlandi.")
 
 
 if __name__ == '__main__':
