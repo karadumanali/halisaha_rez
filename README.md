@@ -266,7 +266,9 @@ Bu proje MIT lisansı altında yayınlanmıştır. Detaylar için [LICENSE](LICE
 
 ## 👥 Geliştiriciler
 
-AYBÜ Bilgisayar Mühendisliği — 2026
+Fatih Muaz EKİNCİ -
+Ali KARADUMAN -
+Mustafa AYYILDIZ
 
 ---
 
