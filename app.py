@@ -76,6 +76,9 @@ if not _secret:
 app.config['SECRET_KEY']                     = _secret
 app.config['SQLALCHEMY_DATABASE_URI']        = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_POOL_SIZE']           = 10
+app.config['SQLALCHEMY_MAX_OVERFLOW']        = 20
+app.config['SQLALCHEMY_POOL_TIMEOUT']        = 30
 app.config['SESSION_PERMANENT']              = True
 app.config['PERMANENT_SESSION_LIFETIME']     = timedelta(minutes=30)
 app.config['SESSION_COOKIE_HTTPONLY']        = True
@@ -1349,6 +1352,13 @@ def apply_security_headers(response):
     response.headers['X-XSS-Protection']       = '0'
     response.headers['Referrer-Policy']        = 'strict-origin-when-cross-origin'
     response.headers['Permissions-Policy']     = 'camera=(), microphone=(), geolocation=()'
+
+    # V-12: CORS — sadece kendi origin'e izin ver, dis siteler veri okuyamaz
+    allowed_origin = os.getenv('CORS_ORIGIN', '')
+    if allowed_origin:
+        response.headers['Access-Control-Allow-Origin'] = allowed_origin
+    else:
+        response.headers['Access-Control-Allow-Origin'] = 'null'
 
     nonce = getattr(g, 'csp_nonce', '')
     response.headers['Content-Security-Policy'] = (
