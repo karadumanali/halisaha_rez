@@ -51,6 +51,20 @@ load_dotenv(dotenv_path)
 
 app = Flask(__name__)
 
+# ── ProxyFix: X-Forwarded-For spoofing onlemi ────────────────────────────────
+# Reverse proxy (Nginx/Gunicorn) arkasinda calisirken gercek IP'yi guvenli alir.
+# x_for=1  → sadece 1 proxy'nin ekledigi IP'ye guven (kullanicinin gonderdigi sahte degere degil)
+# x_proto=1 → HTTPS bilgisini proxy'den al
+# Production'da Nginx arkasinda calisacaksan bu ZORUNLUDUR.
+# Dogrudan calisiyorsan (development) zaten request.remote_addr kullanilir.
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+_proxy_count = int(os.getenv('PROXY_COUNT', '0'))
+if _proxy_count > 0:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=_proxy_count, x_proto=_proxy_count)
+    logger.info(f"ProxyFix aktif: {_proxy_count} proxy katmani guvenilir.")
+# ─────────────────────────────────────────────────────────────────────────────
+
 _secret = os.getenv('SECRET_KEY')
 if not _secret:
     raise RuntimeError(
@@ -256,9 +270,12 @@ def _load_allowed_ips() -> list:
 
 
 def get_real_ip() -> str:
-    forwarded = request.headers.get('X-Forwarded-For', '')
-    if forwarded:
-        return forwarded.split(',')[0].strip()
+    """
+    Gercek IP adresini dondurur.
+    ProxyFix aktifse: request.remote_addr zaten proxy tarafindan dogru ayarlanir.
+    ProxyFix degilse: dogrudan baglanan IP doner.
+    Elle X-Forwarded-For okumuyoruz — spoofing riski var.
+    """
     return request.remote_addr or ''
 
 
