@@ -209,6 +209,30 @@ def auto_expire_reservations():
             logger.info(f"Otomatik sure dolumu: {count} rezervasyon 'Expired' olarak isaretlendi.")
 
 
+def auto_cleanup_blocked_slots():
+    """
+    Tarihi gecmis slot kilitlerini otomatik kaldirir.
+    Her saat basi calisir + admin paneli her acildiginda tetiklenir.
+    """
+    with app.app_context():
+        today = datetime.now().date()
+        expired_blocks = BlockedSlot.query.filter(BlockedSlot.date < today).all()
+        count = len(expired_blocks)
+
+        for block in expired_blocks:
+            db.session.delete(block)
+
+        if count > 0:
+            db.session.add(AuditLog(
+                admin='sistem',
+                ip_address='127.0.0.1',
+                action='otomatik_kilit_temizlik',
+                detail=f'{count} adet tarihi gecmis slot kilidi otomatik kaldirildi.'
+            ))
+            db.session.commit()
+            logger.info(f"Otomatik temizlik: {count} tarihi gecmis slot kilidi kaldirildi.")
+
+
 scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
 scheduler.add_job(
     monthly_cleanup,
@@ -222,6 +246,13 @@ scheduler.add_job(
     trigger='cron',
     hour='*', minute=5,
     id='auto_expire_reservations',
+    replace_existing=True
+)
+scheduler.add_job(
+    auto_cleanup_blocked_slots,
+    trigger='cron',
+    hour='*', minute=5,
+    id='auto_cleanup_blocked_slots',
     replace_existing=True
 )
 scheduler.start()
@@ -800,8 +831,9 @@ def change_password():
 @app.route('/admin')
 @login_required
 def admin_dashboard():
-    # ── Her sayfa acilisinda suresi dolmus rezervasyonlari otomatik kapat ────
+    # ── Her sayfa acilisinda otomatik temizlik ────
     auto_expire_reservations()
+    auto_cleanup_blocked_slots()
 
     pitches       = Pitch.query.all()
     reservations  = Reservation.query.order_by(Reservation.created_at.desc()).all()
