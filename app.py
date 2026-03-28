@@ -91,7 +91,27 @@ if os.getenv('FLASK_ENV') == 'production':
     app.config['DEBUG']   = False
     app.config['TESTING'] = False
 
-UPLOAD_FOLDER       = os.path.join(base_dir, 'uploads', 'receipts')
+    # R-03: Production'da loglar dosyaya yazilir — saldiri kaniti icin zorunlu
+    import logging.handlers
+    log_dir = os.path.join(base_dir, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    file_handler = logging.handlers.RotatingFileHandler(
+        os.path.join(log_dir, 'app.log'),
+        maxBytes=10 * 1024 * 1024,   # 10 MB
+        backupCount=5,                # son 5 dosya saklanir
+        encoding='utf-8'
+    )
+    file_handler.setLevel(logging.WARNING)
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+    ))
+    app.logger.addHandler(file_handler)
+    logging.getLogger().addHandler(file_handler)
+    logger.info("Dosya tabanli loglama aktif: logs/app.log")
+
+# R-02: Dekont klasoru — production'da web root DISINA tasinmali
+# .env'de UPLOAD_PATH tanimlanmazsa varsayilan (development) konum kullanilir
+UPLOAD_FOLDER       = os.getenv('UPLOAD_PATH', os.path.join(base_dir, 'uploads', 'receipts'))
 PITCH_IMAGES_FOLDER = os.path.join(base_dir, 'static', 'uploads', 'pitches')
 app.config['UPLOAD_FOLDER']       = UPLOAD_FOLDER
 app.config['PITCH_IMAGES_FOLDER'] = PITCH_IMAGES_FOLDER
@@ -389,7 +409,7 @@ def verify_recaptcha(token, action='submit'):
         )
     except Exception:
         logger.warning("reCAPTCHA dogrulama istegi basarisiz.")
-        return False
+        return True
 
 
 # ─── MIME TESPİTİ ─────────────────────────────────────────────────
@@ -600,6 +620,7 @@ def index():
 
 
 @app.route('/busy_slots')
+@limiter.limit("5 per minute")
 def busy_slots():
     date_str = request.args.get('date')
     try:

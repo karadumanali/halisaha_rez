@@ -54,6 +54,19 @@ FLASK_ENV=development
 PROXY_COUNT=0
 
 
+# ─── OPSIYONEL: Dekont Klasoru (Production icin ONEMLI) ──────────
+# Musteri dekontlarinin saklanacagi klasor.
+# Bos birakilirsa proje icindeki uploads/receipts/ kullanilir (development).
+# Production'da web root DISINDA bir klasor belirtin:
+#   UPLOAD_PATH=/var/lib/halisaha/receipts
+#
+# Bu klasorun yazma izni olmalidir:
+#   sudo mkdir -p /var/lib/halisaha/receipts
+#   sudo chown www-data:www-data /var/lib/halisaha/receipts
+#
+UPLOAD_PATH=
+
+
 # ─── OPSIYONEL: Admin IP Kisitlamasi ─────────────────────────────
 # Admin paneline (/login, /admin) sadece bu IP'lerden erisilebilir.
 # Birden fazla IP virgul ile ayrilir.
