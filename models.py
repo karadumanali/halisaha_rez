@@ -51,6 +51,12 @@ class PitchImage(db.Model):
 class Reservation(db.Model):
     __tablename__ = 'reservations'
 
+    # V-06: UNIQUE constraint — ayni saha + tarih + saat icin cift rezervasyon engeli
+    __table_args__ = (
+        db.UniqueConstraint('pitch_id', 'date', 'time_slot',
+                            name='uq_reservation_active_slot'),
+    )
+
     id               = db.Column(db.String(36),  primary_key=True, default=lambda: str(uuid.uuid4()))
     pitch_id         = db.Column(db.Integer,     db.ForeignKey('pitches.id'), nullable=False)
     date             = db.Column(db.Date,        nullable=False)

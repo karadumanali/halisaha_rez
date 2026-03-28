@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+
+{% block body %}
+<style nonce="{{ g.csp_nonce }}">
+.error-wrap { text-align:center; padding:80px 20px; }
+.error-icon { font-size:4rem; margin-bottom:16px; }
+.error-icon.clr-gray   { color: var(--gray-300); }
+.error-icon.clr-red    { color: var(--danger); }
+.error-icon.clr-yellow { color: #f59e0b; }
+.error-title { font-size:2rem; font-weight:800; color:var(--ink); margin-bottom:8px; }
+.error-msg { font-size:1rem; color:var(--gray-400); margin-bottom:28px; }
+.error-btn {
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--teal); color:white; padding:12px 28px;
+    border-radius:var(--r-sm); font-weight:700; text-decoration:none;
+    font-size:0.95rem; transition:background 0.15s;
+}
+.error-btn:hover { background:var(--teal-dk); color:white; }
+</style>
+
+<div class="error-wrap">
+    <div class="error-icon {{ icon_color }}">
+        <i class="fas fa-{{ icon }}"></i>
+    </div>
+    <h1 class="error-title">{{ code }} — {{ title }}</h1>
+    <p class="error-msg">{{ message }}</p>
+    <a href="/" class="error-btn">
+        <i class="fas fa-home"></i> Ana Sayfaya Don
+    </a>
+</div>
+{% endblock %}

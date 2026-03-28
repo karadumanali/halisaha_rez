@@ -447,6 +447,8 @@ def send_admin_notification(customer_name, date, time_slot):
     admin_email     = os.getenv('ADMIN_EMAIL')
     if not sender_email or not sender_password:
         return
+    # V-05: Header injection onlemi — newline karakterlerini temizle
+    customer_name = customer_name.replace('\n','').replace('\r','')
     msg = EmailMessage()
     msg['Subject'] = 'Yeni Rezervasyon Talebi!'
     msg['From']    = sender_email
@@ -464,6 +466,9 @@ def send_customer_approval_email(customer_email, customer_name, pitch_name, date
     sender_password = os.getenv('MAIL_PASSWORD')
     if not sender_email or not sender_password:
         return
+    # V-05: Header injection onlemi
+    customer_email = customer_email.replace('\n','').replace('\r','')
+    customer_name  = customer_name.replace('\n','').replace('\r','')
     msg = EmailMessage()
     msg['Subject'] = 'Rezervasyonunuz Onaylandi!'
     msg['From']    = sender_email
@@ -482,6 +487,9 @@ def send_customer_expiry_email(customer_email, customer_name, pitch_name, date, 
     sender_password = os.getenv('MAIL_PASSWORD')
     if not sender_email or not sender_password:
         return
+    # V-05: Header injection onlemi
+    customer_email = customer_email.replace('\n','').replace('\r','')
+    customer_name  = customer_name.replace('\n','').replace('\r','')
     msg = EmailMessage()
     msg['Subject'] = 'Rezervasyon Talebiniz Zaman Asimina Ugradi'
     msg['From']    = sender_email
@@ -670,7 +678,13 @@ def reserve():
         customer_email=customer_email, receipt_filename=saved_filename
     )
     db.session.add(new_res)
-    db.session.commit()
+    # V-06: Race condition onlemi — UNIQUE constraint ihlalini yakala
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        flash('Bu saat dilimi dolu veya onay bekliyor!', 'danger')
+        return redirect(url_for('index'))
     send_admin_notification(customer_name, date_obj, time_slot)
     flash('Rezervasyon talebiniz alindi! Yonetici onayindan sonra kesinlesecektir.', 'success')
     return redirect(url_for('index'))
@@ -1260,6 +1274,64 @@ def generate_report_pdf():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
+
+
+# ─── V-07: OZEL HATA SAYFALARI — Bilgi sizintisini onle ──────────
+# Tek sablon (error.html) + dinamik icerik — her hata kodu icin ayri dosya yok
+
+ERROR_PAGES = {
+    404: {
+        'title': 'Sayfa Bulunamadi',
+        'message': 'Aradiginiz sayfa mevcut degil veya tasinmis olabilir.',
+        'icon': 'search',
+        'icon_color': 'clr-gray',
+    },
+    500: {
+        'title': 'Sunucu Hatasi',
+        'message': 'Bir seyler ters gitti. Lutfen daha sonra tekrar deneyin.',
+        'icon': 'exclamation-triangle',
+        'icon_color': 'clr-red',
+    },
+    429: {
+        'title': 'Cok Fazla Istek',
+        'message': 'Cok fazla istek gonderdiniz. Lutfen birkac dakika bekleyin.',
+        'icon': 'hourglass-half',
+        'icon_color': 'clr-yellow',
+    },
+    403: {
+        'title': 'Erisim Engellendi',
+        'message': 'Bu sayfaya erisim yetkiniz bulunmuyor.',
+        'icon': 'ban',
+        'icon_color': 'clr-red',
+    },
+}
+
+def _render_error(code, e):
+    if code == 500:
+        logger.error(f"500 hatasi: {e}")
+    info = ERROR_PAGES.get(code, {
+        'title': 'Hata',
+        'message': 'Beklenmeyen bir hata olustu.',
+        'icon': 'exclamation-circle',
+        'icon_color': 'var(--gray-400)',
+    })
+    return render_template('error.html', code=code, **info), code
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return _render_error(404, e)
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return _render_error(500, e)
+
+@app.errorhandler(429)
+def too_many_requests(e):
+    return _render_error(429, e)
+
+@app.errorhandler(403)
+def forbidden(e):
+    return _render_error(403, e)
 
 
 # ─── AFTER REQUEST: Cache + Güvenlik Header'ları ─────────────────
