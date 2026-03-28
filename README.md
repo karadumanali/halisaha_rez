@@ -266,8 +266,8 @@ Bu proje MIT lisansı altında yayınlanmıştır. Detaylar için [LICENSE](LICE
 
 ## 👥 Geliştiriciler
 
-Fatih Muaz EKİNCİ
-Ali KARADUMAN
+Fatih Muaz EKİNCİ -
+Ali KARADUMAN -
 Mustafa AYYILDIZ
 
 ---
