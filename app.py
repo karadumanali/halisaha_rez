@@ -81,6 +81,7 @@ app.config['PERMANENT_SESSION_LIFETIME']     = timedelta(minutes=30)
 app.config['SESSION_COOKIE_HTTPONLY']        = True
 app.config['SESSION_COOKIE_SAMESITE']        = 'Lax'
 app.config['SESSION_COOKIE_SECURE']          = os.getenv('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_NAME']            = 'sks_sid'
 app.config['MAX_CONTENT_LENGTH']             = 5 * 1024 * 1024
 
 if os.getenv('FLASK_ENV') == 'production':
@@ -705,11 +706,10 @@ def admin_login():
         password   = request.form.get('password', '')
         ip_address = request.remote_addr
 
+        # V-08: Once IP bazli kilidi kontrol et (kullanici adi ifsa edilmesin)
+        # Hem IP hem username kilidi ayni mesaji gosterir
         if is_account_locked(username, ip_address):
-            flash(
-                f'Cok fazla basarisiz deneme. {LOCKOUT_MINUTES} dakika sonra tekrar deneyin.',
-                'danger'
-            )
+            flash('Cok fazla basarisiz deneme. Lutfen daha sonra tekrar deneyin.', 'danger')
             return render_template('login.html', recaptcha_site_key=RECAPTCHA_SITE)
 
         admin = Admin.query.filter_by(username=username).first()
