@@ -1,0 +1,137 @@
+# ══════════════════════════════════════════════════════════════════
+# AYBU SKS Spor Tesisleri — Ortam Degiskenleri (.env)
+# ══════════════════════════════════════════════════════════════════
+#
+# KURULUM:
+#   1. Bu dosyayi kopyalayip ".env" olarak adlandirin:
+#      cp .env.example .env
+#
+#   2. Asagidaki degerleri kendi ortaminiza gore doldurun
+#
+#   3. .env dosyasini ASLA Git'e pushlamayin!
+#      (.gitignore'da zaten var olmali)
+#
+# ══════════════════════════════════════════════════════════════════
+
+
+# ─── ZORUNLU: Flask Gizli Anahtar ────────────────────────────────
+# Oturum sifrelemesi icin kullanilir. Her ortam icin FARKLI olmalidir.
+# Uretmek icin terminalde su komutu calistirin:
+#   python3 -c "import secrets; print(secrets.token_hex(32))"
+#
+SECRET_KEY=BURAYA_URETTIGINIZ_ANAHTARI_YAPIN
+
+
+# ─── ZORUNLU: Veritabani Baglantisi ─────────────────────────────
+# PostgreSQL icin:
+#   postgresql://kullanici:sifre@sunucu:5432/veritabani_adi
+#
+# Ornek (yerel gelistirme):
+#   postgresql://postgres:postgres123@localhost:5432/halisaha
+#
+# SQLite icin (sadece test amacli — production'da KULLANMAYIN):
+#   sqlite:///halisaha.db
+#
+DATABASE_URL=postgresql://kullanici:sifre@localhost:5432/halisaha
+
+
+# ─── ZORUNLU: Ortam Ayari ────────────────────────────────────────
+# development → debug acik, hatalar detayli gosterilir
+# production  → debug kapali, HTTPS zorunlu, guvenlik siki
+#
+FLASK_ENV=development
+
+
+# ─── OPSIYONEL: Proxy Katmani (Production icin ZORUNLU) ──────────
+# Nginx/Gunicorn arkasinda calisiyorsaniz 1 yapin.
+# Dogrudan calistiriyorsaniz (development) 0 birakin veya silip.
+# Birden fazla proxy varsa (Cloudflare + Nginx) 2 yapin.
+#
+# PROXY_COUNT=0  → development (varsayilan)
+# PROXY_COUNT=1  → tek proxy (Nginx)
+# PROXY_COUNT=2  → cift proxy (Cloudflare + Nginx)
+#
+PROXY_COUNT=0
+
+
+# ─── OPSIYONEL: Admin IP Kisitlamasi ─────────────────────────────
+# Admin paneline (/login, /admin) sadece bu IP'lerden erisilebilir.
+# Birden fazla IP virgul ile ayrilir.
+# Bos birakilirsa herkes erisebilir (gelistirme icin uygun).
+#
+# Ornek:
+#   ALLOWED_ADMIN_IPS=192.168.1.100,10.0.0.0/24
+#
+ALLOWED_ADMIN_IPS=
+
+
+# ─── OPSIYONEL: CORS Origin ─────────────────────────────────────
+# Production'da sitenizin domain'ini yazin.
+# Bos birakilirsa tum cross-origin istekleri engellenir.
+#
+# Ornek:
+#   CORS_ORIGIN=https://halisaha.aybu.edu.tr
+#
+CORS_ORIGIN=
+
+
+# ─── OPSIYONEL: E-posta Bildirimleri ────────────────────────────
+# Gmail kullaniyorsaniz:
+#   1. Google hesabinizda 2 adimli dogrulama acin
+#   2. "Uygulama Sifreleri" bolumunden 16 haneli sifre uretin
+#   3. O sifreyi MAIL_PASSWORD'a yapin
+#
+# Bos birakilirsa e-posta gonderimi devre disi kalir.
+# Sistem calismaya devam eder, sadece bildirim gitmez.
+#
+MAIL_USERNAME=
+MAIL_PASSWORD=
+ADMIN_EMAIL=
+
+
+# ─── OPSIYONEL: Google reCAPTCHA v3 ─────────────────────────────
+# Bot korumaasi icin kullanilir.
+# https://www.google.com/recaptcha/admin adresinden ucretsiz alin.
+# "reCAPTCHA v3" secin ve domain'inizi ekleyin.
+#
+# Bos birakilirsa reCAPTCHA devre disi kalir.
+# Sistem calismaya devam eder ama bot koruması olmaz.
+#
+RECAPTCHA_SITE_KEY=
+RECAPTCHA_SECRET_KEY=
+
+
+# ─── OPSIYONEL: Redis (Rate Limiting icin) ───────────────────────
+# Rate limiter varsayilan olarak bellekte (memory://) calisir.
+# Production'da Redis kullanmaniz onerilir:
+#   redis://localhost:6379/0
+#
+# Redis yoksa bos birakin — bellek kullanilir.
+#
+REDIS_URL=memory://
+
+
+# ─── OPSIYONEL: Debug Modu ───────────────────────────────────────
+# SADECE gelistirme icin True yapin.
+# Production'da ASLA True olmasin!
+#
+FLASK_DEBUG=False
+
+
+# ══════════════════════════════════════════════════════════════════
+# HIZLI BASLANGIC (Minimum Ayar)
+# ══════════════════════════════════════════════════════════════════
+#
+# Sadece test etmek istiyorsaniz su 3 satir yeterli:
+#
+#   SECRET_KEY=test-icin-gecici-anahtar-uretim-icin-degistirin
+#   DATABASE_URL=sqlite:///halisaha.db
+#   FLASK_ENV=development
+#
+# Sonra terminalde:
+#   python setup_db.py
+#   python app.py
+#
+# Tarayicida: http://127.0.0.1:5000
+#
+# ══════════════════════════════════════════════════════════════════
