@@ -24,7 +24,10 @@ if os.getenv("FLASK_ENV") == "production":
 # ── Uygulama import ───────────────────────────────────────────────────────────
 from app import app
 from models import db, Admin
-from werkzeug.security import generate_password_hash
+from passlib.hash import argon2 as _argon2
+
+def ph_hash(password: str) -> str:
+    return _argon2.using(type="ID").hash(password)
 
 # ── Parametre ─────────────────────────────────────────────────────────────────
 no_drop = "--no-drop" in sys.argv
@@ -62,10 +65,7 @@ with app.app_context():
         alfabe    = string.ascii_letters + string.digits + "!@#$%^&*"
         ilk_sifre = "".join(secrets.choice(alfabe) for _ in range(20))
 
-        hashed = generate_password_hash(
-            ilk_sifre,
-            method="pbkdf2:sha256:600000"
-        )
+        hashed = ph_hash(ilk_sifre)
         db.session.add(Admin(username="yonetici", password_hash=hashed))
         db.session.commit()
 

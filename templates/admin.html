@@ -70,7 +70,7 @@
 }
 .stat-cards-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 10px;
     margin-bottom: 18px;
 }
@@ -78,6 +78,7 @@
 .stat-icon.pending  { background: #fef9c3; color: #854d0e; border: 1.5px solid #fcd34d; }
 .stat-icon.approved { background: var(--teal-pale); color: var(--teal-dk); border: 1.5px solid var(--mint-mid); }
 .stat-icon.rejected { background: var(--danger-bg); color: var(--danger); border: 1.5px solid #fca5a5; }
+.stat-icon.expired  { background: #f3f4f6; color: #6b7280; border: 1.5px solid #d1d5db; }
 .stat-icon.blocked  { background: #f3e8ff; color: #6b21a8; border: 1.5px solid #d8b4fe; }
 .stat-num { font-size: 1.2rem; font-weight: 800; color: var(--ink); line-height: 1; }
 .stat-lbl { font-size: 0.6rem; color: var(--gray-400); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
@@ -193,6 +194,7 @@
 .status-pending  { background: #fef9c3; color: #854d0e; border: 1px solid #fcd34d; }
 .status-approved { background: var(--teal-pale); color: var(--teal-dk); border: 1px solid var(--mint-mid); }
 .status-rejected { background: var(--danger-bg); color: var(--danger-tx); border: 1px solid #fca5a5; }
+.status-expired  { background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; }
 
 .receipt-btn {
     display: inline-flex; align-items: center; gap: 5px;
@@ -480,6 +482,7 @@
 .action-slot            { background: #fef9c3; color: #854d0e; }
 .action-sifre           { background: #ffedd5; color: #9a3412; }
 .action-logo            { background: #e0f2fe; color: #0369a1; }
+.action-expired         { background: #f3f4f6; color: #6b7280; }
 .action-diger           { background: var(--gray-100); color: var(--gray-600); }
 
 .audit-filter-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
@@ -631,6 +634,26 @@
 .pw-btn-submit:hover:not(:disabled) { background: var(--teal-dk); }
 .pw-btn-submit:disabled { opacity: 0.38; cursor: not-allowed; }
 
+/* ── YENİ: Canlı şifre politika kontrol listesi ── */
+.pw-check-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0;
+}
+.pw-check-list li {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 2px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--gray-400);
+    transition: color 0.2s;
+}
+.pw-check-list li.pass { color: var(--teal-dk); }
+.pw-check-list li.fail { color: var(--danger); }
+.pw-check-list li i { font-size: 0.7rem; width: 14px; text-align: center; }
+
 /* ── MOBİL ── */
 @media (max-width: 900px) {
     .admin-layout { flex-direction: column; }
@@ -657,6 +680,7 @@
 {% set pending_count  = reservations | selectattr('status','equalto','Pending')  | list | length %}
 {% set approved_count = reservations | selectattr('status','equalto','Approved') | list | length %}
 {% set rejected_count = reservations | selectattr('status','equalto','Rejected') | list | length %}
+{% set expired_count  = reservations | selectattr('status','equalto','Expired')  | list | length %}
 {% set blocked_count  = blocked_slots | length %}
 
 <div class="admin-layout">
@@ -742,6 +766,10 @@
                     <div><div class="stat-num">{{ rejected_count }}</div><div class="stat-lbl">Reddedildi</div></div>
                 </div>
                 <div class="stat-chip">
+                    <div class="stat-icon expired"><i class="fas fa-clock"></i></div>
+                    <div><div class="stat-num">{{ expired_count }}</div><div class="stat-lbl">Süresi Doldu</div></div>
+                </div>
+                <div class="stat-chip">
                     <div class="stat-icon blocked"><i class="fas fa-lock"></i></div>
                     <div><div class="stat-num">{{ blocked_count }}</div><div class="stat-lbl">Kilitli Slot</div></div>
                 </div>
@@ -753,6 +781,7 @@
                 <button class="filter-btn" data-filter="Pending">Bekliyor ({{ pending_count }})</button>
                 <button class="filter-btn" data-filter="Approved">Onaylandı ({{ approved_count }})</button>
                 <button class="filter-btn" data-filter="Rejected">Reddedildi ({{ rejected_count }})</button>
+                <button class="filter-btn" data-filter="Expired">Süresi Doldu ({{ expired_count }})</button>
             </div>
 
             <div class="res-list">
@@ -765,6 +794,8 @@
                         <span class="status-pill status-pending"><i class="fas fa-hourglass-half"></i> Bekliyor</span>
                     {% elif res.status == 'Approved' %}
                         <span class="status-pill status-approved"><i class="fas fa-check-circle"></i> Onaylandı</span>
+                    {% elif res.status == 'Expired' %}
+                        <span class="status-pill status-expired"><i class="fas fa-clock"></i> Süresi Doldu</span>
                     {% else %}
                         <span class="status-pill status-rejected"><i class="fas fa-times-circle"></i> Reddedildi</span>
                     {% endif %}
@@ -816,6 +847,10 @@
                             </button>
                         </form>
                     </div>
+                    {% elif res.status == 'Expired' %}
+                    <span class="done-label" style="color:#6b7280;">
+                        <i class="fas fa-clock"></i> Süre doldu — otomatik kapatıldı
+                    </span>
                     {% else %}
                     <span class="done-label"><i class="fas fa-check"></i> İşlem tamamlandı</span>
                     {% endif %}
@@ -1137,6 +1172,7 @@
                         'slot_kilit_kaldir':     ('action-slot',   'fas fa-unlock',       'Kilit Kaldır'),
                         'sifre_degistir':        ('action-sifre',  'fas fa-key',          'Şifre Değiştir'),
                         'logo_guncelle':         ('action-logo',   'fas fa-image',        'Logo Güncelle'),
+                        'otomatik_suresi_doldu': ('action-expired','fas fa-clock',        'Otomatik Süre Dolumu'),
                     } %}
                     {% set meta = action_map.get(log.action, ('action-diger', 'fas fa-circle', log.action)) %}
                     <div class="audit-item" data-search="{{ log.admin }} {{ log.action }} {{ log.detail }} {{ log.ip_address }}">
@@ -1393,9 +1429,13 @@ function bindLogout() {
     }
 }
 
-/* ══════════════════════════════════════════
-   ŞİFRE DEĞİŞTİR MODAL
-══════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════
+   ŞİFRE DEĞİŞTİR MODAL — CANLI POLİTİKA DOĞRULAMASI
+   ──────────────────────────────────────────────────────────────
+   Submit butonu ancak TÜM şifre politikası kuralları sağlanıp
+   şifreler eşleştiğinde aktif olur.
+   Zayıf şifre ile form ASLA gönderilemez.
+══════════════════════════════════════════════════════════════════ */
 function bindPasswordModal() {
     var modal        = document.getElementById('pwModal');
     var btnOpen      = document.getElementById('btnChangePw');
@@ -1407,6 +1447,13 @@ function bindPasswordModal() {
     var matchMsg     = document.getElementById('pwMatchMsg');
     var strengthFill = document.getElementById('pwStrengthFill');
     var strengthText = document.getElementById('pwStrengthText');
+
+    /* Canlı politika kontrol elemanları */
+    var chkLen     = document.getElementById('chkLen');
+    var chkUpper   = document.getElementById('chkUpper');
+    var chkLower   = document.getElementById('chkLower');
+    var chkDigit   = document.getElementById('chkDigit');
+    var chkSpecial = document.getElementById('chkSpecial');
 
     if (!modal) return;
 
@@ -1423,6 +1470,10 @@ function bindPasswordModal() {
         strengthText.textContent     = '';
         matchMsg.style.display       = 'none';
         submitBtn.disabled           = true;
+        /* Kontrol listesini sıfırla */
+        [chkLen, chkUpper, chkLower, chkDigit, chkSpecial].forEach(function(el) {
+            if (el) { el.className = ''; el.querySelector('i').className = 'fas fa-circle'; }
+        });
     }
 
     btnOpen.addEventListener('click',   openModal);
@@ -1432,11 +1483,50 @@ function bindPasswordModal() {
         if (e.target === modal) closeModal(); /* overlay'e tıklayınca kapat */
     });
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && modal.style.display === 'flex') closeModal();
+        if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
     });
 
-    /* Şifre gücü hesapla */
-    function calcStrength(pw) {
+    /* ── Şifre politikası kontrolleri — backend ile BİREBİR AYNI kurallar ── */
+    function checkPolicy(pw) {
+        var rules = [
+            { el: chkLen,     pass: pw.length >= 10 },
+            { el: chkUpper,   pass: /[A-Z]/.test(pw) },
+            { el: chkLower,   pass: /[a-z]/.test(pw) },
+            { el: chkDigit,   pass: /\d/.test(pw) },
+            { el: chkSpecial, pass: /[!@#$%^&*()\-_=+\[\]{};:,./<>?\\|`~]/.test(pw) }
+        ];
+        var allPass = true;
+        rules.forEach(function(r) {
+            if (!r.el) return;
+            var icon = r.el.querySelector('i');
+            if (pw.length === 0) {
+                r.el.className = '';
+                icon.className = 'fas fa-circle';
+            } else if (r.pass) {
+                r.el.className = 'pass';
+                icon.className = 'fas fa-check-circle';
+            } else {
+                r.el.className = 'fail';
+                icon.className = 'fas fa-times-circle';
+                allPass = false;
+            }
+        });
+        return pw.length > 0 && allPass;
+    }
+
+    /* Submit butonu durumu — politika + eşleşme ikisi de ZORUNLU */
+    function updateSubmitState() {
+        var pw      = newPwInput.value;
+        var cf      = confirmInput.value;
+        var policyOk = checkPolicy(pw);
+        var matchOk  = pw.length > 0 && pw === cf;
+        submitBtn.disabled = !(policyOk && matchOk);
+    }
+
+    /* Şifre güç göstergesi */
+    newPwInput.addEventListener('input', function() {
+        var pw    = newPwInput.value;
+        checkPolicy(pw);
         var score = 0;
         if (pw.length >= 10) score++;
         if (pw.length >= 14) score++;
@@ -1444,23 +1534,6 @@ function bindPasswordModal() {
         if (/[a-z]/.test(pw)) score++;
         if (/\d/.test(pw)) score++;
         if (/[!@#$%^&*()\-_=+\[\]{};:'",.<>?\/\|`~]/.test(pw)) score++;
-        return score;
-    }
-
-    function checkPolicy(pw) {
-        return true;
-    }
-
-    function updateSubmitBtn() {
-        var pw      = newPwInput.value;
-        var confirm = confirmInput.value;
-        var valid = pw.length > 0 && pw === confirm;
-        submitBtn.disabled = !valid;
-    }
-
-    newPwInput.addEventListener('input', function() {
-        var pw    = newPwInput.value;
-        var score = calcStrength(pw);
         var pct   = Math.min((score / 6) * 100, 100);
         var color, label;
         if      (score <= 2) { color = '#ef4444'; label = 'Çok Zayıf'; }
@@ -1472,13 +1545,13 @@ function bindPasswordModal() {
         strengthFill.style.background = color;
         strengthText.textContent      = pw.length > 0 ? label : '';
         strengthText.style.color      = color;
-        updateSubmitBtn();
+        updateSubmitState();
     });
 
     confirmInput.addEventListener('input', function() {
         var pw      = newPwInput.value;
         var confirm = confirmInput.value;
-        if (!confirm) { matchMsg.style.display = 'none'; updateSubmitBtn(); return; }
+        if (!confirm) { matchMsg.style.display = 'none'; updateSubmitState(); return; }
         matchMsg.style.display = 'block';
         if (pw === confirm) {
             matchMsg.textContent = '✓ Şifreler eşleşiyor';
@@ -1487,7 +1560,7 @@ function bindPasswordModal() {
             matchMsg.textContent = '✗ Şifreler eşleşmiyor';
             matchMsg.style.color = 'var(--danger)';
         }
-        updateSubmitBtn();
+        updateSubmitState();
     });
 }
 
@@ -1549,12 +1622,12 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="pw-policy-title">
                 <i class="fas fa-shield-alt"></i> Şifre Gereksinimleri
             </div>
-            <ul>
-                <li>En az <strong>10 karakter</strong></li>
-                <li>En az <strong>1 büyük harf</strong> (A-Z)</li>
-                <li>En az <strong>1 küçük harf</strong> (a-z)</li>
-                <li>En az <strong>1 rakam</strong> (0-9)</li>
-                <li>En az <strong>1 özel karakter</strong> (!@#$%^&* vb.)</li>
+            <ul class="pw-check-list">
+                <li id="chkLen"><i class="fas fa-circle"></i> En az <strong>10 karakter</strong></li>
+                <li id="chkUpper"><i class="fas fa-circle"></i> En az <strong>1 büyük harf</strong> (A-Z)</li>
+                <li id="chkLower"><i class="fas fa-circle"></i> En az <strong>1 küçük harf</strong> (a-z)</li>
+                <li id="chkDigit"><i class="fas fa-circle"></i> En az <strong>1 rakam</strong> (0-9)</li>
+                <li id="chkSpecial"><i class="fas fa-circle"></i> En az <strong>1 özel karakter</strong> (!@#$%^&* vb.)</li>
             </ul>
         </div>
 

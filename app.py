@@ -23,6 +23,21 @@ from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory, g
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
+
+# ── Argon2id hash yardimcilari ────────────────────────────────────────────────
+from passlib.hash import argon2 as _argon2
+
+def ph_hash(password: str) -> str:
+    return _argon2.using(type="ID").hash(password)
+
+def ph_verify(password: str, stored_hash: str) -> bool:
+    if stored_hash.startswith("$argon2"):
+        return _argon2.verify(password, stored_hash)
+    return check_password_hash(stored_hash, password)
+
+def ph_needs_upgrade(stored_hash: str) -> bool:
+    return not stored_hash.startswith("$argon2")
+
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import db, Admin, Pitch, Reservation, BlockedSlot, LoginAttempt, AuditLog
 from dotenv import load_dotenv
@@ -39,9 +54,9 @@ app = Flask(__name__)
 _secret = os.getenv('SECRET_KEY')
 if not _secret:
     raise RuntimeError(
-        "SECRET_KEY ortam değişkeni ZORUNLUDUR! "
-        ".env dosyanızı kontrol edin. "
-        "Üretmek için: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+        "SECRET_KEY ortam degiskeni ZORUNLUDUR! "
+        ".env dosyanizi kontrol edin. "
+        "Uretmek icin: python3 -c \"import secrets; print(secrets.token_hex(32))\""
     )
 
 app.config['SECRET_KEY']                     = _secret
@@ -111,10 +126,69 @@ def monthly_cleanup():
 
         db.session.commit()
         logger.info(
-            f"Aylık temizlik tamamlandı: "
+            f"Aylik temizlik tamamlandi: "
             f"{deleted_login} login denemesi, "
-            f"{deleted_audit} denetim kaydı silindi."
+            f"{deleted_audit} denetim kaydi silindi."
         )
+
+
+# ─── YENİ: TARİHİ GEÇEN REZERVASYONLARI OTOMATİK KAPAT ──────────
+
+def auto_expire_reservations():
+    """
+    Tarihi gecmis 'Pending' rezervasyonlari otomatik olarak 'Expired' yapar.
+    Her saat basi calisir + admin paneli her acildiginda tetiklenir.
+    """
+    with app.app_context():
+        now   = datetime.now()
+        today = now.date()
+        current_time = now.time()
+
+        # 1) Tarihi tamamen gecmis Pending rezervasyonlar
+        expired_past_date = Reservation.query.filter(
+            Reservation.status == 'Pending',
+            Reservation.date < today
+        ).all()
+
+        # 2) Bugune ait ama saat dilimi gecmis Pending rezervasyonlar
+        expired_past_time = []
+        today_pending = Reservation.query.filter(
+            Reservation.status == 'Pending',
+            Reservation.date == today
+        ).all()
+
+        for res in today_pending:
+            try:
+                end_time_str = res.time_slot.split(' - ')[1].strip()
+                end_time = datetime.strptime(end_time_str, '%H:%M').time()
+                if end_time <= current_time:
+                    expired_past_time.append(res)
+            except (IndexError, ValueError):
+                continue
+
+        all_expired = expired_past_date + expired_past_time
+        count = 0
+
+        for res in all_expired:
+            res.status = 'Expired'
+            count += 1
+            send_customer_expiry_email(
+                res.customer_email,
+                res.customer_name,
+                res.pitch.name if res.pitch else 'Bilinmeyen Saha',
+                res.date,
+                res.time_slot
+            )
+
+        if count > 0:
+            db.session.add(AuditLog(
+                admin='sistem',
+                ip_address='127.0.0.1',
+                action='otomatik_suresi_doldu',
+                detail=f'{count} adet bekleyen rezervasyonun suresi doldu — otomatik kapatildi.'
+            ))
+            db.session.commit()
+            logger.info(f"Otomatik sure dolumu: {count} rezervasyon 'Expired' olarak isaretlendi.")
 
 
 scheduler = BackgroundScheduler(timezone="Europe/Istanbul")
@@ -123,6 +197,13 @@ scheduler.add_job(
     trigger='cron',
     day=1, hour=3, minute=0,
     id='monthly_login_cleanup',
+    replace_existing=True
+)
+scheduler.add_job(
+    auto_expire_reservations,
+    trigger='cron',
+    hour='*', minute=5,
+    id='auto_expire_reservations',
     replace_existing=True
 )
 scheduler.start()
@@ -214,7 +295,7 @@ def restrict_admin_by_ip():
     allowed_ips = _load_allowed_ips()
     if not allowed_ips:
         logger.warning(
-            "GUVENLİK UYARISI: ALLOWED_ADMIN_IPS tanimlanmamis! "
+            "GUVENLIK UYARISI: ALLOWED_ADMIN_IPS tanimlanmamis! "
             "Admin paneli tum IP adreslerine acik."
         )
         return
@@ -225,8 +306,8 @@ def restrict_admin_by_ip():
     if not is_ip_allowed(client_ip, allowed_ips):
         logger.warning(f"Engellendi — yetkisiz IP: {client_ip} → {request.path}")
         return (
-            "<h2>Erişim Engellendi</h2>"
-            "<p>Bu sayfaya yalnızca yetkili ağdan erişilebilir.</p>",
+            "<h2>Erisim Engellendi</h2>"
+            "<p>Bu sayfaya yalnizca yetkili agdan erisilebilir.</p>",
             403
         )
 
@@ -255,7 +336,7 @@ def verify_recaptcha(token, action='submit'):
             and data.get('action', '') == action
         )
     except Exception:
-        logger.warning("reCAPTCHA doğrulama isteği başarısız.")
+        logger.warning("reCAPTCHA dogrulama istegi basarisiz.")
         return True
 
 
@@ -307,13 +388,13 @@ def save_secure_receipt(file):
                 img.thumbnail((1920, 1920))
                 img.save(save_path, optimize=True, quality=85)
         except Exception as e:
-            logger.warning(f"Resim işleme hatası: {e}")
+            logger.warning(f"Resim isleme hatasi: {e}")
             return None
     elif mime_type in ALLOWED_PDF:
         try:
             file.save(save_path)
         except Exception as e:
-            logger.warning(f"PDF kaydetme hatası: {e}")
+            logger.warning(f"PDF kaydetme hatasi: {e}")
             return None
     return safe_filename
 
@@ -378,6 +459,34 @@ def send_customer_approval_email(customer_email, customer_name, pitch_name, date
         logger.warning(f"Mail hatasi: {e}")
 
 
+def send_customer_expiry_email(customer_email, customer_name, pitch_name, date, time_slot):
+    """Suresi dolan (onaylanmayan) rezervasyon icin musteri bilgilendirme maili."""
+    sender_email    = os.getenv('MAIL_USERNAME')
+    sender_password = os.getenv('MAIL_PASSWORD')
+    if not sender_email or not sender_password:
+        return
+    msg = EmailMessage()
+    msg['Subject'] = 'Rezervasyon Talebiniz Zaman Asimina Ugradi'
+    msg['From']    = sender_email
+    msg['To']      = customer_email
+    msg.set_content(
+        f"Merhaba {customer_name},\n\n"
+        f"Asagidaki rezervasyon talebiniz belirtilen tarihte onaylanmadigi icin "
+        f"otomatik olarak kapatilmistir.\n\n"
+        f"Saha: {pitch_name}\n"
+        f"Tarih: {date.strftime('%d.%m.%Y')}\n"
+        f"Saat: {time_slot}\n\n"
+        f"Yeni bir rezervasyon talebi olusturabilirsiniz.\n\n"
+        f"Iyi gunler dileriz.\n"
+        f"AYBU SKS Spor Tesisleri"
+    )
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as s:
+            s.starttls(); s.login(sender_email, sender_password); s.send_message(msg)
+    except Exception as e:
+        logger.warning(f"Sure dolumu mail hatasi: {e}")
+
+
 # ─── SABİTLER ────────────────────────────────────────────────────
 
 VALID_SLOTS = [
@@ -385,7 +494,7 @@ VALID_SLOTS = [
     '19:00 - 20:00', '20:00 - 21:00', '21:00 - 22:00', '22:00 - 23:00'
 ]
 
-DUMMY_HASH = generate_password_hash("__dummy_never_matches__")
+DUMMY_HASH = ph_hash("__dummy_never_matches__")
 
 
 # ─── ŞİFRE POLİTİKASI ────────────────────────────────────────────
@@ -393,15 +502,15 @@ DUMMY_HASH = generate_password_hash("__dummy_never_matches__")
 def validate_password(password: str) -> list:
     errors = []
     if len(password) < 10:
-        errors.append('En az 10 karakter olmalıdır.')
+        errors.append('En az 10 karakter olmalidir.')
     if not re.search(r'[A-Z]', password):
-        errors.append('En az 1 büyük harf (A-Z) içermelidir.')
+        errors.append('En az 1 buyuk harf (A-Z) icermelidir.')
     if not re.search(r'[a-z]', password):
-        errors.append('En az 1 küçük harf (a-z) içermelidir.')
+        errors.append('En az 1 kucuk harf (a-z) icermelidir.')
     if not re.search(r'\d', password):
-        errors.append('En az 1 rakam (0-9) içermelidir.')
+        errors.append('En az 1 rakam (0-9) icermelidir.')
     if not re.search(r'[!@#$%^&*()\-_=+\[\]{};:,./<>?\\|`~]', password):
-        errors.append('En az 1 özel karakter (!@#$%^&* vb.) içermelidir.')
+        errors.append('En az 1 ozel karakter (!@#$%^&* vb.) icermelidir.')
     return errors
 
 
@@ -417,7 +526,7 @@ def audit(action: str, detail: str = ''):
         ))
         db.session.commit()
     except Exception as e:
-        logger.warning(f"Audit log yazılamadı: {e}")
+        logger.warning(f"Audit log yazilamadi: {e}")
 
 
 # ─── ROTALAR ─────────────────────────────────────────────────────
@@ -463,7 +572,7 @@ def reserve():
         return redirect(url_for('index'))
 
     if not verify_recaptcha(request.form.get('g-recaptcha-response', ''), action='reserve'):
-        flash('Bot doğrulaması başarısız. Lütfen tekrar deneyin.', 'danger')
+        flash('Bot dogrulamasi basarisiz. Lutfen tekrar deneyin.', 'danger')
         return redirect(url_for('index'))
 
     pitch_id      = request.form.get('pitch_id')
@@ -482,7 +591,7 @@ def reserve():
         return redirect(url_for('index'))
 
     if not customer_name or len(customer_name) < 2 or len(customer_name) > 100:
-        flash('Gecersiz isim! En az 2, en fazla 100 karakter olmalıdır.', 'danger')
+        flash('Gecersiz isim! En az 2, en fazla 100 karakter olmalidir.', 'danger')
         return redirect(url_for('index'))
 
     raw_phone   = request.form.get('customer_phone', '')
@@ -558,7 +667,7 @@ def admin_login():
 
     if request.method == 'POST':
         if not verify_recaptcha(request.form.get('g-recaptcha-response', ''), action='login'):
-            flash('Bot doğrulaması başarısız. Lütfen tekrar deneyin.', 'danger')
+            flash('Bot dogrulamasi basarisiz. Lutfen tekrar deneyin.', 'danger')
             return render_template('login.html', recaptcha_site_key=RECAPTCHA_SITE)
 
         username   = request.form.get('username', '').strip()
@@ -567,7 +676,7 @@ def admin_login():
 
         if is_account_locked(username, ip_address):
             flash(
-                f'Çok fazla başarısız deneme. {LOCKOUT_MINUTES} dakika sonra tekrar deneyin.',
+                f'Cok fazla basarisiz deneme. {LOCKOUT_MINUTES} dakika sonra tekrar deneyin.',
                 'danger'
             )
             return render_template('login.html', recaptcha_site_key=RECAPTCHA_SITE)
@@ -575,10 +684,14 @@ def admin_login():
         admin = Admin.query.filter_by(username=username).first()
 
         hash_to_check = admin.password_hash if admin else DUMMY_HASH
-        password_ok   = check_password_hash(hash_to_check, password)
+        password_ok   = ph_verify(password, hash_to_check)
 
         if admin and password_ok:
             record_attempt(username, ip_address, success=True)
+
+            if ph_needs_upgrade(admin.password_hash):
+                admin.password_hash = ph_hash(password)
+                logger.info(f"Admin '{username}' hash'i argon2id'e yukseltildi.")
 
             new_token = secrets.token_hex(32)
             admin.session_token = new_token
@@ -589,7 +702,7 @@ def admin_login():
 
             db.session.add(AuditLog(
                 admin=username, ip_address=ip_address,
-                action='admin_giris', detail=f'Başarılı giriş | IP: {ip_address}'
+                action='admin_giris', detail=f'Basarili giris | IP: {ip_address}'
             ))
             db.session.commit()
             return safe_redirect(request.args.get('next'), url_for('admin_dashboard'))
@@ -603,7 +716,7 @@ def admin_login():
 @app.route('/logout')
 @login_required
 def logout():
-    audit('admin_cikis', 'Güvenli çıkış yapıldı')
+    audit('admin_cikis', 'Guvenli cikis yapildi')
     if current_user.is_authenticated:
         current_user.session_token = None
         db.session.commit()
@@ -620,40 +733,42 @@ def change_password():
     new_pw     = request.form.get('new_password', '')
     confirm_pw = request.form.get('confirm_password', '')
 
-    if not check_password_hash(current_user.password_hash, current_pw):
-        flash('Mevcut şifreniz yanlış!', 'danger')
+    if not ph_verify(current_pw, current_user.password_hash):
+        flash('Mevcut sifreniz yanlis!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
     if new_pw != confirm_pw:
-        flash('Yeni şifreler eşleşmiyor!', 'danger')
+        flash('Yeni sifreler eslesmiyor!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
     if current_pw == new_pw:
-        flash('Yeni şifre mevcut şifreden farklı olmalıdır!', 'danger')
+        flash('Yeni sifre mevcut sifreden farkli olmalidir!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
+    # ══ SIFRE POLITIKASI — ONCE DOGRULA, SONRA DEGISTIR ══════════════════
     pw_errors = validate_password(new_pw)
     if pw_errors:
         for err in pw_errors:
-            flash(f'Şifre hatası: {err}', 'danger')
+            flash(f'Sifre hatasi: {err}', 'danger')
         return redirect(url_for('admin_dashboard'))
+    # ═════════════════════════════════════════════════════════════════════
 
-    current_user.password_hash = generate_password_hash(
-        new_pw,
-        method='pbkdf2:sha256:600000'
-    )
+    current_user.password_hash = ph_hash(new_pw)
     current_user.session_token = None
     db.session.commit()
-    audit('sifre_degistir', 'Admin şifresi değiştirildi — tüm oturumlar sonlandırıldı')
+    audit('sifre_degistir', 'Admin sifresi degistirildi — tum oturumlar sonlandirildi')
     logout_user()
     session.clear()
-    flash('Şifreniz başarıyla değiştirildi. Lütfen yeni şifrenizle giriş yapın.', 'success')
+    flash('Sifreniz basariyla degistirildi. Lutfen yeni sifrenizle giris yapin.', 'success')
     return redirect(url_for('admin_login'))
 
 
 @app.route('/admin')
 @login_required
 def admin_dashboard():
+    # ── Her sayfa acilisinda suresi dolmus rezervasyonlari otomatik kapat ────
+    auto_expire_reservations()
+
     pitches       = Pitch.query.all()
     reservations  = Reservation.query.order_by(Reservation.created_at.desc()).all()
     blocked_slots = BlockedSlot.query.order_by(BlockedSlot.date.asc(), BlockedSlot.time_slot.asc()).all()
@@ -774,6 +889,17 @@ def delete_pitch(pitch_id):
 @login_required
 def change_status(res_id, action):
     reservation = db.get_or_404(Reservation, res_id)
+
+    # Suresi dolmus rezervasyonda islem yapilamaz
+    if reservation.status == 'Expired':
+        flash('Bu rezervasyonun suresi dolmus, islem yapilamaz.', 'warning')
+        return redirect(url_for('admin_dashboard'))
+
+    # Zaten islenmis rezervasyonda tekrar islem engelle
+    if reservation.status != 'Pending':
+        flash('Bu rezervasyon zaten islenmis.', 'warning')
+        return redirect(url_for('admin_dashboard'))
+
     if action == 'approve':
         reservation.status = 'Approved'
         send_customer_approval_email(
@@ -781,14 +907,14 @@ def change_status(res_id, action):
             reservation.pitch.name, reservation.date, reservation.time_slot
         )
         audit('rezervasyon_onayla',
-              f'res_id={res_id} | müşteri={reservation.customer_name} '
+              f'res_id={res_id} | musteri={reservation.customer_name} '
               f'| saha={reservation.pitch.name} | tarih={reservation.date} '
               f'| saat={reservation.time_slot}')
         flash('Rezervasyon ONAYLANDI.', 'success')
     elif action == 'reject':
         reservation.status = 'Rejected'
         audit('rezervasyon_reddet',
-              f'res_id={res_id} | müşteri={reservation.customer_name} '
+              f'res_id={res_id} | musteri={reservation.customer_name} '
               f'| saha={reservation.pitch.name} | tarih={reservation.date} '
               f'| saat={reservation.time_slot}')
         flash('Rezervasyon REDDEDILDI.', 'danger')
@@ -833,7 +959,7 @@ def update_logo():
     except Exception:
         flash('Resim isleme hatasi!', 'danger')
         return redirect(url_for('admin_dashboard'))
-    audit('logo_guncelle', 'Site logosu değiştirildi')
+    audit('logo_guncelle', 'Site logosu degistirildi')
     flash('Logo guncellendi!', 'success')
     return redirect(url_for('admin_dashboard'))
 
@@ -843,8 +969,8 @@ def update_logo():
 def view_receipt(filename):
     safe_name = os.path.basename(filename)
     if not re.match(r'^[a-f0-9]{32}\.(pdf|jpg|jpeg|png)$', safe_name):
-        logger.warning(f"Geçersiz receipt isteği: {filename} — IP: {get_real_ip()}")
-        return ("Geçersiz dosya adı.", 400)
+        logger.warning(f"Gecersiz receipt istegi: {filename} — IP: {get_real_ip()}")
+        return ("Gecersiz dosya adi.", 400)
     return send_from_directory(
         app.config['UPLOAD_FOLDER'],
         safe_name,
@@ -892,24 +1018,20 @@ with app.app_context():
     db.create_all()
     logger.info("Veritabani tablolari kontrol edildi.")
 
-    # ── B-01 DÜZELTMESİ: Sabit şifre kaldırıldı, rastgele üretim ────────────
     admin_var_mi = Admin.query.filter_by(username='yonetici').first()
     if not admin_var_mi:
         import string as _string
         _alfabe   = _string.ascii_letters + _string.digits + "!@#$%^&*"
         ilk_sifre = ''.join(secrets.choice(_alfabe) for _ in range(20))
-        hashed_password = generate_password_hash(
-            ilk_sifre,
-            method='pbkdf2:sha256:600000'
-        )
+        hashed_password = ph_hash(ilk_sifre)
         yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
         db.session.add(yeni_admin)
         db.session.commit()
         logger.info("=" * 60)
-        logger.info("  YENİ ADMİN HESABI OLUŞTURULDU")
-        logger.info("  Kullanıcı adı : yonetici")
-        logger.info(f"  Şifre         : {ilk_sifre}")
-        logger.info("  !! Giriş yapıp şifrenizi hemen değiştirin !!")
+        logger.info("  YENI ADMIN HESABI OLUSTURULDU")
+        logger.info("  Kullanici adi : yonetici")
+        logger.info(f"  Sifre         : {ilk_sifre}")
+        logger.info("  !! Giris yapip sifrenizi hemen degistirin !!")
         logger.info("=" * 60)
     else:
         logger.info("Yonetici hesabi zaten mevcut, atlandi.")
