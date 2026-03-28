@@ -354,8 +354,7 @@ def verify_recaptcha(token, action='submit'):
         )
     except Exception:
         logger.warning("reCAPTCHA dogrulama istegi basarisiz.")
-        return True
-
+        return False
 
 # ─── MIME TESPİTİ ─────────────────────────────────────────────────
 
