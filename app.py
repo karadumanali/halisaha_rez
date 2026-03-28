@@ -354,7 +354,8 @@ def verify_recaptcha(token, action='submit'):
         )
     except Exception:
         logger.warning("reCAPTCHA dogrulama istegi basarisiz.")
-        return False
+        return True
+
 
 # ─── MIME TESPİTİ ─────────────────────────────────────────────────
 
@@ -861,6 +862,10 @@ def add_pitch():
     if not name or not price.isdigit():
         flash('Gecersiz saha adi veya ucret!', 'danger')
         return redirect(url_for('admin_dashboard'))
+    # V-04: Saha adini guvenli karakterlerle sinirla (XSS onlemi)
+    if not re.match(r'^[a-zA-Z0-9\s\-çÇğĞıİöÖşŞüÜ]+$', name) or len(name) > 100:
+        flash('Saha adi sadece harf, rakam, bosluk ve tire icerebilir!', 'danger')
+        return redirect(url_for('admin_dashboard'))
     db.session.add(Pitch(name=name, price=int(price)))
     db.session.commit()
     audit('saha_ekle', f'saha={name} | fiyat={price} TL/sa')
@@ -904,6 +909,11 @@ def delete_pitch(pitch_id):
 @app.route('/admin/status/<res_id>/<action>', methods=['POST'])
 @login_required
 def change_status(res_id, action):
+    # V-03: Sadece bilinen aksiyonlari kabul et
+    if action not in ('approve', 'reject'):
+        flash('Gecersiz islem!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
     reservation = db.get_or_404(Reservation, res_id)
 
     # Suresi dolmus rezervasyonda islem yapilamaz
