@@ -1,242 +1,233 @@
-{% extends "layout.html" %}
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AYBÜ SKS Spor Tesisleri Rezervasyon Sistemi</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%230ea874'/%3E%3Ctext y='50' x='50' text-anchor='middle' dominant-baseline='middle' font-size='58' fill='white'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
 
-{% block body %}
-<style nonce="{{ g.csp_nonce }}">
-.login-wrap {
-    min-height: 72vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 40px 16px;
-}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-.login-card {
-    width: 100%;
-    max-width: 420px;
-    background: var(--white);
-    border: 2px solid var(--mint-mid);
-    border-radius: var(--r);
-    box-shadow: 0 8px 40px rgba(14,168,116,0.13), 0 2px 12px rgba(0,0,0,0.08);
-    overflow: hidden;
-}
+    <style nonce="{{ g.csp_nonce }}">
+        :root {
+            --teal:        #0ea874;
+            --teal-dk:     #0b8a5f;
+            --teal-lt:     #16c98a;
+            --teal-pale:   #d0f5e8;
+            --teal-glass:  rgba(14,168,116,0.12);
+            --mint-bg:     #dff5ec;
+            --mint-mid:    #b0e4cc;
+            --white:       #ffffff;
+            --gray-50:     #f9fafb;
+            --gray-100:    #f0f1f3;
+            --gray-200:    #e2e4e8;
+            --gray-300:    #c8cdd6;
+            --gray-400:    #8f97a8;
+            --gray-600:    #4a5568;
+            --gray-700:    #2d3748;
+            --ink:         #0d1f17;
+            --success-bg:  #e6faf2; --success-tx: #065f3e;
+            --warning-bg:  #fffbeb; --warning-tx: #92400e; --warning-bd: #fcd34d;
+            --danger:      #e53e3e; --danger-bg:  #fff5f5; --danger-tx:  #9b2c2c;
+            --info-bg:     #ebf8ff; --info-tx:    #1e40af;
+            --font: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            --r:    16px;
+            --r-sm: 10px;
+            --r-xs:  6px;
+            --sh-xs: 0 1px 3px  rgba(0,0,0,0.06);
+            --sh-sm: 0 2px 8px  rgba(0,0,0,0.08);
+            --sh-md: 0 4px 20px rgba(0,0,0,0.10);
+            --sh-lg: 0 12px 40px rgba(0,0,0,0.14);
+        }
 
-.login-header {
-    padding: 28px 32px 22px;
-    background: linear-gradient(135deg, var(--teal-pale) 0%, #f0fdf8 100%);
-    border-bottom: 1.5px solid var(--mint-mid);
-    text-align: center;
-}
-.login-badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: var(--teal); color: var(--white);
-    font-size: 0.68rem; font-weight: 800;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    padding: 4px 12px; border-radius: 20px; margin-bottom: 10px;
-}
-.login-title {
-    font-size: 1.45rem; font-weight: 800;
-    color: var(--ink); margin: 0; letter-spacing: -0.025em;
-}
-.login-sub {
-    font-size: 0.82rem; color: var(--gray-400);
-    margin-top: 4px; font-weight: 500;
-}
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-.login-body { padding: 28px 32px 24px; }
+        body {
+            font-family: var(--font);
+            background: var(--mint-bg);
+            color: var(--ink);
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
 
-.form-label {
-    font-size: 0.82rem; font-weight: 700;
-    color: var(--gray-600); display: block; margin-bottom: 6px;
-}
-.form-control {
-    width: 100%; padding: 11px 14px;
-    border: 1.5px solid var(--gray-300);
-    border-radius: var(--r-sm);
-    font-size: 0.93rem; font-family: var(--font);
-    color: var(--ink); background: var(--white);
-    transition: border-color 0.15s, box-shadow 0.15s;
-    box-sizing: border-box;
-}
-.form-control:focus {
-    outline: none;
-    border-color: var(--teal);
-    box-shadow: 0 0 0 3px rgba(14,168,116,0.15);
-}
+        .site-nav {
+            background: var(--white);
+            border-bottom: 2px solid var(--mint-mid);
+            box-shadow: var(--sh-xs);
+            position: sticky; top: 0; z-index: 900;
+            padding: 5px 0;
+        }
+        .nav-inner {
+            display: flex; align-items: center;
+            justify-content: space-between;
+            height: 70px;
+        }
+        .nav-home-link {
+            display: flex; align-items: center; gap: 15px;
+            text-decoration: none; color: inherit;
+            transition: opacity 0.2s;
+        }
+        .nav-home-link:hover { opacity: 0.85; }
+        .nav-logo {
+            width: 60px; height: 60px;
+            border-radius: 500px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; overflow: hidden;
+        }
+        .nav-logo img { width:100%; height:100%; object-fit:contain; }
+        .nav-logo-fb  { display:none; align-items:center; justify-content:center; width:100%; height:100%; font-size: 1.5rem; color: var(--teal); }
+        .nav-brand-name { font-size: 1.1rem; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; line-height: 1.2; }
+        .nav-brand-sub  { font-size: 0.8rem; font-weight: 500; color: var(--gray-600); margin-top: 2px; }
 
-.input-icon-wrap { position: relative; }
-.input-icon-wrap .form-control { padding-left: 42px; }
-.input-icon {
-    position: absolute; left: 14px; top: 50%;
-    transform: translateY(-50%);
-    color: var(--gray-400); font-size: 0.85rem; pointer-events: none;
-}
+        main.site-main { flex: 1; padding: 36px 0 72px; }
 
-.password-wrap { position: relative; }
-.password-wrap .form-control { padding-right: 44px; }
-.toggle-pw {
-    position: absolute; right: 12px; top: 50%;
-    transform: translateY(-50%);
-    background: none; border: none; cursor: pointer;
-    color: var(--gray-400); font-size: 0.88rem; padding: 4px;
-    transition: color 0.15s;
-}
-.toggle-pw:hover { color: var(--teal); }
+        .flash-wrap { margin-bottom: 20px; }
+        .alert {
+            border: none; border-radius: var(--r-sm);
+            font-size: 0.9rem; font-weight: 500;
+            padding: 13px 18px;
+            display: flex; align-items: center; gap: 10px;
+            box-shadow: var(--sh-xs);
+        }
+        .alert-success { background: var(--success-bg); color: var(--success-tx); border-left: 3px solid var(--teal); }
+        .alert-danger  { background: var(--danger-bg);  color: var(--danger-tx);  border-left: 3px solid var(--danger); }
+        .alert-warning { background: var(--warning-bg); color: var(--warning-tx); border-left: 3px solid var(--warning-bd); }
+        .alert-info    { background: var(--info-bg);    color: var(--info-tx);    border-left: 3px solid #3b82f6; }
+        .alert .btn-close { margin-left: auto; opacity: 0.4; flex-shrink: 0; }
 
-.mb-4 { margin-bottom: 18px; }
-.mb-5 { margin-bottom: 24px; }
+        .card {
+            background: var(--white) !important;
+            border: 1.5px solid rgba(0,0,0,0.07) !important;
+            border-radius: var(--r) !important;
+            box-shadow: var(--sh-md);
+            overflow: hidden;
+        }
 
-.btn-login {
-    width: 100%;
-    background: var(--teal);
-    color: var(--white);
-    border: none; border-radius: var(--r-sm);
-    padding: 13px;
-    font-size: 0.97rem; font-weight: 800;
-    font-family: var(--font);
-    cursor: pointer; transition: all 0.15s;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    letter-spacing: -0.01em;
-}
-.btn-login:hover { background: var(--teal-dk); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(14,168,116,0.35); }
-.btn-login:active { transform: translateY(0); }
-.btn-login:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        .form-control, .form-select {
+            border: 1.5px solid var(--gray-300);
+            border-radius: var(--r-sm);
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            font-family: var(--font);
+            color: var(--ink);
+            background: var(--white);
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .form-control::placeholder { color: var(--gray-400); }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--teal);
+            box-shadow: 0 0 0 3px rgba(14,168,116,0.15);
+            outline: none;
+        }
+        .form-label {
+            font-size: 0.9rem; font-weight: 700;
+            color: var(--gray-700); margin-bottom: 7px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .form-label i { color: var(--teal); font-size: 0.8rem; }
+        .form-text { font-size: 0.8rem; color: var(--gray-400); margin-top: 5px; }
 
-.login-footer {
-    padding: 14px 32px;
-    border-top: 1.5px solid var(--gray-200);
-    background: var(--gray-50);
-    text-align: center;
-}
-.back-link {
-    font-size: 0.82rem; color: var(--gray-400);
-    text-decoration: none; font-weight: 600;
-    display: inline-flex; align-items: center; gap: 5px;
-    transition: color 0.15s;
-}
-.back-link:hover { color: var(--teal); }
+        .btn {
+            font-family: var(--font); font-weight: 700;
+            font-size: 0.9rem; border-radius: var(--r-sm);
+            padding: 11px 22px; transition: all 0.15s;
+            cursor: pointer; border: none;
+            display: inline-flex; align-items: center; gap: 7px;
+        }
+        .btn-teal { background: var(--teal); color: var(--white); }
+        .btn-teal:hover:not(:disabled) {
+            background: var(--teal-dk); color: var(--white);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(14,168,116,0.35);
+        }
+        .btn-teal:disabled { opacity: 0.38; cursor: not-allowed; }
+        .btn-outline-teal { background: transparent; color: var(--teal); border: 1.5px solid var(--teal); }
+        .btn-outline-teal:hover { background: var(--teal-pale); color: var(--teal-dk); }
+        .btn-ghost { background: var(--gray-100); color: var(--gray-700); border: 1.5px solid var(--gray-200); }
+        .btn-ghost:hover { background: var(--gray-200); color: var(--ink); }
+        .btn-danger-soft { background: var(--danger-bg); color: var(--danger); border: 1.5px solid #fed7d7; }
+        .btn-danger-soft:hover { background: var(--danger); color: var(--white); }
 
-/* reCAPTCHA küçük bildirim */
-.recaptcha-notice {
-    font-size: 0.7rem; color: var(--gray-400);
-    text-align: center; margin-top: 14px; line-height: 1.5;
-}
-.recaptcha-notice a { color: var(--teal); text-decoration: none; }
-.recaptcha-notice a:hover { text-decoration: underline; }
+        .pill { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:0.75rem; font-weight:700; }
+        .pill-pending  { background: #fef9c3; color: #854d0e; }
+        .pill-approved { background: #d0f5e8; color: #065f3e; }
+        .pill-rejected { background: #fee2e2; color: #9b2c2c; }
 
-/* reCAPTCHA rozetini küçült / sağ alta sabitle */
-.grecaptcha-badge { visibility: hidden !important; }
-</style>
+        .modal-content { border:none !important; border-radius:var(--r) !important; box-shadow:var(--sh-lg); overflow:hidden; }
+        .modal-header  { padding:18px 22px; border-bottom:1.5px solid var(--gray-200); }
+        .modal-body    { padding:22px; }
+        .modal-footer  { padding:14px 22px; border-top:1.5px solid var(--gray-200); background:var(--gray-50); border-radius:0 0 var(--r) var(--r); gap:8px; }
 
-<div class="login-wrap">
-    <div class="login-card">
+        .input-group-text { background:var(--gray-100); border:1.5px solid var(--gray-300); color:var(--gray-600); font-size:0.85rem; }
 
-        <div class="login-header">
-            <div class="login-badge"><i class="fas fa-shield-alt"></i> Yönetici Girişi</div>
-            <h1 class="login-title">Hoş Geldiniz</h1>
-            <p class="login-sub">Devam etmek için giriş yapın</p>
-        </div>
+        .site-container { max-width: 740px; }
 
-        <div class="login-body">
+        .site-footer { background:var(--white); border-top:2px solid var(--mint-mid); padding:15px 0; }
+        .footer-inner {
+            display:flex; align-items:center; justify-content:center;
+            flex-wrap:wrap; gap:8px; font-size:0.77rem; color:var(--gray-400);
+        }
+        .footer-dot { color: var(--mint-mid); user-select:none; }
+        .footer-secure { display:inline-flex; align-items:center; gap:4px; color:var(--teal); font-weight:700; font-size:0.73rem; }
+        .footer-secure i { font-size:0.63rem; }
+    </style>
+</head>
+<body>
 
-            <form method="POST" action="{{ url_for('admin_login') }}" novalidate>
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <!-- reCAPTCHA v3 token — JS tarafından doldurulur -->
-                <input type="hidden" name="g-recaptcha-response" id="gRecaptchaLogin">
-
-                <div class="mb-4">
-                    <label class="form-label" for="username">Kullanıcı Adı</label>
-                    <div class="input-icon-wrap">
-                        <i class="fas fa-user input-icon"></i>
-                        <input type="text" id="username" name="username"
-                               class="form-control" required
-                               autocomplete="username"
-                               placeholder="Kullanıcı adınızı girin">
-                    </div>
-                </div>
-
-                <div class="mb-5">
-                    <label class="form-label" for="password">Şifre</label>
-                    <div class="input-icon-wrap password-wrap">
-                        <i class="fas fa-lock input-icon"></i>
-                        <input type="password" id="password" name="password"
-                               class="form-control" required
-                               autocomplete="current-password"
-                               placeholder="Şifrenizi girin">
-                        <button type="button" class="toggle-pw" id="togglePwBtn"
-                                aria-label="Şifreyi göster/gizle">
-                            <i class="fas fa-eye" id="pwEyeIcon"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-login" id="loginBtn">
-                    <i class="fas fa-sign-in-alt"></i> Giriş Yap
-                </button>
-
-                {% if recaptcha_site_key %}
-                <p class="recaptcha-notice">
-                    Bu site reCAPTCHA ile korunmaktadır.
-                    <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Gizlilik Politikası</a>
-                    ve
-                    <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Kullanım Koşulları</a> geçerlidir.
-                </p>
-                {% endif %}
-            </form>
-        </div>
-
-        <div class="login-footer">
-            <a href="{{ url_for('index') }}" class="back-link">
-                <i class="fas fa-arrow-left"></i> Rezervasyon Sayfasına Dön
-            </a>
-        </div>
-
+<nav class="site-nav">
+    <div class="nav-inner" style="padding: 0 24px;">
+        <a href="/" class="nav-home-link" title="Ana Sayfaya Dön">
+            <div class="nav-logo">
+                <img src="{{ url_for('static', filename='uploads/site_logo.png') }}" alt="Logo"
+                     onerror="this.style.display='none'; this.parentElement.querySelector('.nav-logo-fb').style.display='flex';">
+                <div class="nav-logo-fb"><i class="fas fa-futbol"></i></div>
+            </div>
+            <div class="nav-brand">
+                <div class="nav-brand-name">AYBÜ SKS Spor Tesisleri</div>
+                <div class="nav-brand-sub">Rezervasyon Sistemi</div>
+            </div>
+        </a>
     </div>
-</div>
+</nav>
 
-<script nonce="{{ g.csp_nonce }}">
-function togglePw() {
-    var inp  = document.getElementById('password');
-    var icon = document.getElementById('pwEyeIcon');
-    if (inp.type === 'password') {
-        inp.type = 'text';
-        icon.className = 'fas fa-eye-slash';
-    } else {
-        inp.type = 'password';
-        icon.className = 'fas fa-eye';
-    }
-}
+<main class="site-main">
+    <div class="container site-container">
+        <div class="flash-wrap">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {% if   category == 'success' %}<i class="fas fa-check-circle"></i>
+                            {% elif category == 'danger'  %}<i class="fas fa-exclamation-circle"></i>
+                            {% elif category == 'warning' %}<i class="fas fa-exclamation-triangle"></i>
+                            {% else                       %}<i class="fas fa-info-circle"></i>{% endif %}
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        {% block body %}{% endblock %}
+    </div>
+</main>
 
-document.addEventListener('DOMContentLoaded', function() {
-    var btn = document.getElementById('togglePwBtn');
-    if (btn) { btn.addEventListener('click', togglePw); }
-});
+<footer class="site-footer">
+    <div class="container site-container">
+        <div class="footer-inner">
+            <span>&copy; 2026 AYBÜ SKS Spor Tesisleri</span>
+            <span class="footer-dot">·</span>
+            <span class="footer-dot">·</span>
+            <span>Tüm hakları saklıdır</span>
+        </div>
+    </div>
+</footer>
 
-// reCAPTCHA site key — Jinja if/endif yerine JS değişkeni (VS Code uyumlu)
-var RECAPTCHA_SITE_KEY = '{{ recaptcha_site_key|default("") }}';
-
-if (RECAPTCHA_SITE_KEY) {
-    // Form submit'i yakala — önce reCAPTCHA token al, sonra gönder
-    document.querySelector('form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        var form = this;
-        var btn  = document.getElementById('loginBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Doğrulanıyor...';
-
-        grecaptcha.ready(function() {
-            grecaptcha.execute(RECAPTCHA_SITE_KEY, {action: 'login'}).then(function(token) {
-                document.getElementById('gRecaptchaLogin').value = token;
-                form.submit();
-            }).catch(function() {
-                form.submit();
-            });
-        });
-    });
-}
-</script>
-
-{% if recaptcha_site_key %}
-<script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}"></script>
-{% endif %}
-
-{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

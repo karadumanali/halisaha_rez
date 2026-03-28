@@ -978,6 +978,264 @@ def view_receipt(filename):
     )
 
 
+# ─── PDF RAPOR: Günlük Rezervasyon Çıktısı ────────────────────────
+
+@app.route('/admin/report/pdf', methods=['POST'])
+@login_required
+@limiter.limit("10 per minute")
+def generate_report_pdf():
+    """
+    Secilen tarih ve saha icin rezervasyon raporunu PDF olarak uretir.
+    Guvenlik: login_required + CSRF + input validation + rate limit + audit log
+    Performans: reportlab ile bellekte uretilir, diske yazilmaz
+    """
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from flask import make_response
+
+    # ── 1. Input validation ──────────────────────────────────────────
+    date_str = request.form.get('report_date', '').strip()
+    try:
+        pitch_id = int(request.form.get('report_pitch_id', 0))
+    except (ValueError, TypeError):
+        flash('Gecersiz saha secimi!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    # Tarih formati kontrolu — sadece YYYY-MM-DD kabul et
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_str):
+        flash('Gecersiz tarih formati!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    try:
+        report_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        flash('Gecersiz tarih!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    # Tarih limiti — en fazla 1 ay ilerisi
+    max_date = (datetime.now() + timedelta(days=31)).date()
+    if report_date > max_date:
+        flash('En fazla 1 ay ilerisine rapor olusturulabilir!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    # Saha kontrolu
+    pitch = db.session.get(Pitch, pitch_id)
+    if not pitch:
+        flash('Saha bulunamadi!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+
+    # ── 2. Veri cekme (tek sorgu — performans) ──────────────────────
+    reservations = Reservation.query.filter_by(
+        pitch_id=pitch_id, date=report_date
+    ).order_by(Reservation.time_slot.asc()).all()
+
+    blocked_slots = BlockedSlot.query.filter_by(
+        pitch_id=pitch_id, date=report_date
+    ).all()
+    blocked_dict = {b.time_slot: b.reason for b in blocked_slots}
+
+    # ── 3. PDF uretimi (bellekte — diske yazmaz) ────────────────────
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        topMargin=20*mm, bottomMargin=15*mm,
+        leftMargin=15*mm, rightMargin=15*mm
+    )
+
+    styles = getSampleStyleSheet()
+
+    # Ozel stiller
+    title_style = ParagraphStyle(
+        'ReportTitle', parent=styles['Title'],
+        fontSize=16, leading=20, spaceAfter=4,
+        textColor=colors.HexColor('#0d1f17')
+    )
+    subtitle_style = ParagraphStyle(
+        'ReportSubtitle', parent=styles['Normal'],
+        fontSize=10, leading=14, spaceAfter=12,
+        textColor=colors.HexColor('#4a5568')
+    )
+    info_style = ParagraphStyle(
+        'InfoText', parent=styles['Normal'],
+        fontSize=9, leading=12, textColor=colors.HexColor('#4a5568')
+    )
+    footer_style = ParagraphStyle(
+        'FooterText', parent=styles['Normal'],
+        fontSize=7, leading=10, textColor=colors.HexColor('#8f97a8'),
+        alignment=1  # center
+    )
+
+    story = []
+
+    # Baslik
+    formatted_date = report_date.strftime('%d.%m.%Y')
+    story.append(Paragraph('AYBU SKS Spor Tesisleri', title_style))
+    story.append(Paragraph(
+        f'Gunluk Rezervasyon Raporu &mdash; {pitch.name} &mdash; {formatted_date}',
+        subtitle_style
+    ))
+
+    # Ozet bilgi
+    total = len(reservations)
+    pending  = sum(1 for r in reservations if r.status == 'Pending')
+    approved = sum(1 for r in reservations if r.status == 'Approved')
+    rejected = sum(1 for r in reservations if r.status == 'Rejected')
+    expired  = sum(1 for r in reservations if r.status == 'Expired')
+    blocked_count = len(blocked_dict)
+
+    summary_text = (
+        f'Toplam: <b>{total}</b> rezervasyon | '
+        f'<font color="#065f3e">Onaylanmis: <b>{approved}</b></font> | '
+        f'<font color="#854d0e">Bekleyen: <b>{pending}</b></font> | '
+        f'<font color="#9b2c2c">Reddedilen: <b>{rejected}</b></font> | '
+        f'<font color="#6b7280">Suresi Dolmus: <b>{expired}</b></font> | '
+        f'<font color="#6b21a8">Kilitli Slot: <b>{blocked_count}</b></font>'
+    )
+    story.append(Paragraph(summary_text, info_style))
+    story.append(Spacer(1, 8*mm))
+
+    # ── Tablo: Tum saat dilimleri ────────────────────────────────────
+    TEAL = colors.HexColor('#0ea874')
+    TEAL_PALE = colors.HexColor('#d0f5e8')
+    GRAY_50 = colors.HexColor('#f9fafb')
+    GRAY_200 = colors.HexColor('#e2e4e8')
+    INK = colors.HexColor('#0d1f17')
+
+    # Durum renkleri — daha belirgin arka plan + yazi
+    CLR_APPROVED_BG  = colors.HexColor('#b2f0d6')   # CANLI yesil arka plan
+    CLR_APPROVED_TX  = colors.HexColor('#065f3e')    # koyu yesil yazi
+    CLR_PENDING_BG   = colors.HexColor('#fde68a')    # CANLI sari arka plan
+    CLR_PENDING_TX   = colors.HexColor('#713f12')    # koyu sari yazi
+    CLR_REJECTED_BG  = colors.HexColor('#fca5a5')    # CANLI kirmizi arka plan
+    CLR_REJECTED_TX  = colors.HexColor('#7f1d1d')    # koyu kirmizi yazi
+    CLR_EXPIRED_BG   = colors.HexColor('#e5e7eb')    # belirgin gri arka plan
+    CLR_EXPIRED_TX   = colors.HexColor('#4b5563')    # koyu gri yazi
+    CLR_BLOCKED_BG   = colors.HexColor('#e9d5ff')    # belirgin mor arka plan
+    CLR_BLOCKED_TX   = colors.HexColor('#581c87')    # koyu mor yazi
+    CLR_AVAILABLE_BG = colors.white                   # beyaz — temiz
+    CLR_AVAILABLE_TX = colors.HexColor('#6b7280')    # gri yazi
+
+    STATUS_TR = {
+        'Pending':  '● Bekliyor',
+        'Approved': '✓ Onaylandi',
+        'Rejected': '✗ Reddedildi',
+        'Expired':  '○ Suresi Doldu'
+    }
+
+    # Tablo basliklari
+    header = ['Saat Dilimi', 'Durum', 'Musteri', 'Telefon', 'E-posta']
+    table_data = [header]
+
+    # Rezervasyonlari slot bazli dict'e cevir
+    res_by_slot = {}
+    for r in reservations:
+        if r.time_slot not in res_by_slot:
+            res_by_slot[r.time_slot] = []
+        res_by_slot[r.time_slot].append(r)
+
+    for slot in VALID_SLOTS:
+        if slot in blocked_dict:
+            table_data.append([
+                slot, f'KILITLI: {blocked_dict[slot]}', '-', '-', '-'
+            ])
+        elif slot in res_by_slot:
+            for r in res_by_slot[slot]:
+                table_data.append([
+                    slot,
+                    STATUS_TR.get(r.status, r.status),
+                    r.customer_name[:30],
+                    r.customer_phone,
+                    r.customer_email[:35]
+                ])
+        else:
+            table_data.append([slot, 'Musait', '-', '-', '-'])
+
+    # Tablo olustur
+    col_widths = [35*mm, 35*mm, 40*mm, 30*mm, 45*mm]
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+    # Tablo stili
+    style_cmds = [
+        # Baslik satiri
+        ('BACKGROUND',    (0, 0), (-1, 0), TEAL),
+        ('TEXTCOLOR',     (0, 0), (-1, 0), colors.white),
+        ('FONTSIZE',      (0, 0), (-1, 0), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING',    (0, 0), (-1, 0), 8),
+
+        # Genel
+        ('FONTSIZE',      (0, 1), (-1, -1), 8),
+        ('TOPPADDING',    (0, 1), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+        ('GRID',          (0, 0), (-1, -1), 0.5, GRAY_200),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+    ]
+
+    # Durum bazli SATIR renklendirme (arka plan + yazi rengi)
+    for i in range(1, len(table_data)):
+        status_cell = table_data[i][1]
+
+        # Durum sutununu kalin yap
+        style_cmds.append(('FONTNAME', (1, i), (1, i), 'Helvetica-Bold'))
+
+        if 'Onaylandi' in status_cell:
+            style_cmds.append(('BACKGROUND', (0, i), (-1, i), CLR_APPROVED_BG))
+            style_cmds.append(('TEXTCOLOR',  (0, i), (-1, i), CLR_APPROVED_TX))
+        elif 'Bekliyor' in status_cell:
+            style_cmds.append(('BACKGROUND', (0, i), (-1, i), CLR_PENDING_BG))
+            style_cmds.append(('TEXTCOLOR',  (0, i), (-1, i), CLR_PENDING_TX))
+        elif 'Reddedildi' in status_cell:
+            style_cmds.append(('BACKGROUND', (0, i), (-1, i), CLR_REJECTED_BG))
+            style_cmds.append(('TEXTCOLOR',  (0, i), (-1, i), CLR_REJECTED_TX))
+        elif 'Suresi Doldu' in status_cell:
+            style_cmds.append(('BACKGROUND', (0, i), (-1, i), CLR_EXPIRED_BG))
+            style_cmds.append(('TEXTCOLOR',  (0, i), (-1, i), CLR_EXPIRED_TX))
+        elif 'KILITLI' in status_cell:
+            style_cmds.append(('BACKGROUND', (0, i), (-1, i), CLR_BLOCKED_BG))
+            style_cmds.append(('TEXTCOLOR',  (0, i), (-1, i), CLR_BLOCKED_TX))
+        elif 'Musait' in status_cell:
+            style_cmds.append(('BACKGROUND', (0, i), (-1, i), CLR_AVAILABLE_BG))
+            style_cmds.append(('TEXTCOLOR',  (0, i), (-1, i), CLR_AVAILABLE_TX))
+
+    table.setStyle(TableStyle(style_cmds))
+    story.append(table)
+
+    # Alt bilgi
+    story.append(Spacer(1, 10*mm))
+    now_str = datetime.now().strftime('%d.%m.%Y %H:%M')
+    story.append(Paragraph(
+        f'Rapor olusturma: {now_str} | Olusturan: {current_user.username} | '
+        f'Bu belge AYBU SKS Spor Tesisleri yonetim sistemi tarafindan uretilmistir.',
+        footer_style
+    ))
+
+    # ── 4. PDF'i belleğe yaz ─────────────────────────────────────────
+    doc.build(story)
+    buffer.seek(0)
+
+    # ── 5. Audit log ─────────────────────────────────────────────────
+    audit('rapor_indir',
+          f'saha={pitch.name} | tarih={formatted_date} | '
+          f'rezervasyon={total} | onay={approved} | bekleyen={pending}')
+
+    # ── 6. Response ──────────────────────────────────────────────────
+    safe_filename = f"rapor_{pitch.name.replace(' ', '_')}_{date_str}.pdf"
+    safe_filename = re.sub(r'[^a-zA-Z0-9_\-.]', '', safe_filename)
+
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
 # ─── AFTER REQUEST: Cache + Güvenlik Header'ları ─────────────────
 
 @app.after_request
