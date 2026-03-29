@@ -87,6 +87,12 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_POOL_SIZE']           = 10
 app.config['SQLALCHEMY_MAX_OVERFLOW']        = 20
 app.config['SQLALCHEMY_POOL_TIMEOUT']        = 30
+app.config['SQLALCHEMY_POOL_PRE_PING']       = True
+app.config['SQLALCHEMY_POOL_RECYCLE']        = 280
+app.config['SQLALCHEMY_ENGINE_OPTIONS']      = {
+    'pool_pre_ping': True,
+    'pool_recycle': 280,
+}
 app.config['SESSION_PERMANENT']              = True
 app.config['PERMANENT_SESSION_LIFETIME']     = timedelta(minutes=30)
 app.config['SESSION_COOKIE_HTTPONLY']        = True
@@ -1469,17 +1475,6 @@ def apply_security_headers(response):
 with app.app_context():
     db.create_all()
     logger.info("Veritabani tablolari kontrol edildi.")
-
-#YENİ EKLENEN YAMA KODU (session_token Sütununu Ekler)
-    from sqlalchemy import text
-    try:
-        # Eğer sütun yoksa ekler
-        db.session.execute(text('ALTER TABLE admins ADD COLUMN session_token VARCHAR(64);'))
-        db.session.commit()
-        logger.info("✅ admins tablosuna 'session_token' sutunu basariyla eklendi!")
-    except Exception as e:
-        # Eğer sütun zaten varsa (veya başka hataysa) geri alıp yola devam eder
-        db.session.rollback()
 
     admin_var_mi = Admin.query.filter_by(username='yonetici').first()
     if not admin_var_mi:
