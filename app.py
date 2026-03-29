@@ -870,9 +870,9 @@ def admin_dashboard():
     auto_expire_reservations()
     auto_cleanup_blocked_slots()
 
-    # R-06: Sayfalama — her sayfada 50 rezervasyon, bellek ve performans icin
+    # R-06: Sayfalama — her sayfada 20 rezervasyon, bellek ve performans icin
     page = request.args.get('page', 1, type=int)
-    per_page = 50
+    per_page = 20
 
     pitches       = Pitch.query.all()
     pagination    = Reservation.query.order_by(
