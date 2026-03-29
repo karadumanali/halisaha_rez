@@ -73,6 +73,14 @@ if not _secret:
         "Uretmek icin: python3 -c \"import secrets; print(secrets.token_hex(32))\""
     )
 
+# R-08: SECRET_KEY minimum uzunluk kontrolu — kisa anahtarlar tahmin edilebilir
+if len(_secret) < 32:
+    raise RuntimeError(
+        "SECRET_KEY en az 32 karakter olmalidir! "
+        f"Mevcut uzunluk: {len(_secret)}. "
+        "Uretmek icin: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+
 app.config['SECRET_KEY']                     = _secret
 app.config['SQLALCHEMY_DATABASE_URI']        = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -110,8 +118,9 @@ if os.getenv('FLASK_ENV') == 'production':
     logger.info("Dosya tabanli loglama aktif: logs/app.log")
 
 # R-02: Dekont klasoru — production'da web root DISINA tasinmali
-# .env'de UPLOAD_PATH tanimlanmazsa varsayilan (development) konum kullanilir
-UPLOAD_FOLDER       = os.getenv('UPLOAD_PATH', os.path.join(base_dir, 'uploads', 'receipts'))
+# .env'de UPLOAD_PATH tanimlanmazsa veya bos birakilirsa varsayilan konum kullanilir
+_default_upload = os.path.join(base_dir, 'uploads', 'receipts')
+UPLOAD_FOLDER       = os.getenv('UPLOAD_PATH', '').strip() or _default_upload
 PITCH_IMAGES_FOLDER = os.path.join(base_dir, 'static', 'uploads', 'pitches')
 app.config['UPLOAD_FOLDER']       = UPLOAD_FOLDER
 app.config['PITCH_IMAGES_FOLDER'] = PITCH_IMAGES_FOLDER
@@ -675,6 +684,11 @@ def reserve():
         flash('Gecersiz isim! En az 2, en fazla 100 karakter olmalidir.', 'danger')
         return redirect(url_for('index'))
 
+    # R-07: Isimde sadece harf, bosluk, tire ve nokta kabul et
+    if not re.match(r'^[a-zA-ZçÇğĞıİöÖşŞüÜ\s\-\.]+$', customer_name):
+        flash('Isim sadece harf, bosluk ve tire icerebilir!', 'danger')
+        return redirect(url_for('index'))
+
     raw_phone   = request.form.get('customer_phone', '')
     clean_phone = raw_phone.replace(" ", "")
     if not re.match(r"^05\d{9}$", clean_phone):
@@ -856,13 +870,32 @@ def admin_dashboard():
     auto_expire_reservations()
     auto_cleanup_blocked_slots()
 
+    # R-06: Sayfalama — her sayfada 50 rezervasyon, bellek ve performans icin
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+
     pitches       = Pitch.query.all()
-    reservations  = Reservation.query.order_by(Reservation.created_at.desc()).all()
+    pagination    = Reservation.query.order_by(
+        Reservation.created_at.desc()
+    ).paginate(page=page, per_page=per_page, error_out=False)
+    reservations  = pagination.items
+
+    # Istatistikler icin tum durumlarin sayisi (sayfalamadan bagimsiz)
+    from sqlalchemy import func
+    status_counts = dict(
+        db.session.query(Reservation.status, func.count(Reservation.id))
+        .group_by(Reservation.status).all()
+    )
+    total_count   = sum(status_counts.values())
+
     blocked_slots = BlockedSlot.query.order_by(BlockedSlot.date.asc(), BlockedSlot.time_slot.asc()).all()
     audit_logs    = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(200).all()
     return render_template('admin.html',
                            pitches=pitches,
                            reservations=reservations,
+                           pagination=pagination,
+                           status_counts=status_counts,
+                           total_count=total_count,
                            blocked_slots=blocked_slots,
                            audit_logs=audit_logs,
                            now=datetime.now())

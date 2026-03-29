@@ -32,6 +32,10 @@ SECRET_KEY=BURAYA_URETTIGINIZ_ANAHTARI_YAPIN
 # SQLite icin (sadece test amacli — production'da KULLANMAYIN):
 #   sqlite:///halisaha.db
 #
+# R-09: Production'da veritabani AYRI sunucudaysa SSL zorunlu:
+#   postgresql://kullanici:sifre@sunucu:5432/halisaha?sslmode=require
+#   (Yerel sunucuda sslmode gerekmez)
+#
 DATABASE_URL=postgresql://kullanici:sifre@localhost:5432/halisaha
 
 
