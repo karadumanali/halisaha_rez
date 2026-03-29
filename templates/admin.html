@@ -654,6 +654,203 @@
 .pw-check-list li.fail { color: var(--danger); }
 .pw-check-list li i { font-size: 0.7rem; width: 14px; text-align: center; }
 
+/* ══════════════════════════════════════════════════
+   PDF RAPOR — Minimalist & Modern Redesign v2
+══════════════════════════════════════════════════ */
+.report-card {
+    background: var(--white);
+    border-radius: var(--r);
+    padding: 30px 32px 28px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.report-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+.report-section-title i {
+    color: var(--teal);
+    font-size: 0.95rem;
+}
+.report-section-title h3 {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0;
+}
+.report-section-sub {
+    font-size: 0.82rem;
+    color: var(--gray-400);
+    margin-bottom: 24px;
+}
+
+/* İki input yan yana, eşit genişlik, üst hizada */
+.report-inputs-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+.report-field-group {
+    display: flex;
+    flex-direction: column;
+}
+.report-field-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--gray-700);
+    margin-bottom: 8px;
+    line-height: 1;
+}
+.report-field-group label i {
+    font-size: 0.82rem;
+    color: var(--teal);
+}
+.report-field-group .form-control,
+.report-field-group .form-select {
+    padding: 12px 14px;
+    font-size: 0.93rem;
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--r-sm);
+    background: var(--white);
+    color: var(--ink);
+    font-family: var(--font);
+    font-weight: 600;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    height: 46px;
+}
+.report-field-group .form-control:focus,
+.report-field-group .form-select:focus {
+    outline: none;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(14,168,116,0.12);
+}
+
+/* Uyarı mesajı — sadece gösterildiğinde yer kaplar */
+.report-date-warn {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: var(--danger);
+    font-weight: 600;
+    display: none;
+}
+.report-date-warn.visible {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Buton + hint aynı satırda, sağ alt köşede */
+.report-footer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 20px;
+    gap: 16px;
+}
+.report-hint-msg {
+    font-size: 0.82rem;
+    color: var(--gray-400);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+.report-hint-msg.ready {
+    color: var(--teal-dk);
+}
+.report-download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--teal);
+    color: var(--white);
+    border: none;
+    border-radius: var(--r-sm);
+    padding: 12px 28px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.report-download-btn:hover:not(:disabled) {
+    background: var(--teal-dk);
+}
+.report-download-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Rapor Hakkında — soft info card */
+.report-info-card {
+    background: #f6faf8;
+    border-radius: var(--r);
+    padding: 26px 30px;
+    margin-top: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+.report-info-card .info-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin-bottom: 16px;
+}
+.report-info-card .info-heading i {
+    color: var(--teal);
+    font-size: 0.88rem;
+}
+.report-info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.88rem;
+    color: var(--gray-600);
+    line-height: 1.7;
+    margin-bottom: 12px;
+}
+.report-info-item:last-child {
+    margin-bottom: 0;
+}
+.report-info-item i {
+    color: var(--teal);
+    font-size: 0.82rem;
+    margin-top: 4px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+    .report-inputs-row {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .report-footer-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .report-download-btn {
+        justify-content: center;
+    }
+    .report-card {
+        padding: 20px;
+    }
+    .report-info-card {
+        padding: 20px;
+    }
+}
+
 /* ── MOBİL ── */
 @media (max-width: 900px) {
     .admin-layout { flex-direction: column; }
@@ -1262,7 +1459,7 @@
 
         </div><!-- /tab-denetim -->
 
-        <!-- ══ TAB 5: PDF RAPOR ══ -->
+        <!-- ══ TAB 5: PDF RAPOR — Minimalist Modern Redesign ══ -->
         <div class="tab-panel" id="tab-rapor">
 
             <div class="panel-heading">
@@ -1273,72 +1470,80 @@
                 </div>
             </div>
 
-            <div class="card" style="overflow:hidden;">
-                <div class="section-head-inline">
-                    <i class="fas fa-download" style="color:var(--teal)"></i>
+            <!-- Rapor Oluştur — clean card, aligned inputs, button bottom-right -->
+            <div class="report-card">
+                <div class="report-section-title">
+                    <i class="fas fa-download"></i>
                     <h3>Rapor Oluştur</h3>
                 </div>
-                <div style="padding:30px 30px 28px;">
-                    <form action="/admin/report/pdf" method="POST" id="reportForm">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="report-section-sub">Tarih ve saha seçerek rapor oluşturabilirsiniz.</div>
 
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:28px;">
-                            <div>
-                                <label class="form-label" for="reportDate" style="margin-bottom:10px; font-size:0.9rem;">
-                                    <i class="fas fa-calendar-alt"></i> Tarih Seçin
-                                </label>
-                                <input type="date" id="reportDate" name="report_date"
-                                       class="form-control" required
-                                       style="padding:14px 16px; font-size:1rem; border-width:2px;">
-                                <div id="reportDateWarn" style="display:none; margin-top:10px; font-size:0.82rem; color:var(--danger); font-weight:600;">
-                                    <i class="fas fa-exclamation-triangle"></i> <span id="reportDateWarnText"></span>
-                                </div>
-                            </div>
-                            <div>
-                                <label class="form-label" for="reportPitch" style="margin-bottom:10px; font-size:0.9rem;">
-                                    <i class="fas fa-futbol"></i> Saha Seçin
-                                </label>
-                                <select id="reportPitch" name="report_pitch_id"
-                                        class="form-control form-select" required
-                                        style="padding:14px 16px; font-size:1rem; border-width:2px; color:var(--ink); font-weight:600; cursor:pointer;">
-                                    <option value="" style="color:var(--gray-400); font-weight:400;">— Saha seçin —</option>
-                                    {% for pitch in pitches %}
-                                    <option value="{{ pitch.id }}" style="color:var(--ink); font-weight:600;">{{ pitch.name }}</option>
-                                    {% endfor %}
-                                </select>
+                <form action="/admin/report/pdf" method="POST" id="reportForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- İki input yan yana, üst hizada -->
+                    <div class="report-inputs-row">
+                        <div class="report-field-group">
+                            <label for="reportDate">
+                                <i class="fas fa-calendar-alt"></i> Tarih Seçin
+                            </label>
+                            <input type="date" id="reportDate" name="report_date"
+                                   class="form-control" required>
+                            <div class="report-date-warn" id="reportDateWarn">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span id="reportDateWarnText"></span>
                             </div>
                         </div>
 
-                        <div style="display:flex; gap:16px; align-items:center; padding-top:20px; border-top:1.5px solid var(--gray-200);">
-                            <button type="submit" class="btn-sm-teal" id="btnDownloadPdf" disabled
-                                    style="padding:15px 36px; font-size:1rem; border-radius:var(--r-sm);">
-                                <i class="fas fa-file-pdf"></i> PDF İndir
-                            </button>
-                            <span style="font-size:0.88rem; color:var(--gray-400); font-weight:600;" id="reportHint">
-                                <i class="fas fa-info-circle"></i> Tarih ve saha seçerek rapor oluşturabilirsiniz.
-                            </span>
+                        <div class="report-field-group">
+                            <label for="reportPitch">
+                                <i class="fas fa-futbol"></i> Saha Seçin
+                            </label>
+                            <select id="reportPitch" name="report_pitch_id"
+                                    class="form-control form-select" required>
+                                <option value="">— Saha seçin —</option>
+                                {% for pitch in pitches %}
+                                <option value="{{ pitch.id }}">{{ pitch.name }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
-                    </form>
-                </div>
+                    </div>
+
+                    <!-- Hint solda, buton sağda -->
+                    <div class="report-footer-row">
+                        <div class="report-hint-msg" id="reportHint">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Tarih ve saha seçerek rapor oluşturabilirsiniz.</span>
+                        </div>
+                        <button type="submit" class="report-download-btn" id="btnDownloadPdf" disabled>
+                            <i class="fas fa-file-pdf"></i> PDF İndir
+                        </button>
+                    </div>
+                </form>
             </div>
 
-            <div class="card" style="overflow:hidden; margin-top:22px;">
-                <div class="section-head-inline">
-                    <i class="fas fa-info-circle" style="color:var(--teal)"></i>
-                    <h3>Rapor Hakkında</h3>
+            <!-- Rapor Hakkında — soft pastel card, no border -->
+            <div class="report-info-card">
+                <div class="info-heading">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Rapor Hakkında</span>
                 </div>
-                <div style="padding:24px 30px; font-size:0.9rem; color:var(--gray-600); line-height:1.9;">
-                    <p style="margin:0 0 12px;">
-                        <i class="fas fa-table" style="color:var(--teal); margin-right:6px;"></i>
+
+                <div class="report-info-item">
+                    <i class="fas fa-table"></i>
+                    <div>
                         <strong>Rapor içeriği:</strong> Seçilen tarih ve saha için tüm saat dilimlerinin
                         durumunu ve rezervasyon yapan müşterilerin bilgilerini içerir.
                         Her durum farklı renkle gösterilir (yeşil=onaylı, sarı=bekleyen, kırmızı=reddedildi).
-                    </p>
-                    <p style="margin:0;">
-                        <i class="fas fa-shield-alt" style="color:var(--teal); margin-right:6px;"></i>
+                    </div>
+                </div>
+
+                <div class="report-info-item">
+                    <i class="fas fa-shield-alt"></i>
+                    <div>
                         <strong>Güvenlik:</strong> Her rapor indirme işlemi denetim kayıtlarında loglanır.
                         PDF yalnızca oturum açmış yöneticiler tarafından oluşturulabilir.
-                    </p>
+                    </div>
                 </div>
             </div>
 
@@ -1727,7 +1932,7 @@ function bindReportForm() {
     var dateInput  = document.getElementById('reportDate');
     var pitchInput = document.getElementById('reportPitch');
     var submitBtn  = document.getElementById('btnDownloadPdf');
-    var hint       = document.getElementById('reportHint');
+    var hintEl     = document.getElementById('reportHint');
     var warnBox    = document.getElementById('reportDateWarn');
     var warnText   = document.getElementById('reportDateWarnText');
 
@@ -1744,28 +1949,28 @@ function bindReportForm() {
         if (dateInput.value) {
             var sel = new Date(dateInput.value + 'T00:00:00');
             if (sel > maxDate) {
-                warnBox.style.display = 'block';
+                warnBox.classList.add('visible');
                 var maxStr = maxDate.getDate().toString().padStart(2,'0') + '.'
                            + (maxDate.getMonth()+1).toString().padStart(2,'0') + '.'
                            + maxDate.getFullYear();
-                warnText.textContent = 'En fazla 1 ay ilerisine rapor olusturulabilir. (' + maxStr + ' tarihine kadar)';
+                warnText.textContent = 'En fazla 1 ay ilerisine rapor oluşturulabilir. (' + maxStr + ' tarihine kadar)';
                 dateInput.value = '';
             } else {
-                warnBox.style.display = 'none';
+                warnBox.classList.remove('visible');
                 dateOk = true;
             }
         } else {
-            warnBox.style.display = 'none';
+            warnBox.classList.remove('visible');
         }
 
         var ok = dateOk && pitchInput.value;
         submitBtn.disabled = !ok;
         if (ok) {
-            hint.innerHTML = '<i class="fas fa-check-circle"></i> Rapor indirmeye hazir.';
-            hint.style.color = 'var(--teal-dk)';
+            hintEl.innerHTML = '<i class="fas fa-check-circle"></i> <span>Rapor indirmeye hazır.</span>';
+            hintEl.classList.add('ready');
         } else {
-            hint.innerHTML = '<i class="fas fa-info-circle"></i> Tarih ve saha secerek rapor olusturabilirsiniz.';
-            hint.style.color = 'var(--gray-400)';
+            hintEl.innerHTML = '<i class="fas fa-info-circle"></i> <span>Tarih ve saha seçerek rapor oluşturabilirsiniz.</span>';
+            hintEl.classList.remove('ready');
         }
     }
 
