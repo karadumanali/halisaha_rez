@@ -1470,6 +1470,17 @@ with app.app_context():
     db.create_all()
     logger.info("Veritabani tablolari kontrol edildi.")
 
+#YENİ EKLENEN YAMA KODU (session_token Sütununu Ekler)
+    from sqlalchemy import text
+    try:
+        # Eğer sütun yoksa ekler
+        db.session.execute(text('ALTER TABLE admins ADD COLUMN session_token VARCHAR(64);'))
+        db.session.commit()
+        logger.info("✅ admins tablosuna 'session_token' sutunu basariyla eklendi!")
+    except Exception as e:
+        # Eğer sütun zaten varsa (veya başka hataysa) geri alıp yola devam eder
+        db.session.rollback()
+
     admin_var_mi = Admin.query.filter_by(username='yonetici').first()
     if not admin_var_mi:
         import string as _string
