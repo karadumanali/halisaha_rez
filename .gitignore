@@ -1,7 +1,7 @@
 
 venv/
 
-
+*.dll
 .env
 
 # Python cache dosyaları
