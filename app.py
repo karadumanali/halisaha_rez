@@ -333,13 +333,6 @@ def safe_redirect(next_url, fallback):
     return redirect(fallback)
 
 
-# ─── IP KISITLAMA ─────────────────────────────────────────────────
-
-def _load_allowed_ips() -> list:
-    raw = os.getenv('ALLOWED_ADMIN_IPS', '')
-    return [ip.strip() for ip in raw.split(',') if ip.strip()]
-
-
 def get_real_ip() -> str:
     """
     Gercek IP adresini dondurur.
@@ -350,54 +343,11 @@ def get_real_ip() -> str:
     return request.remote_addr or ''
 
 
-def is_ip_allowed(ip: str, allowed: list) -> bool:
-    import ipaddress
-    if not allowed:
-        return True
-    try:
-        client = ipaddress.ip_address(ip)
-        for entry in allowed:
-            try:
-                if '/' in entry:
-                    if client in ipaddress.ip_network(entry, strict=False):
-                        return True
-                else:
-                    if client == ipaddress.ip_address(entry):
-                        return True
-            except ValueError:
-                continue
-    except ValueError:
-        pass
-    return False
-
-
 # ─── NONCE ÜRETİMİ ───────────────────────────────────────────────
 
 @app.before_request
 def generate_csp_nonce():
     g.csp_nonce = secrets.token_urlsafe(16)
-
-
-@app.before_request
-def restrict_admin_by_ip():
-    allowed_ips = _load_allowed_ips()
-    if not allowed_ips:
-        logger.warning(
-            "GUVENLIK UYARISI: ALLOWED_ADMIN_IPS tanimlanmamis! "
-            "Admin paneli tum IP adreslerine acik."
-        )
-        return
-    admin_paths = ('/login', '/admin')
-    if not any(request.path.startswith(p) for p in admin_paths):
-        return
-    client_ip = get_real_ip()
-    if not is_ip_allowed(client_ip, allowed_ips):
-        logger.warning(f"Engellendi — yetkisiz IP: {client_ip} → {request.path}")
-        return (
-            "<h2>Erisim Engellendi</h2>"
-            "<p>Bu sayfaya yalnizca yetkili agdan erisilebilir.</p>",
-            403
-        )
 
 
 # ─── reCAPTCHA v3 ────────────────────────────────────────────────
@@ -471,7 +421,7 @@ def save_secure_receipt(file):
     ALLOWED_PDF         = {'application/pdf'}
     if mime_type not in (ALLOWED_IMAGE_TYPES | ALLOWED_PDF) or not allowed_file(file.filename):
         return None
-    ext           = secure_filename(file.filename).rsplit('.', 1)[1].lower()
+    ext           = file.filename.rsplit('.', 1)[1].lower()
     safe_filename = f"{uuid.uuid4().hex}.{ext}"
     save_path     = os.path.join(app.config['UPLOAD_FOLDER'], safe_filename)
     if mime_type in ALLOWED_IMAGE_TYPES:
@@ -504,7 +454,7 @@ def save_secure_pitch_image(file):
     ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png'}
     if mime_type not in ALLOWED_IMAGE_TYPES or not allowed_file(file.filename):
         return None
-    ext = secure_filename(file.filename).rsplit('.', 1)[1].lower()
+    ext = file.filename.rsplit('.', 1)[1].lower()
     safe_filename = f"pitch_{uuid.uuid4().hex}.{ext}"
     save_path = os.path.join(app.config['PITCH_IMAGES_FOLDER'], safe_filename)
     try:
@@ -658,7 +608,8 @@ def index():
     pitches    = Pitch.query.all()
     today_date = datetime.now().date().isoformat()
     return render_template('index.html', pitches=pitches, today_date=today_date,
-                           recaptcha_site_key=RECAPTCHA_SITE)
+                           recaptcha_site_key=RECAPTCHA_SITE,
+                           site_iban=os.getenv('SITE_IBAN', ''))
 
 
 @app.route('/busy_slots')
@@ -1396,6 +1347,14 @@ def generate_report_pdf():
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
+
+
+# ─── /.well-known/security.txt — Guvenlik arastirmacilari icin iletisim ──────
+@app.route('/.well-known/security.txt')
+def security_txt():
+    from flask import Response
+    content = open(os.path.join(base_dir, 'static', '.well-known', 'security.txt'), encoding='utf-8').read()
+    return Response(content, mimetype='text/plain')
 
 
 # ─── V-07: OZEL HATA SAYFALARI — Bilgi sizintisini onle ──────────

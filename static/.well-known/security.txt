@@ -1,0 +1,10 @@
+# AYBU SKS Spor Tesisleri — Halı Saha Rezervasyon Sistemi
+# Güvenlik açığı bildirimi için aşağıdaki iletişim bilgilerini kullanın.
+
+Contact: mailto:fatihmuaz67@gmail.com
+Expires: 2027-04-01T00:00:00.000Z
+Preferred-Languages: tr, en
+Scope: /
+
+# Bu sistem Ankara Yıldırım Beyazıt Üniversitesi SKS bünyesinde öğrenci projesi olarak geliştirilmiştir.
+# Tespit ettiğiniz güvenlik açıklarını lütfen yukarıdaki adrese bildirin.
