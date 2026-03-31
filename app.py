@@ -22,7 +22,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory, g
 from werkzeug.utils import secure_filename
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 
 # ── Argon2id hash yardimcilari ────────────────────────────────────────────────
 from passlib.hash import argon2 as _argon2
