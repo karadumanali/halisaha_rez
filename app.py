@@ -172,7 +172,8 @@ def monthly_cleanup():
             LoginAttempt.attempted_at < login_cutoff
         ).delete()
 
-        audit_cutoff  = datetime.now(timezone.utc) - timedelta(days=365)
+        # V-09: Denetim kayıtları 2 yıl (730 gün) saklanır (KVKK/GDPR uyumu)
+        audit_cutoff  = datetime.now(timezone.utc) - timedelta(days=730)
         deleted_audit = AuditLog.query.filter(
             AuditLog.created_at < audit_cutoff
         ).delete()
@@ -405,6 +406,13 @@ RECAPTCHA_SECRET    = os.getenv('RECAPTCHA_SECRET_KEY', '')
 RECAPTCHA_SITE      = os.getenv('RECAPTCHA_SITE_KEY', '')
 RECAPTCHA_MIN_SCORE = 0.5
 
+# V-RECAPTCHA: Prodüksiyonda reCAPTCHA anahtarları zorunludur
+if os.getenv('FLASK_ENV') == 'production' and not RECAPTCHA_SECRET:
+    raise RuntimeError(
+        "RECAPTCHA_SECRET_KEY prodüksiyonda zorunludur. "
+        ".env dosyasına RECAPTCHA_SECRET_KEY ve RECAPTCHA_SITE_KEY ekleyin."
+    )
+
 def verify_recaptcha(token, action='submit'):
     if not RECAPTCHA_SECRET:
         return True
@@ -424,7 +432,8 @@ def verify_recaptcha(token, action='submit'):
         )
     except Exception:
         logger.warning("reCAPTCHA dogrulama istegi basarisiz.")
-        return True
+        # Prodüksiyonda ağ hatası durumunda reddet (fail-closed)
+        return os.getenv('FLASK_ENV') != 'production'
 
 
 # ─── MIME TESPİTİ ─────────────────────────────────────────────────
@@ -625,6 +634,24 @@ def audit(action: str, detail: str = ''):
 
 
 # ─── ROTALAR ─────────────────────────────────────────────────────
+
+# V-08: CSP ihlal raporlarını yakala ve logla
+@app.route('/csp-report', methods=['POST'])
+def csp_report():
+    try:
+        report = request.get_json(force=True, silent=True) or {}
+        violation = report.get('csp-report', report)
+        logger.warning(
+            "CSP ihlali: blocked-uri=%s, violated-directive=%s, document-uri=%s, ip=%s",
+            violation.get('blocked-uri', '-'),
+            violation.get('violated-directive', '-'),
+            violation.get('document-uri', '-'),
+            get_real_ip()
+        )
+    except Exception:
+        pass
+    return '', 204
+
 
 @app.route('/')
 def index():
@@ -1462,7 +1489,8 @@ def apply_security_headers(response):
         f"font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
         f"img-src 'self' data:; "
         f"connect-src 'self'; "
-        f"frame-src https://www.google.com"
+        f"frame-src https://www.google.com; "
+        f"report-uri /csp-report"  # V-08: CSP ihlallerini logla
     )
 
     if not app.debug:
