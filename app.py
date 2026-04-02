@@ -1,5 +1,6 @@
 import os
 import smtplib
+import threading
 from email.message import EmailMessage
 from PIL import Image
 from urllib.parse import urlparse
@@ -470,6 +471,19 @@ def save_secure_pitch_image(file):
     return safe_filename
 
 
+def _send_mail_async(msg):
+    """Mail gönderimini background thread'de çalıştır — SMTP blocking DoS'u önler."""
+    sender_email    = os.getenv('MAIL_USERNAME')
+    sender_password = os.getenv('MAIL_PASSWORD')
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as s:
+            s.starttls()
+            s.login(sender_email, sender_password)
+            s.send_message(msg)
+    except Exception as e:
+        logger.warning(f"Mail hatasi: {e}")
+
+
 def send_admin_notification(customer_name, date, time_slot):
     sender_email    = os.getenv('MAIL_USERNAME')
     sender_password = os.getenv('MAIL_PASSWORD')
@@ -483,11 +497,7 @@ def send_admin_notification(customer_name, date, time_slot):
     msg['From']    = sender_email
     msg['To']      = admin_email
     msg.set_content(f"Yeni rezervasyon:\n{customer_name}\n{date}\n{time_slot}")
-    try:
-        with smtplib.SMTP('smtp.gmail.com', 587) as s:
-            s.starttls(); s.login(sender_email, sender_password); s.send_message(msg)
-    except Exception as e:
-        logger.warning(f"Mail hatasi: {e}")
+    threading.Thread(target=_send_mail_async, args=(msg,), daemon=True).start()
 
 
 def send_customer_approval_email(customer_email, customer_name, pitch_name, date, time_slot):
@@ -503,11 +513,7 @@ def send_customer_approval_email(customer_email, customer_name, pitch_name, date
     msg['From']    = sender_email
     msg['To']      = customer_email
     msg.set_content(f"Merhaba {customer_name},\n\nRezervasyon onaylandi.\nSaha: {pitch_name}\nTarih: {date.strftime('%d.%m.%Y')}\nSaat: {time_slot}")
-    try:
-        with smtplib.SMTP('smtp.gmail.com', 587) as s:
-            s.starttls(); s.login(sender_email, sender_password); s.send_message(msg)
-    except Exception as e:
-        logger.warning(f"Mail hatasi: {e}")
+    threading.Thread(target=_send_mail_async, args=(msg,), daemon=True).start()
 
 
 def send_customer_expiry_email(customer_email, customer_name, pitch_name, date, time_slot):
@@ -534,11 +540,7 @@ def send_customer_expiry_email(customer_email, customer_name, pitch_name, date, 
         f"Iyi gunler dileriz.\n"
         f"AYBU SKS Spor Tesisleri"
     )
-    try:
-        with smtplib.SMTP('smtp.gmail.com', 587) as s:
-            s.starttls(); s.login(sender_email, sender_password); s.send_message(msg)
-    except Exception as e:
-        logger.warning(f"Sure dolumu mail hatasi: {e}")
+    threading.Thread(target=_send_mail_async, args=(msg,), daemon=True).start()
 
 
 # ─── SABİTLER ────────────────────────────────────────────────────
@@ -714,9 +716,10 @@ def reserve():
         flash(f'Bu saat dilimi kilitli: {blocked.reason}', 'danger')
         return redirect(url_for('index'))
 
+    # V-06: Race condition onlemi — FOR UPDATE ile satır kilitle
     existing = Reservation.query.filter_by(
         pitch_id=pitch_id, date=date_obj, time_slot=time_slot
-    ).filter(Reservation.status.in_(['Pending', 'Approved'])).first()
+    ).filter(Reservation.status.in_(['Pending', 'Approved'])).with_for_update().first()
     if existing:
         flash('Bu saat dilimi dolu veya onay bekliyor!', 'danger')
         return redirect(url_for('index'))
@@ -1001,7 +1004,8 @@ def change_status(res_id, action):
         flash('Gecersiz islem!', 'danger')
         return redirect(url_for('admin_dashboard'))
 
-    reservation = db.get_or_404(Reservation, res_id)
+    # V-07: Race condition onlemi — FOR UPDATE ile satır kilitle (concurrent approval)
+    reservation = Reservation.query.filter_by(id=res_id).with_for_update().first_or_404()
 
     # Suresi dolmus rezervasyonda islem yapilamaz
     if reservation.status == 'Expired':
