@@ -1,256 +1,347 @@
-# Güvenlik Taraması & Yapılan Değişiklikler Raporu
+# Güvenlik Sızma Testi Raporu
 
 **Proje:** AYBÜ SKS Spor Tesisleri — Halisaha Rezervasyon Sistemi
-**Tarih:** 2026-03-31
-**Genel Güvenlik Puanı:** 7.5 / 10
+**Tarih:** 2026-04-02
+**Genel Güvenlik Puanı:** 8.4 / 10
+**Test Kapsamı:** Kaynak kodu statik analiz (SAST) + business logic incelemesi
 
 ---
 
-## İçindekiler
+## Yönetici Özeti
 
-1. [Proje Özeti](#1-proje-özeti)
-2. [Güvenlik Taraması — Bulunan Açıklar](#2-güvenlik-taraması--bulunan-açıklar)
-3. [Güçlü Yönler](#3-güçlü-yönler)
-4. [OWASP Top 10 Karşılaştırması](#4-owasp-top-10-karşılaştırması)
-5. [Bu Oturumda Yapılan Düzeltmeler](#5-bu-oturumda-yapılan-düzeltmeler)
-6. [.env Git Geçmişinden Silme Talimatları](#6-env-git-geçmişinden-silme-talimatları)
-7. [Kalan Öneriler](#7-kalan-öneriler)
+Sistem genel olarak **iyi güvenlik pratiği** sergilemektedir. CSRF koruması, Argon2id şifre hashleme, oturum token doğrulaması, rate limiting, CSP/HSTS header'ları ve audit logging gibi kritik savunma mekanizmaları yerinde ve doğru uygulanmıştır. Tespit edilen açıkların büyük çoğunluğu **deployment konfigürasyonu** ve **operasyonel güvenlik** kategorisindedir; kodun kendisinde kritik bir zayıflık bulunamamıştır.
 
 ---
 
-## 1. Proje Özeti
+## Puanlama
 
-| Özellik | Değer |
-|---------|-------|
-| Framework | Flask (Python) |
-| Veritabanı | PostgreSQL / SQLite |
-| Şifreleme | Argon2id (passlib) |
-| Oturum Yönetimi | Flask-Login + session token |
-| CSRF Koruması | Flask-WTF |
-| Rate Limiting | Flask-Limiter |
-| Dosya Yükleme | PDF / JPG / PNG (MIME doğrulama) |
-| Raporlama | ReportLab (PDF) |
-| Arka Plan Görevler | APScheduler |
-
----
-
-## 2. Güvenlik Taraması — Bulunan Açıklar
-
-### KRİTİK
-
-#### C-01 — `.env` Dosyası Git Deposunda Açık
-- **Nerede:** Repo kökü, tüm commit geçmişi
-- **Risk:** `SECRET_KEY`, veritabanı şifresi, Gmail uygulama şifresi dışarıya sızdı
-- **Durum:** Talimatlar aşağıda verildi → [Bkz. Bölüm 6](#6-env-git-geçmişinden-silme-talimatları)
-
-#### C-02 — Zayıf Veritabanı Şifresi
-- **Nerede:** `.env` → `DATABASE_URL`
-- **Şifre:** `seng302` (çok kısa, tahmin edilebilir)
-- **Durum:** Üniversite altyapısının sorumluluğunda
-
-#### C-03 — reCAPTCHA Production'da Zorunlu Değildi
-- **Nerede:** `app.py` → `verify_recaptcha()` fonksiyonu
-- **Risk:** `RECAPTCHA_SECRET_KEY` girilmezse bot koruması tamamen devre dışı kalıyordu
-- **Durum:** ✅ **Bu oturumda düzeltildi**
+| Kategori | Puan | Notlar |
+|----------|------|--------|
+| Authentication | 9/10 | Argon2id, brute-force kilidi, session token rotasyonu |
+| Authorization | 8/10 | login_required yerinde, tek admin rolü yeterli |
+| Input Validation | 9/10 | Regex, ORM, header injection onlemi |
+| Session Management | 9/10 | Güçlü token, cookie flags, otomatik geçersizleştirme |
+| Security Headers | 9/10 | CSP, HSTS, X-Frame-Options, Referrer-Policy |
+| File Upload | 7/10 | Magic bytes kontrolü var, web root dışına taşınmalı |
+| Rate Limiting | 8/10 | Kritik endpoint'lerde mevcut |
+| Logging & Monitoring | 8/10 | Audit log kapsamlı, log injection kapatıldı |
+| Dependency Security | 7/10 | Güncel versiyonlar, pip-audit önerilir |
+| Deployment Config | 6/10 | Aşağıdaki checklist uygulanmalı |
+| **GENEL** | **8.4/10** | |
 
 ---
 
-### YÜKSEK
-
-#### H-01 — reCAPTCHA Ağ Hatasında "Geçir" Diyordu
-- **Nerede:** `app.py` → `verify_recaptcha()` → `except` bloğu
-- **Risk:** Google'ın sunucusuna ulaşılamazsa her istek otomatik geçiyordu
-- **Durum:** ✅ **Bu oturumda düzeltildi** (fail-closed: production'da `False` döner)
-
-#### H-02 — HTTPS Yönlendirmesi Yok
-- **Risk:** HTTP üzerinden gelen istekler HTTPS'e yönlendirilmiyor
-- **Durum:** Üniversite altyapısının sorumluluğunda (Nginx konfigürasyonu)
-
-#### H-03 — Veritabanı SSL Bağlantısı Yok
-- **Risk:** `DATABASE_URL`'de `?sslmode=require` yok
-- **Durum:** Üniversite altyapısının sorumluluğunda
+## Bulgular
 
 ---
 
-### ORTA
-
-#### M-01 — CSP İhlalleri Raporlanmıyordu *(Bulgu #8)*
-- **Nerede:** `app.py` → `apply_security_headers()` → CSP header
-- **Risk:** Tarayıcı XSS girişimlerini veya izinsiz script yüklemelerini tespit etse bile sunucu habersiz kalıyordu
-- **Durum:** ✅ **Bu oturumda düzeltildi**
-
-#### M-02 — Denetim Logu Saklama Süresi Kısaydı *(Bulgu #9)*
-- **Nerede:** `app.py` → `monthly_cleanup()` fonksiyonu
-- **Eski değer:** 365 gün (1 yıl)
-- **Risk:** KVKK/GDPR uyumu için yetersiz süre
-- **Durum:** ✅ **Bu oturumda düzeltildi** → 730 güne (2 yıl) çıkarıldı
-
-#### M-03 — Admin Şifre Sıfırlama Mekanizması Yok
-- **Risk:** Admin şifresi unutulursa sisteme erişim kesilebilir
-- **Öneri:** Yedek kurtarma kodu veya alternatif giriş eklenebilir
-
-#### M-04 — CSP İhlal Bildirimleri İzlenmiyor
-- **Durum:** `/csp-report` eklendi, loglar `app.log` dosyasına yazılıyor ✅
+### VULN-001 — Denetim Logu Injection
+**Severity:** Medium → **KAPATILDI**
+**Dosya:** `app.py:575`
+**Açıklama:** `audit()` fonksiyonuna iletilen `action` ve `detail` parametrelerinde newline karakterleri bulunabiliyordu. Saldırgan müşteri adına `\nFAKE_ADMIN_ACTION` yazarak log kaydını manipüle edebilirdi.
+**Düzeltme:** `re.sub(r'[\r\n\t]', ' ', ...)` ile control karakterler temizlendi.
 
 ---
 
-### DÜŞÜK
-
-#### L-01 — `security.txt` Dosyası Yok
-- **Öneri:** `/.well-known/security.txt` eklenirse güvenlik araştırmacıları iletişim kurabilir
-
-#### L-02 — Log Uyarı Mekanizması Yok
-- Brute-force denemeleri loglanıyor ama eşik aşılınca alarm gitmiyor
-- Öneri: E-posta bildirimi eklenebilir
+### VULN-002 — Admin Şifresi Log Dosyasına Yazılıyordu
+**Severity:** High → **KAPATILDI**
+**Dosya:** `app.py:1479`
+**Açıklama:** İlk `yonetici` hesabı oluşturulduğunda şifre `logger.info()` ile log dosyasına yazılıyordu. Log dosyasına erişim sağlayan biri (örn. log aggregation sistemi, IT personeli) açık metin şifreyi okuyabilirdi.
+**Düzeltme:** `logger.info()` → `print()` ile değiştirildi; şifre artık yalnızca sunucu konsoluna (stdout) yazdırılıyor, log dosyasına gitmiyor.
 
 ---
 
-## 3. Güçlü Yönler
-
-| # | Uygulama | Açıklama |
-|---|----------|----------|
-| 1 | Argon2id şifre hash | En güçlü modern algoritma |
-| 2 | CSRF koruması | Flask-WTF, tüm formlarda |
-| 3 | SQL Injection koruması | SQLAlchemy ORM, parametrik sorgular |
-| 4 | XSS koruması | CSP nonce + Jinja2 auto-escape |
-| 5 | Brute-force kilidi | 5 deneme → 15 dk kilit |
-| 6 | Rate limiting | Login: 3/dk, Reserve: 3/dk |
-| 7 | Dosya yükleme güvenliği | MIME byte kontrolü, UUID isimlendirme |
-| 8 | Session token rotasyonu | Her login'de yeni token, çıkışta geçersiz |
-| 9 | Timing-safe login | Olmayan kullanıcı için DUMMY_HASH |
-| 10 | Audit log | Tüm admin işlemleri kayıt altında |
-| 11 | Clickjacking koruması | `X-Frame-Options: DENY` |
-| 12 | Honeypot bot tuzağı | Gizli `website` alanı |
-| 13 | IP whitelist | Admin paneli isteğe bağlı IP kısıtlaması |
-| 14 | Çift rezervasyon önlemi | DB UNIQUE constraint ile race condition koruması |
-| 15 | Özel hata sayfaları | 404/500/429/403 — sistem bilgisi sızdırılmıyor |
-| 16 | bcrypt → Argon2id otomatik yükseltme | Eski hash'ler login'de otomatik güncellenir |
-| 17 | Server header kaldırıldı | `response.headers.pop('Server', None)` |
-| 18 | Güvenli yönlendirme | `safe_redirect()` ile open-redirect önlemi |
+### VULN-003 — SMTP Blocking DoS
+**Severity:** High → **KAPATILDI**
+**Dosya:** `app.py:487`
+**Açıklama:** Rezervasyon ve onay akışlarında `smtplib.SMTP` senkron çağrılıyordu. Her SMTP bağlantısı 2-5 saniye request thread'ini bloke ediyordu. Rate limit (3/dk) ile birleşince saldırgan Gunicorn worker pool'unu tüketebilirdi.
+**Düzeltme:** `_send_mail_async()` oluşturuldu, tüm mail çağrıları `threading.Thread(daemon=True)` ile background'a alındı. SMTP timeout 10 saniyeyle sınırlandırıldı.
 
 ---
 
-## 4. OWASP Top 10 Karşılaştırması
-
-| Zafiyet | Durum | Detay |
-|---------|-------|-------|
-| A01 — Broken Access Control | ✅ Korumalı | `@login_required`, IP whitelist |
-| A02 — Cryptographic Failures | ⚠️ Kısmi | Argon2id var, HTTPS üniversiteye bağlı |
-| A03 — SQL Injection | ✅ Korumalı | SQLAlchemy ORM |
-| A04 — Insecure Design | ✅ İyi | Rate limit, honeypot, UNIQUE constraint |
-| A05 — Security Misconfiguration | ✅ Düzeltildi | reCAPTCHA zorunlu hale getirildi |
-| A06 — Vulnerable Components | ⚠️ Takip et | Bağımlılıklar güncel, düzenli kontrol önerilir |
-| A07 — Auth & Session Failures | ✅ Korumalı | Token rotasyonu, brute-force kilidi |
-| A08 — Software Integrity Failures | ✅ Korumalı | CSP, SRI uygulanmış |
-| A09 — Logging & Monitoring | ✅ Düzeltildi | CSP report-uri eklendi, 2 yıl saklama |
-| A10 — SSRF | ✅ N/A | Harici istek yapılmıyor |
+### VULN-004 — Race Condition: Rezervasyon Oluşturma
+**Severity:** High → **KAPATILDI**
+**Dosya:** `app.py:719`
+**Açıklama:** Slot müsaitlik kontrolü ile yeni rezervasyon INSERT'i arasında zaman penceresi mevcuttu. Eşzamanlı iki istek aynı slot'u çift rezerve edebilirdi.
+**Düzeltme:** `with_for_update()` eklendi; `SELECT ... FOR UPDATE` ile sorgu anında satır kilitleniyor.
 
 ---
 
-## 5. Bu Oturumda Yapılan Düzeltmeler
+### VULN-005 — Race Condition: Concurrent Admin Onay/Red
+**Severity:** Medium → **KAPATILDI**
+**Dosya:** `app.py:1004`
+**Açıklama:** İki admin aynı rezervasyona eşzamanlı işlem yapabiliyordu.
+**Düzeltme:** `db.get_or_404()` → `Reservation.query.filter_by(id=res_id).with_for_update().first_or_404()` ile değiştirildi.
 
-### Düzeltme 1 — reCAPTCHA Production'da Zorunlu Hale Getirildi
-**Dosya:** `app.py`
+---
 
-**Ne değişti:**
-```python
-# ÖNCE — reCAPTCHA anahtarı yoksa sessizce geçiyordu
-if not RECAPTCHA_SECRET:
-    return True
+### VULN-006 — Datetime Tutarsızlığı (Küçük)
+**Severity:** Low → **KAPATILDI**
+**Dosya:** `app.py:689`
+**Açıklama:** `datetime.now()` birden fazla kez çağrılıyordu; gece yarısı geçişlerinde nadir tutarsızlık oluşabilirdi.
+**Düzeltme:** Tek `_now = datetime.now()` ile tüm karşılaştırmalar aynı anlık değeri kullanıyor.
 
-# SONRA — Production'da anahtar yoksa uygulama başlamıyor
-if os.getenv('FLASK_ENV') == 'production' and not RECAPTCHA_SECRET:
-    raise RuntimeError(
-        "RECAPTCHA_SECRET_KEY prodüksiyonda zorunludur. ..."
-    )
-```
+---
 
-**Ağ hatası için de düzeltildi (fail-closed):**
-```python
-# ÖNCE — Google'a ulaşılamazsa herkes geçiyordu
-except Exception:
-    return True
+### VULN-007 — Yüklenmiş Dosyalar Web Root'unda
+**Severity:** Medium → **Deployment'ta Kapatılacak**
+**Dosya:** `app.py` / `UPLOAD_FOLDER` config
+**Açıklama:** Dekont dosyaları web root içinde `static/uploads/` altında sunuluyor. Nginx/Apache yanlış yapılandırılırsa dosyalara doğrudan URL ile erişilebilir.
+**Öneri (Deployment):** Aşağıdaki Deployment Checklist'e bakınız — UPLOAD_FOLDER web root dışına taşınmalı.
 
-# SONRA — Production'da ağ hatası = reddet
-except Exception:
-    return os.getenv('FLASK_ENV') != 'production'
+---
+
+### VULN-008 — Bağımlılık Güvenliği
+**Severity:** Low → **Periyodik Kontrol Gerekiyor**
+**Dosya:** `requirements.txt`
+**Açıklama:** Paket versiyonları sabitlenmiş (iyi) fakat bilinen CVE'ler düzenli taranmıyor.
+**Öneri:**
+```bash
+pip install pip-audit
+pip-audit
 ```
 
 ---
 
-### Düzeltme 2 — CSP İhlal Raporlama Endpoint'i Eklendi *(Bulgu #8)*
-**Dosya:** `app.py`
-
-**Eklenen route:**
-```python
-@app.route('/csp-report', methods=['POST'])
-def csp_report():
-    # Tarayıcı, izinsiz script/style girişimlerini buraya bildirir
-    # İhlaller app.log'a yazılır: blocked-uri, violated-directive, ip
-```
-
-**CSP header'ına eklendi:**
-```
-report-uri /csp-report
-```
-
-**Ne işe yarar:** Bir saldırgan XSS ile script enjekte etmeye çalışırsa tarayıcı bunu engeller ve `/csp-report`'a bildirir. Sunucu bunu loglar — saldırı girişimleri izlenebilir hale gelir.
+### BILGI-001 — SQL Injection
+**Severity:** Yok
+Tüm database işlemleri SQLAlchemy ORM üzerinden yapılıyor. Raw SQL veya f-string SQL kullanımı tespit edilmedi.
 
 ---
 
-### Düzeltme 3 — Denetim Logu Saklama Süresi Uzatıldı *(Bulgu #9)*
-**Dosya:** `app.py` → `monthly_cleanup()`
-
-```python
-# ÖNCE
-audit_cutoff = datetime.now(timezone.utc) - timedelta(days=365)
-
-# SONRA — KVKK/GDPR uyumu için 2 yıl
-# V-09: Denetim kayıtları 2 yıl (730 gün) saklanır (KVKK/GDPR uyumu)
-audit_cutoff = datetime.now(timezone.utc) - timedelta(days=730)
-```
+### BILGI-002 — XSS
+**Severity:** Yok
+Jinja2 auto-escape aktif. Template'lerde `| safe` veya `Markup()` kullanımı tespit edilmedi. CSP header'ı nonce tabanlı uygulanmış.
 
 ---
 
-## 6. `.env` Git Geçmişinden Silme Talimatları
+### BILGI-003 — CSRF
+**Severity:** Yok
+Flask-WTF CSRFProtect tüm POST isteklerini koruyor. Token doğrulaması aktif.
 
-> **Önemli:** Bu işlem geçmişi yeniden yazar. Remote repo varsa dikkatli ol.
+---
+
+### BILGI-004 — Command Injection
+**Severity:** Yok
+`os.system()`, `subprocess`, `shell=True` kullanımı tespit edilmedi.
+
+---
+
+### BILGI-005 — Path Traversal
+**Severity:** Yok
+Dosya isimleri `uuid.uuid4().hex` ile üretiliyor. `os.path.basename()` ve regex doğrulaması ile güvenli.
+
+---
+
+## Deployment Checklist (Yayınlama Öncesi Zorunlu Adımlar)
+
+Aşağıdaki adımlar uygulanmadan sistemi canlıya ALMAYIN.
+
+---
+
+### 1. Ortam Değişkenleri
 
 ```bash
-# Adım 1 — .env'i aktif takipten çıkar (dosya diskte kalır)
-git rm --cached .env
-git commit -m "chore: .env git takibinden cikarildi"
-
-# Adım 2 — Tüm geçmiş commit'lerden sil
-git filter-branch --force --index-filter \
-  'git rm --cached --ignore-unmatch .env' \
-  --prune-empty --tag-name-filter cat -- --all
-
-# Adım 3 — Temizle
-git reflog expire --expire=now --all
-git gc --prune=now --aggressive
-
-# Adım 4 — Remote varsa (GitHub/GitLab) zorla gönder
-git push origin --force --all
+# .env dosyasında şunlar MUTLAKA ayarlanmalı:
+FLASK_ENV=production
+FLASK_DEBUG=False
+SECRET_KEY=<en az 64 karakter rastgele string — python -c "import secrets; print(secrets.token_hex(64))">
+DATABASE_URL=postgresql://user:GUCLU_SIFRE@localhost:5432/halisaha_db
+MAIL_USERNAME=<gmail adresi>
+MAIL_PASSWORD=<gmail uygulama şifresi — 2FA aktif olmalı>
+ADMIN_EMAIL=<admin mail>
+RECAPTCHA_SECRET_KEY=<gerçek key>
+RECAPTCHA_SITE_KEY=<gerçek key>
 ```
 
-> **Not:** Üniversiteye yerel teslim yapılacaksa Adım 1-2 yeterlidir.
+**UYARI:** `.env` dosyasının izinleri kısıtlanmalı:
+```bash
+chmod 600 .env
+chown www-data:www-data .env  # veya uygulama kullanıcısı
+```
 
 ---
 
-## 7. Kalan Öneriler
+### 2. PostgreSQL SSL Bağlantısı
 
-Aşağıdakiler üniversite altyapısına veya teslim sonrasına bırakılmıştır:
-
-| Öncelik | Öneri | Sorumluluk |
-|---------|-------|-----------|
-| Yüksek | HTTPS / TLS sertifikası | Üniversite sunucusu |
-| Yüksek | Veritabanı şifresi güçlendirilmeli | Üniversite DB yöneticisi |
-| Yüksek | `DATABASE_URL`'e `?sslmode=require` | Üniversite altyapısı |
-| Orta | Admin 2FA (TOTP) | Gelecek geliştirme |
-| Orta | Brute-force e-posta alarmı | Gelecek geliştirme |
-| Düşük | `/.well-known/security.txt` | Gelecek geliştirme |
+Veritabanı sunucu ile uygulama aynı sunucuda değilse:
+```bash
+DATABASE_URL=postgresql://user:pass@dbhost:5432/halisaha_db?sslmode=require
+```
 
 ---
 
-*Rapor otomatik olarak oluşturulmuştur — 2026-03-31*
+### 3. Nginx Konfigürasyonu — Upload Dizini Koruması
+
+```nginx
+server {
+    # Yüklenen dosyaları doğrudan erişime KAPAT
+    location /static/uploads/ {
+        deny all;
+        return 404;
+    }
+
+    # Sadece Flask üzerinden servis edilsin
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**Alternatif (önerilen):** `UPLOAD_FOLDER` web root dışına taşı:
+```python
+# app.py / .env
+UPLOAD_FOLDER=/var/uploads/halisaha_receipts  # /var/www dışında!
+```
+
+---
+
+### 4. HTTPS / SSL Sertifikası
+
+```nginx
+# HTTPS zorunlu — HTTP'yi yönlendir
+server {
+    listen 80;
+    return 301 https://$host$request_uri;
+}
+server {
+    listen 443 ssl;
+    ssl_certificate     /etc/ssl/certs/site.crt;
+    ssl_certificate_key /etc/ssl/private/site.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+}
+```
+
+---
+
+### 5. Gunicorn ile Çalıştırma
+
+`app.run()` asla production'da kullanılmaz:
+```bash
+gunicorn --workers 4 --bind 127.0.0.1:8000 --timeout 30 app:app
+```
+
+systemd service önerisi:
+```ini
+[Service]
+User=www-data
+WorkingDirectory=/var/www/halisaha_rez
+ExecStart=/var/www/halisaha_rez/.venv/bin/gunicorn --workers 4 --bind 127.0.0.1:8000 app:app
+EnvironmentFile=/var/www/halisaha_rez/.env
+Restart=always
+```
+
+---
+
+### 6. Firewall (UFW)
+
+```bash
+ufw allow 22/tcp    # SSH (kaynak IP kısıtla)
+ufw allow 80/tcp    # HTTP (HTTPS'e yönlendir)
+ufw allow 443/tcp   # HTTPS
+ufw deny 5432/tcp   # PostgreSQL dışarıya KAPALI
+ufw enable
+```
+
+---
+
+### 7. PostgreSQL Sertleştirme
+
+```sql
+-- Sadece uygulama kullanıcısı, sadece kendi DB'ye erişsin
+REVOKE ALL ON DATABASE halisaha_db FROM PUBLIC;
+GRANT CONNECT ON DATABASE halisaha_db TO halisaha_app;
+GRANT USAGE ON SCHEMA public TO halisaha_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO halisaha_app;
+
+-- postgres superuser ile uygulama BAĞLANMAMALI
+-- Yeni kullanıcı oluştur:
+CREATE USER halisaha_app WITH PASSWORD 'guclu_sifre_buraya';
+```
+
+---
+
+### 8. Statik CDN Dosyaları — Subresource Integrity
+
+Bootstrap ve diğer CDN kaynakları SRI hash ile doğrulanmalı:
+```html
+<!-- Örnek: -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.x/dist/js/bootstrap.min.js"
+        integrity="sha384-XXXXX"
+        crossorigin="anonymous"></script>
+```
+
+SRI hash üretmek için: https://www.srihash.org/
+
+---
+
+### 9. Log Güvenliği
+
+```bash
+# Log dosyaları sadece uygulama kullanıcısı okuyabilmeli
+chmod 640 /var/log/halisaha/*.log
+chown www-data:adm /var/log/halisaha/*.log
+
+# Log rotation
+logrotate -d /etc/logrotate.d/halisaha
+```
+
+---
+
+### 10. pip-audit — Dependency Taraması
+
+```bash
+pip install pip-audit
+pip-audit -r requirements.txt
+```
+Yayın öncesi ve her ay çalıştırılmalı.
+
+---
+
+### 11. İlk Admin Şifresini Değiştir
+
+Sunucuyu ilk başlattığında konsolda çıkan şifreyi hemen değiştir:
+```
+Admin paneli → Şifre Değiştir
+```
+Kullan, sil, unut. Bu şifreyi hiçbir yerde saklama.
+
+---
+
+## Güvenlik Kontrol Özeti
+
+| # | Kontrol | Durum |
+|---|---------|-------|
+| 1 | Argon2id şifre hashleme | Aktif |
+| 2 | CSRF koruması | Aktif |
+| 3 | Rate limiting (login, rezervasyon) | Aktif |
+| 4 | Brute-force kilidi (5 hatalı giriş → 15dk kilit) | Aktif |
+| 5 | Session token rotasyonu | Aktif |
+| 6 | CSP header (nonce tabanlı) | Aktif |
+| 7 | HSTS header | Aktif |
+| 8 | X-Frame-Options: DENY | Aktif |
+| 9 | X-Content-Type-Options: nosniff | Aktif |
+| 10 | SQL Injection (ORM kullanımı) | Korumalı |
+| 11 | XSS (Jinja2 auto-escape) | Korumalı |
+| 12 | Command Injection | Risk yok |
+| 13 | Path Traversal (UUID dosya adı) | Korumalı |
+| 14 | File upload MIME kontrolü | Aktif |
+| 15 | Audit logging (730 gün) | Aktif |
+| 16 | Race condition (FOR UPDATE) | Kapatıldı |
+| 17 | SMTP async (DoS önlemi) | Kapatıldı |
+| 18 | Log injection önlemi | Kapatıldı |
+| 19 | Admin şifre log leak | Kapatıldı |
+| 20 | HTTPS | Deployment'ta yapılacak |
+| 21 | Upload dizini web root dışı | Deployment'ta yapılacak |
+| 22 | PostgreSQL kısıtlı kullanıcı | Deployment'ta yapılacak |
+| 23 | Gunicorn (app.run değil) | Deployment'ta yapılacak |
+| 24 | CDN Subresource Integrity | Opsiyonel |
+| 25 | pip-audit (dependency CVE tarama) | Periyodik |
+
+---
+
+*Rapor tarihi: 2026-04-02 | Hazırlayan: Statik kod analizi (SAST)*

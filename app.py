@@ -573,12 +573,15 @@ def validate_password(password: str) -> list:
 # ─── DENETİM KAYDI (AUDIT LOG) ───────────────────────────────────
 
 def audit(action: str, detail: str = ''):
+    # Log injection onlemi — newline/control karakterleri temizle
+    action = re.sub(r'[\r\n\t]', ' ', action)[:100]
+    detail = re.sub(r'[\r\n\t]', ' ', detail)[:500] if detail else ''
     try:
         db.session.add(AuditLog(
             admin      = current_user.username if current_user.is_authenticated else 'sistem',
             ip_address = get_real_ip(),
             action     = action,
-            detail     = detail[:500] if detail else ''
+            detail     = detail
         ))
         db.session.commit()
     except Exception as e:
@@ -688,9 +691,10 @@ def reserve():
 
     try:
         date_obj     = datetime.strptime(date_str, '%Y-%m-%d').date()
-        current_date = datetime.now().date()
-        current_time = datetime.now().time()
-        max_date     = (datetime.now() + timedelta(days=31)).date()
+        _now         = datetime.now()
+        current_date = _now.date()
+        current_time = _now.time()
+        max_date     = (_now + timedelta(days=31)).date()
 
         if date_obj < current_date:
             flash('Gecmis bir tarihe rezervasyon yapilamaz!', 'danger')
@@ -1476,12 +1480,14 @@ with app.app_context():
         yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
         db.session.add(yeni_admin)
         db.session.commit()
-        logger.info("=" * 60)
-        logger.info("  YENI ADMIN HESABI OLUSTURULDU")
-        logger.info("  Kullanici adi : yonetici")
-        logger.info(f"  Sifre         : {ilk_sifre}")
-        logger.info("  !! Giris yapip sifrenizi hemen degistirin !!")
-        logger.info("=" * 60)
+        # Şifre log dosyasına yazılmaz — sadece konsola yazdırılır
+        print("=" * 60)
+        print("  YENI ADMIN HESABI OLUSTURULDU")
+        print("  Kullanici adi : yonetici")
+        print(f"  Sifre         : {ilk_sifre}")
+        print("  !! Giris yapip sifrenizi hemen degistirin !!")
+        print("=" * 60)
+        logger.info("Yeni admin hesabi olusturuldu (sifre konsola yazildi, log dosyasina yazilmadi).")
     else:
         logger.info("Yonetici hesabi zaten mevcut, atlandi.")
 
