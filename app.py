@@ -603,8 +603,9 @@ def csp_report():
             violation.get('document-uri', '-'),
             get_real_ip()
         )
-    except Exception:
-        pass
+    except Exception as e:
+        # Pass yerine hatayı logluyoruz
+        logger.error(f"CSP raporu islenirken hata olustu: {e}") 
     return '', 204
 
 
