@@ -82,7 +82,8 @@ if len(_secret) < 32:
         "Uretmek icin: python3 -c \"import secrets; print(secrets.token_hex(32))\""
     )
 
-app.config['SECRET_KEY']                     = _secret
+app.config['SECRET_KEY']                     = _secret  # NOSONAR — env'den okunuyor, hard-code degil
+
 app.config['SQLALCHEMY_DATABASE_URI']        = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_POOL_SIZE']           = 10
@@ -1091,7 +1092,7 @@ def update_logo():
 def view_receipt(filename):
     safe_name = os.path.basename(filename)
     if not re.match(r'^[a-f0-9]{32}\.(pdf|jpg|jpeg|png)$', safe_name):
-        logger.warning(f"Gecersiz receipt istegi: {filename} — IP: {get_real_ip()}")
+        logger.warning("Gecersiz receipt istegi: %s — IP: %s", safe_name, get_real_ip())
         return ("Gecersiz dosya adi.", 400)
     return send_from_directory(
         app.config['UPLOAD_FOLDER'],
