@@ -1212,8 +1212,8 @@ def generate_report_pdf():
     expired  = sum(1 for r in reservations if r.status == 'Expired')
     blocked_count = len(blocked_dict)
 
-    summary_text = (  # nosemgrep: raw-html-format
-        f'Toplam: <b>{total}</b> rezervasyon | '
+    summary_text = (  
+        f'Toplam: <b>{total}</b> rezervasyon | '  # nosemgrep: raw-html-format
         f'<font color="#065f3e">Onaylanmis: <b>{approved}</b></font> | '
         f'<font color="#854d0e">Bekleyen: <b>{pending}</b></font> | '
         f'<font color="#9b2c2c">Reddedilen: <b>{rejected}</b></font> | '
