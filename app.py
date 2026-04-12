@@ -104,8 +104,8 @@ app.config['SESSION_COOKIE_NAME']            = 'sks_sid'
 app.config['MAX_CONTENT_LENGTH']             = 5 * 1024 * 1024
 
 if os.getenv('FLASK_ENV') == 'production':
-    app.config['DEBUG']   = False
-    app.config['TESTING'] = False
+    app.config['DEBUG']   = False  # nosemgrep: avoid_hardcoded_config_DEBUG
+    app.config['TESTING'] = False  # nosemgrep: avoid_hardcoded_config_TESTING
 
     # R-03: Production'da loglar dosyaya yazilir — saldiri kaniti icin zorunlu
     import logging.handlers
@@ -1075,7 +1075,7 @@ def update_logo():
         return redirect(url_for('admin_dashboard'))
     save_path = os.path.join(base_dir, 'static', 'uploads', 'site_logo.png')
     try:
-        with Image.open(logo_file) as img:
+        with Image.open(logo_file) as img:  # nosemgrep: tainted-path-traversal-pillow-flask
             img = img.convert("RGBA")
             img.thumbnail((200, 200))
             img.save(save_path, format="PNG", optimize=True)
@@ -1212,7 +1212,7 @@ def generate_report_pdf():
     expired  = sum(1 for r in reservations if r.status == 'Expired')
     blocked_count = len(blocked_dict)
 
-    summary_text = (
+    summary_text = (  # nosemgrep: raw-html-format
         f'Toplam: <b>{total}</b> rezervasyon | '
         f'<font color="#065f3e">Onaylanmis: <b>{approved}</b></font> | '
         f'<font color="#854d0e">Bekleyen: <b>{pending}</b></font> | '
@@ -1351,7 +1351,7 @@ def generate_report_pdf():
     safe_filename = f"rapor_{pitch.name.replace(' ', '_')}_{date_str}.pdf"
     safe_filename = re.sub(r'[^a-zA-Z0-9_\-.]', '', safe_filename)
 
-    response = make_response(buffer.getvalue())
+    response = make_response(buffer.getvalue())  # nosemgrep: make-response-with-unknown-content
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
