@@ -1459,11 +1459,19 @@ def apply_security_headers(response):
         f"img-src 'self' data:; "
         f"connect-src 'self'; "
         f"frame-src https://www.google.com; "
-        f"report-uri /csp-report"  # V-08: CSP ihlallerini logla
+        f"frame-ancestors 'none'; "
+        f"form-action 'self'; "
+        f"report-uri /csp-report; "
+        f"report-to csp-endpoint"
     )
 
     if not app.debug:
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+
+    response.headers['Report-To'] = (
+        '{"group":"csp-endpoint","max_age":10886400,'
+        '"endpoints":[{"url":"/csp-report"}]}'
+    )
 
     response.headers.pop('Server', None)
     return response
