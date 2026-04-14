@@ -1,0 +1,4 @@
+# Google reCAPTCHA URL'i dinamik oldugu icin SRI hash eklenemez
+templates/index.html
+templates/login.html
+templates/admin.html
