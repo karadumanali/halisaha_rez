@@ -1,15 +1,26 @@
-from flask_sqlalchemy import SQLAlchemy
+"""
+models.py — Veritabanı modelleri.
+
+7 tablo: admins, pitches, pitch_images, reservations,
+         blocked_slots, login_attempts, audit_logs
+
+Önemli: db nesnesi extensions.py'den import edilir (circular import önlemi).
+"""
+
 from flask_login import UserMixin
 from datetime import datetime, timezone
 import uuid
 
-db = SQLAlchemy()
+from extensions import db
+
 
 # Timezone-aware UTC yardımcı fonksiyon
 def utcnow():
     return datetime.now(timezone.utc)
 
-# 1. ADMIN TABLOSU
+
+# ── 1. ADMIN TABLOSU ──────────────────────────────────────────────
+
 class Admin(UserMixin, db.Model):
     __tablename__ = 'admins'
 
@@ -23,7 +34,9 @@ class Admin(UserMixin, db.Model):
     def __repr__(self):
         return f'<Admin {self.username}>'
 
-# 2. HALI SAHA TABLOSU
+
+# ── 2. HALI SAHA TABLOSU ──────────────────────────────────────────
+
 class Pitch(db.Model):
     __tablename__ = 'pitches'
 
@@ -38,7 +51,9 @@ class Pitch(db.Model):
     def __repr__(self):
         return f'<Pitch {self.name}>'
 
-# 3. SAHA RESİMLERİ TABLOSU
+
+# ── 3. SAHA RESİMLERİ TABLOSU ────────────────────────────────────
+
 class PitchImage(db.Model):
     __tablename__ = 'pitch_images'
 
@@ -47,11 +62,13 @@ class PitchImage(db.Model):
     image_filename = db.Column(db.String(255), nullable=False)
     created_at     = db.Column(db.DateTime,    default=utcnow)
 
-# 4. REZERVASYON TABLOSU
+
+# ── 4. REZERVASYON TABLOSU ────────────────────────────────────────
+
 class Reservation(db.Model):
     __tablename__ = 'reservations'
 
-    # V-06: UNIQUE constraint — ayni saha + tarih + saat icin cift rezervasyon engeli
+    # V-06: UNIQUE constraint — aynı saha + tarih + saat için çift rezervasyon engeli
     __table_args__ = (
         db.UniqueConstraint('pitch_id', 'date', 'time_slot',
                             name='uq_reservation_active_slot'),
@@ -71,7 +88,9 @@ class Reservation(db.Model):
     def __repr__(self):
         return f'<Reservation {self.date} {self.time_slot} - {self.status}>'
 
-# 5. KİLİTLİ SLOT TABLOSU
+
+# ── 5. KİLİTLİ SLOT TABLOSU ──────────────────────────────────────
+
 class BlockedSlot(db.Model):
     __tablename__ = 'blocked_slots'
 
@@ -86,7 +105,9 @@ class BlockedSlot(db.Model):
     def __repr__(self):
         return f'<BlockedSlot {self.date} {self.time_slot} pitch={self.pitch_id}>'
 
-# 6. GİRİŞ DENEMELERİ TABLOSU (Brute-Force koruması)
+
+# ── 6. GİRİŞ DENEMELERİ TABLOSU (Brute-Force koruması) ──────────
+
 class LoginAttempt(db.Model):
     __tablename__ = 'login_attempts'
 
@@ -99,7 +120,9 @@ class LoginAttempt(db.Model):
     def __repr__(self):
         return f'<LoginAttempt {self.ip_address} {self.attempted_at} success={self.success}>'
 
-# 7. DENETİM KAYITLARI TABLOSU (Audit Log)
+
+# ── 7. DENETİM KAYITLARI TABLOSU (Audit Log) ─────────────────────
+
 class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 

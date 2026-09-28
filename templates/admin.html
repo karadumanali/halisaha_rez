@@ -397,6 +397,41 @@
 }
 .btn-unblock:hover { background: var(--danger); color: var(--white); }
 
+/* Toplu kilit kaldırma */
+.bulk-unblock-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; margin-bottom: 10px;
+    background: #faf5ff; border: 1.5px solid #e9d5ff;
+    border-radius: var(--r-sm); flex-wrap: wrap;
+}
+.bulk-unblock-bar .select-all-wrap {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.82rem; font-weight: 700; color: #6b21a8;
+    cursor: pointer; user-select: none;
+}
+.bulk-unblock-bar .select-all-wrap input[type="checkbox"] {
+    width: 17px; height: 17px; accent-color: #7c3aed; cursor: pointer;
+}
+.bulk-unblock-bar .bulk-count {
+    font-size: 0.78rem; color: var(--gray-400); font-weight: 600;
+}
+.btn-bulk-unblock {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--danger); color: var(--white);
+    border: none; border-radius: var(--r-xs);
+    padding: 8px 16px; font-size: 0.82rem; font-weight: 700;
+    cursor: pointer; transition: all 0.15s; font-family: var(--font);
+    margin-left: auto;
+}
+.btn-bulk-unblock:hover { background: #b91c1c; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(185,28,28,0.3); }
+.btn-bulk-unblock:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+.block-item-check {
+    flex-shrink: 0; display: flex; align-items: center;
+}
+.block-item-check input[type="checkbox"] {
+    width: 17px; height: 17px; accent-color: #7c3aed; cursor: pointer;
+}
+
 /* Genel butonlar */
 .btn-sm-teal {
     display: inline-flex; align-items: center; gap: 5px;
@@ -1025,7 +1060,7 @@
                     </div>
                 </div>
                 <div class="res-card-foot">
-                    <a href="{{ url_for('view_receipt', filename=res.receipt_filename) }}"
+                    <a href="{{ url_for('admin.view_receipt', filename=res.receipt_filename) }}"
                        target="_blank" rel="noopener noreferrer" class="receipt-btn">
                         <i class="fas fa-file-alt"></i> Dekontu Görüntüle
                     </a>
@@ -1069,7 +1104,7 @@
             {% if pagination.pages > 1 %}
             <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:20px; flex-wrap:wrap;">
                 {% if pagination.has_prev %}
-                <a href="{{ url_for('admin_dashboard', page=pagination.prev_num) }}"
+                <a href="{{ url_for('admin.admin_dashboard', page=pagination.prev_num) }}"
                    style="display:inline-flex; align-items:center; gap:5px; padding:8px 16px;
                           background:var(--white); border:1.5px solid var(--gray-300);
                           border-radius:var(--r-xs); color:var(--gray-600); font-size:0.85rem;
@@ -1087,7 +1122,7 @@
                             {{ p }}
                         </span>
                         {% else %}
-                        <a href="{{ url_for('admin_dashboard', page=p) }}"
+                        <a href="{{ url_for('admin.admin_dashboard', page=p) }}"
                            style="display:inline-flex; align-items:center; justify-content:center;
                                   width:36px; height:36px; background:var(--white);
                                   border:1.5px solid var(--gray-300); border-radius:var(--r-xs);
@@ -1102,7 +1137,7 @@
                 {% endfor %}
 
                 {% if pagination.has_next %}
-                <a href="{{ url_for('admin_dashboard', page=pagination.next_num) }}"
+                <a href="{{ url_for('admin.admin_dashboard', page=pagination.next_num) }}"
                    style="display:inline-flex; align-items:center; gap:5px; padding:8px 16px;
                           background:var(--white); border:1.5px solid var(--gray-300);
                           border-radius:var(--r-xs); color:var(--gray-600); font-size:0.85rem;
@@ -1345,36 +1380,59 @@
                     <span class="head-count">{{ blocked_slots|length }} kilit</span>
                 </div>
                 <div style="padding:18px;">
-                    <div class="block-list">
-                        {% for block in blocked_slots %}
-                        <div class="block-item">
-                            <div class="block-item-icon"><i class="fas fa-lock"></i></div>
-                            <div class="block-item-info">
-                                <div class="block-item-pitch">{{ block.pitch.name }}</div>
-                                <div class="block-item-date">
-                                    <i class="fas fa-calendar-alt"></i> {{ block.date.strftime('%d.%m.%Y') }}
-                                    &nbsp;|&nbsp;
-                                    <i class="fas fa-clock"></i> {{ block.time_slot }}
-                                </div>
-                            </div>
-                            <span class="block-item-reason">
-                                <i class="fas fa-info-circle"></i> {{ block.reason }}
-                            </span>
-                            <form action="/admin/unblock_slot/{{ block.id }}" method="POST" class="d-inline confirm-form"
-                                  data-msg="Bu kilidi kaldırmak istiyor musunuz?">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn-unblock">
-                                    <i class="fas fa-unlock"></i> Kilidi Kaldır
-                                </button>
-                            </form>
+                    {% if blocked_slots %}
+                    <form action="/admin/bulk_unblock_slots" method="POST" id="bulkUnblockForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <!-- Toplu işlem barı -->
+                        <div class="bulk-unblock-bar">
+                            <label class="select-all-wrap">
+                                <input type="checkbox" id="selectAllBlocks">
+                                Tümünü Seç
+                            </label>
+                            <span class="bulk-count" id="bulkBlockCount">0 kilit seçili</span>
+                            <button type="submit" class="btn-bulk-unblock" id="btnBulkUnblock" disabled>
+                                <i class="fas fa-unlock"></i> Seçilenleri Kaldır
+                            </button>
                         </div>
-                        {% else %}
+
+                        <div class="block-list">
+                            {% for block in blocked_slots %}
+                            <div class="block-item">
+                                <div class="block-item-check">
+                                    <input type="checkbox" name="block_ids" value="{{ block.id }}" class="block-check">
+                                </div>
+                                <div class="block-item-icon"><i class="fas fa-lock"></i></div>
+                                <div class="block-item-info">
+                                    <div class="block-item-pitch">{{ block.pitch.name }}</div>
+                                    <div class="block-item-date">
+                                        <i class="fas fa-calendar-alt"></i> {{ block.date.strftime('%d.%m.%Y') }}
+                                        &nbsp;|&nbsp;
+                                        <i class="fas fa-clock"></i> {{ block.time_slot }}
+                                    </div>
+                                </div>
+                                <span class="block-item-reason">
+                                    <i class="fas fa-info-circle"></i> {{ block.reason }}
+                                </span>
+                                <form action="/admin/unblock_slot/{{ block.id }}" method="POST" class="d-inline confirm-form"
+                                      data-msg="Bu kilidi kaldırmak istiyor musunuz?">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn-unblock">
+                                        <i class="fas fa-unlock"></i> Kaldır
+                                    </button>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="block-list">
                         <div class="empty-state-sm">
                             <i class="fas fa-unlock"></i>
                             Aktif slot kilidi bulunmuyor.
                         </div>
-                        {% endfor %}
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -1978,6 +2036,42 @@ function bindReportForm() {
     pitchInput.addEventListener('change', checkReportForm);
 }
 
+/* ══ Toplu kilit kaldırma ══ */
+function initBulkUnblock() {
+    var selectAll = document.getElementById('selectAllBlocks');
+    var checks    = document.querySelectorAll('.block-check');
+    var countEl   = document.getElementById('bulkBlockCount');
+    var btnBulk   = document.getElementById('btnBulkUnblock');
+    var form      = document.getElementById('bulkUnblockForm');
+
+    if (!selectAll || !checks.length) return;
+
+    function updateCount() {
+        var checked = document.querySelectorAll('.block-check:checked').length;
+        countEl.textContent = checked + ' kilit seçili';
+        btnBulk.disabled = (checked === 0);
+        selectAll.checked = (checked === checks.length);
+        selectAll.indeterminate = (checked > 0 && checked < checks.length);
+    }
+
+    selectAll.addEventListener('change', function() {
+        checks.forEach(function(cb) { cb.checked = selectAll.checked; });
+        updateCount();
+    });
+
+    checks.forEach(function(cb) {
+        cb.addEventListener('change', updateCount);
+    });
+
+    form.addEventListener('submit', function(e) {
+        var checked = document.querySelectorAll('.block-check:checked').length;
+        if (checked === 0) { e.preventDefault(); return; }
+        if (!confirm('Seçili ' + checked + ' slot kilidini kaldırmak istiyor musunuz?\n\nBu işlem geri alınamaz.')) {
+            e.preventDefault();
+        }
+    });
+}
+
 /* ══ DOMContentLoaded — tüm bağlamalar burada ══ */
 document.addEventListener('DOMContentLoaded', function() {
     /* Tab navigasyon */
@@ -2000,6 +2094,9 @@ document.addEventListener('DOMContentLoaded', function() {
     /* Kilitle butonu */
     var btnBlock = document.getElementById('btnSubmitBlock');
     if (btnBlock) btnBlock.addEventListener('click', submitBlock);
+
+    /* Toplu kilit kaldırma */
+    initBulkUnblock();
 });
 </script>
 

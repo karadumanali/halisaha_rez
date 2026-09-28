@@ -138,7 +138,7 @@
 
         <div class="login-body">
 
-            <form method="POST" action="{{ url_for('admin_login') }}" novalidate>
+            <form method="POST" action="{{ url_for('auth.admin_login') }}" novalidate>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <!-- reCAPTCHA v3 token — JS tarafından doldurulur -->
                 <input type="hidden" name="g-recaptcha-response" id="gRecaptchaLogin">
@@ -185,7 +185,7 @@
         </div>
 
         <div class="login-footer">
-            <a href="{{ url_for('index') }}" class="back-link">
+            <a href="{{ url_for('public.index') }}" class="back-link">
                 <i class="fas fa-arrow-left"></i> Rezervasyon Sayfasına Dön
             </a>
         </div>

@@ -621,6 +621,10 @@ function checkStep1() {
             warnText.textContent = 'En fazla 1 ay ilerisine rezervasyon yapılabilir. (' + maxStr + ' tarihine kadar)';
             warnBox.classList.add('visible');
             dateInput.value = ''; /* seçimi temizle */
+        } else if (sel.getDay() === 0 || sel.getDay() === 6) {
+            warnText.textContent = 'Hafta sonları (Cumartesi-Pazar) rezervasyon yapılamaz. Lütfen hafta içi bir tarih seçin.';
+            warnBox.classList.add('visible');
+            dateInput.value = '';
         } else {
             warnBox.classList.remove('visible');
             dateValid = true;
