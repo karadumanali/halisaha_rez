@@ -1,0 +1,155 @@
+        <!-- ══ TAB 3: SLOT KİLİTLERİ ══ -->
+        <div class="tab-panel" id="tab-kilitler">
+
+            <div class="panel-heading">
+                <div class="panel-icon purple"><i class="fas fa-lock"></i></div>
+                <div>
+                    <div class="panel-title">Slot Kilitleri</div>
+                    <div class="panel-sub">{{ blocked_slots|length }} aktif kilit</div>
+                </div>
+            </div>
+
+            <div class="block-form-card">
+                <h3>
+                    <i class="fas fa-lock"></i> Yeni Slot Kilitle
+                    <span style="font-size:0.75rem;font-weight:600;color:var(--gray-400);margin-left:6px;">— Birden fazla seçim yapabilirsiniz</span>
+                </h3>
+
+                <form id="blockForm" action="/admin/block_slot" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div id="blockHiddenInputs"></div>
+
+                    <div class="block-grid">
+
+                        <!-- 1. SAHA -->
+                        <div>
+                            <label class="form-label"><i class="fas fa-futbol"></i> Saha <span class="multi-hint">(çoklu)</span></label>
+                            <div class="multi-pick-list" id="pitchPicker">
+                                {% for pitch in pitches %}
+                                <div class="multi-pick-item" data-val="{{ pitch.id }}" data-pick-type="pitch">
+                                    <i class="fas fa-futbol"></i> {{ pitch.name }}
+                                    <i class="fas fa-check pick-check"></i>
+                                </div>
+                                {% endfor %}
+                                {% if not pitches %}
+                                <div style="padding:12px;color:var(--gray-400);font-size:0.85rem;">Henüz saha yok.</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 2. TARİH TAKVİMİ -->
+                        <div>
+                            <label class="form-label"><i class="fas fa-calendar-alt"></i> Tarih <span class="multi-hint">(çoklu)</span></label>
+                            <div class="cal-wrap">
+                                <div class="cal-nav">
+                                    <button type="button" class="cal-nav-btn" id="calPrev"><i class="fas fa-chevron-left"></i></button>
+                                    <span class="cal-month-label" id="calMonthLabel"></span>
+                                    <button type="button" class="cal-nav-btn" id="calNext"><i class="fas fa-chevron-right"></i></button>
+                                </div>
+                                <div class="cal-grid" id="calGrid"></div>
+                                <div class="cal-selected-tags" id="calSelectedTags"></div>
+                            </div>
+                        </div>
+
+                        <!-- 3. SAAT -->
+                        <div>
+                            <label class="form-label"><i class="fas fa-clock"></i> Saat Dilimi <span class="multi-hint">(çoklu)</span></label>
+                            <div class="multi-pick-list" id="slotPicker">
+                                {% set slots = ['16:00 - 17:00','17:00 - 18:00','18:00 - 19:00','19:00 - 20:00','20:00 - 21:00','21:00 - 22:00','22:00 - 23:00'] %}
+                                {% for s in slots %}
+                                <div class="multi-pick-item" data-val="{{ s }}" data-pick-type="slot">
+                                    <i class="fas fa-clock"></i> {{ s }}
+                                    <i class="fas fa-check pick-check"></i>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- 4. SEBEP + ÖZET + BUTON -->
+                        <div class="block-action-col">
+                            <label class="form-label"><i class="fas fa-comment"></i> Kilitleme Sebebi</label>
+                            <textarea id="bReason" name="reason" class="form-control"
+                                      maxlength="150" rows="5"
+                                      placeholder="Örn: Bahar Şenlikleri sebebiyle sahamız kullanılamamaktadır."
+                                      style="resize:vertical;min-height:110px;line-height:1.5;"></textarea>
+                            <div style="text-align:right;font-size:0.72rem;color:var(--gray-400);margin-top:3px;">
+                                <span id="charCount">0</span>/150 karakter
+                            </div>
+                            <div class="block-summary" id="blockSummary" style="display:none;">
+                                <i class="fas fa-info-circle"></i>
+                                <span id="blockSummaryText"></span>
+                            </div>
+                            <button type="button" class="btn-purple" id="btnSubmitBlock">
+                                <i class="fas fa-lock"></i> Kilitle
+                            </button>
+                        </div>
+
+                    </div>
+                </form>
+            </div>
+
+            <!-- Aktif kilitler -->
+            <div class="card" style="overflow:hidden;">
+                <div class="section-head-inline">
+                    <i class="fas fa-lock" style="color:#7c3aed"></i>
+                    <h3>Aktif Slot Kilitleri</h3>
+                    <span class="head-count">{{ blocked_slots|length }} kilit</span>
+                </div>
+                <div style="padding:18px;">
+                    {% if blocked_slots %}
+                    <form action="/admin/bulk_unblock_slots" method="POST" id="bulkUnblockForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <!-- Toplu işlem barı -->
+                        <div class="bulk-unblock-bar">
+                            <label class="select-all-wrap">
+                                <input type="checkbox" id="selectAllBlocks">
+                                Tümünü Seç
+                            </label>
+                            <span class="bulk-count" id="bulkBlockCount">0 kilit seçili</span>
+                            <button type="submit" class="btn-bulk-unblock" id="btnBulkUnblock" disabled>
+                                <i class="fas fa-unlock"></i> Seçilenleri Kaldır
+                            </button>
+                        </div>
+
+                        <div class="block-list">
+                            {% for block in blocked_slots %}
+                            <div class="block-item">
+                                <div class="block-item-check">
+                                    <input type="checkbox" name="block_ids" value="{{ block.id }}" class="block-check">
+                                </div>
+                                <div class="block-item-icon"><i class="fas fa-lock"></i></div>
+                                <div class="block-item-info">
+                                    <div class="block-item-pitch">{{ block.pitch.name }}</div>
+                                    <div class="block-item-date">
+                                        <i class="fas fa-calendar-alt"></i> {{ block.date.strftime('%d.%m.%Y') }}
+                                        &nbsp;|&nbsp;
+                                        <i class="fas fa-clock"></i> {{ block.time_slot }}
+                                    </div>
+                                </div>
+                                <span class="block-item-reason">
+                                    <i class="fas fa-info-circle"></i> {{ block.reason }}
+                                </span>
+                                <form action="/admin/unblock_slot/{{ block.id }}" method="POST" class="d-inline confirm-form"
+                                      data-msg="Bu kilidi kaldırmak istiyor musunuz?">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn-unblock">
+                                        <i class="fas fa-unlock"></i> Kaldır
+                                    </button>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </form>
+                    {% else %}
+                    <div class="block-list">
+                        <div class="empty-state-sm">
+                            <i class="fas fa-unlock"></i>
+                            Aktif slot kilidi bulunmuyor.
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div><!-- /tab-kilitler -->

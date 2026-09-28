@@ -1,0 +1,89 @@
+        <!-- ══ TAB 5: PDF RAPOR — Minimalist Modern Redesign ══ -->
+        <div class="tab-panel" id="tab-rapor">
+
+            <div class="panel-heading">
+                <div class="panel-icon teal"><i class="fas fa-file-pdf"></i></div>
+                <div>
+                    <div class="panel-title">PDF Rapor</div>
+                    <div class="panel-sub">Günlük rezervasyon raporunu PDF olarak indirin</div>
+                </div>
+            </div>
+
+            <!-- Rapor Oluştur — clean card, aligned inputs, button bottom-right -->
+            <div class="report-card">
+                <div class="report-section-title">
+                    <i class="fas fa-download"></i>
+                    <h3>Rapor Oluştur</h3>
+                </div>
+                <div class="report-section-sub">Tarih ve saha seçerek rapor oluşturabilirsiniz.</div>
+
+                <form action="/admin/report/pdf" method="POST" id="reportForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- İki input yan yana, üst hizada -->
+                    <div class="report-inputs-row">
+                        <div class="report-field-group">
+                            <label for="reportDate">
+                                <i class="fas fa-calendar-alt"></i> Tarih Seçin
+                            </label>
+                            <input type="date" id="reportDate" name="report_date"
+                                   class="form-control" required>
+                            <div class="report-date-warn" id="reportDateWarn">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span id="reportDateWarnText"></span>
+                            </div>
+                        </div>
+
+                        <div class="report-field-group">
+                            <label for="reportPitch">
+                                <i class="fas fa-futbol"></i> Saha Seçin
+                            </label>
+                            <select id="reportPitch" name="report_pitch_id"
+                                    class="form-control form-select" required>
+                                <option value="">— Saha seçin —</option>
+                                {% for pitch in pitches %}
+                                <option value="{{ pitch.id }}">{{ pitch.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Hint solda, buton sağda -->
+                    <div class="report-footer-row">
+                        <div class="report-hint-msg" id="reportHint">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Tarih ve saha seçerek rapor oluşturabilirsiniz.</span>
+                        </div>
+                        <button type="submit" class="report-download-btn" id="btnDownloadPdf" disabled>
+                            <i class="fas fa-file-pdf"></i> PDF İndir
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Rapor Hakkında — soft pastel card, no border -->
+            <div class="report-info-card">
+                <div class="info-heading">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Rapor Hakkında</span>
+                </div>
+
+                <div class="report-info-item">
+                    <i class="fas fa-table"></i>
+                    <div>
+                        <strong>Rapor içeriği:</strong> Seçilen tarih ve saha için tüm saat dilimlerinin
+                        durumunu ve rezervasyon yapan müşterilerin bilgilerini içerir.
+                        Her durum farklı renkle gösterilir (yeşil=onaylı, sarı=bekleyen, kırmızı=reddedildi).
+                    </div>
+                </div>
+
+                <div class="report-info-item">
+                    <i class="fas fa-shield-alt"></i>
+                    <div>
+                        <strong>Güvenlik:</strong> Her rapor indirme işlemi denetim kayıtlarında loglanır.
+                        PDF yalnızca oturum açmış yöneticiler tarafından oluşturulabilir.
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /tab-rapor -->

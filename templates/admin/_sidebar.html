@@ -1,0 +1,55 @@
+    <aside class="admin-sidebar">
+
+        <div class="sidebar-header">
+            <div class="admin-role-tag"><i class="fas fa-shield-alt"></i> Yönetici Paneli</div>
+            <div class="admin-main-title">Yönetim Paneli</div>
+        </div>
+
+        <div class="sidebar-session">
+            <i class="fas fa-shield-alt"></i>
+            <span class="session-timer-val" id="sessionTimerVal">30:00</span>
+            <div class="session-progress">
+                <div class="session-progress-fill" id="sessionProgressFill" style="width:100%"></div>
+            </div>
+            <span id="sessionWarnMsg"><i class="fas fa-exclamation-triangle"></i> Sürüyor!</span>
+        </div>
+
+        <!-- data-tab attribute ile tab yönlendirme — inline onclick YOK (CSP uyumu) -->
+        <nav class="sidebar-nav" role="tablist">
+            <div class="sidebar-nav-item active" data-tab="rezervasyonlar" role="tab" tabindex="0">
+                <div class="nav-icon"><i class="fas fa-clipboard-list"></i></div>
+                <span>Rezervasyonlar</span>
+                {% if pending_count > 0 %}<span class="nav-badge warn">{{ pending_count }}</span>{% endif %}
+            </div>
+            <div class="sidebar-nav-item" data-tab="sahalar" role="tab" tabindex="0">
+                <div class="nav-icon"><i class="fas fa-futbol"></i></div>
+                <span>Sahalar</span>
+            </div>
+            <div class="sidebar-nav-item" data-tab="kilitler" role="tab" tabindex="0">
+                <div class="nav-icon"><i class="fas fa-lock"></i></div>
+                <span>Slot Kilitleri</span>
+                {% if blocked_count > 0 %}<span class="nav-badge purple">{{ blocked_count }}</span>{% endif %}
+            </div>
+            <div class="sidebar-nav-item" data-tab="denetim" role="tab" tabindex="0">
+                <div class="nav-icon"><i class="fas fa-history"></i></div>
+                <span>Denetim Kayıtları</span>
+            </div>
+            <div class="sidebar-nav-item" data-tab="rapor" role="tab" tabindex="0">
+                <div class="nav-icon"><i class="fas fa-file-pdf"></i></div>
+                <span>PDF Rapor</span>
+            </div>
+            <!-- Şifre Değiştir — nav item olarak, diğerleriyle aynı stilde -->
+            <div class="sidebar-nav-item" id="btnChangePw" role="button" tabindex="0"
+                 style="border-top:1.5px solid var(--gray-200); margin-top:4px;">
+                <div class="nav-icon"><i class="fas fa-key"></i></div>
+                <span>Şifre Değiştir</span>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <a href="/logout" class="btn-logout" id="logoutBtn">
+                <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+            </a>
+        </div>
+
+    </aside>

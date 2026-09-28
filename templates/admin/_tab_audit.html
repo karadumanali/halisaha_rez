@@ -1,0 +1,78 @@
+        <!-- ══ TAB 4: DENETİM KAYITLARI ══ -->
+        <div class="tab-panel" id="tab-denetim">
+
+            <div class="panel-heading">
+                <div class="panel-icon teal"><i class="fas fa-history"></i></div>
+                <div>
+                    <div class="panel-title">Denetim Kayıtları</div>
+                    <div class="panel-sub">Son 200 admin işlemi</div>
+                </div>
+            </div>
+
+            <div class="card" style="overflow:hidden;">
+                <div class="section-head-inline">
+                    <i class="fas fa-shield-alt" style="color:var(--teal)"></i>
+                    <h3>İşlem Geçmişi</h3>
+                    <span class="head-count">{{ audit_logs|length }} kayıt</span>
+                </div>
+                <div style="padding:16px;">
+                    <!-- Arama -->
+                    <div class="audit-filter-row">
+                        <input type="text" id="auditSearch" class="audit-search"
+                               placeholder="İşlem, kullanıcı veya detay ara...">
+                    </div>
+
+                    <!-- Başlık -->
+                    <div class="audit-item" style="background:var(--gray-50);border-color:var(--gray-300);margin-bottom:4px;">
+                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">Tarih / Saat</span>
+                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">Kullanıcı</span>
+                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">İşlem</span>
+                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">Detay</span>
+                    </div>
+
+                    <div class="audit-list" id="auditList">
+                    {% for log in audit_logs %}
+                    {% set action_map = {
+                        'admin_giris':           ('action-giris',  'fas fa-sign-in-alt',  'Giriş'),
+                        'admin_cikis':           ('action-cikis',  'fas fa-sign-out-alt', 'Çıkış'),
+                        'rezervasyon_onayla':    ('action-onayla', 'fas fa-check',        'Rezervasyon Onay'),
+                        'rezervasyon_reddet':    ('action-reddet', 'fas fa-times',        'Rezervasyon Red'),
+                        'saha_ekle':             ('action-saha',   'fas fa-plus',         'Saha Ekle'),
+                        'saha_fiyat_guncelle':   ('action-saha',   'fas fa-pen',          'Fiyat Güncelle'),
+                        'saha_sil':              ('action-reddet', 'fas fa-trash',        'Saha Sil'),
+                        'slot_kilitle':          ('action-slot',   'fas fa-lock',         'Slot Kilitle'),
+                        'slot_kilit_kaldir':     ('action-slot',   'fas fa-unlock',       'Kilit Kaldır'),
+                        'sifre_degistir':        ('action-sifre',  'fas fa-key',          'Şifre Değiştir'),
+                        'logo_guncelle':         ('action-logo',   'fas fa-image',        'Logo Güncelle'),
+                        'otomatik_suresi_doldu': ('action-expired','fas fa-clock',        'Otomatik Süre Dolumu'),
+                        'otomatik_kilit_temizlik':('action-slot', 'fas fa-unlock',       'Otomatik Kilit Temizlik'),
+                        'rapor_indir':          ('action-logo',   'fas fa-file-pdf',     'PDF Rapor İndir'),
+                    } %}
+                    {% set meta = action_map.get(log.action, ('action-diger', 'fas fa-circle', log.action)) %}
+                    <div class="audit-item" data-search="{{ log.admin }} {{ log.action }} {{ log.detail }} {{ log.ip_address }}">
+                        <span class="audit-time">
+                            {{ log.created_at.strftime('%d.%m.%Y %H:%M') }}
+                        </span>
+                        <span class="audit-admin">
+                            <i class="fas fa-user" style="font-size:0.7rem;opacity:0.6;"></i>
+                            {{ log.admin }}
+                        </span>
+                        <span class="audit-action {{ meta[0] }}">
+                            <i class="{{ meta[1] }}"></i> {{ meta[2] }}
+                        </span>
+                        <span class="audit-detail" title="{{ log.detail }}">
+                            {{ log.detail or '—' }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <div class="empty-state-sm">
+                        <i class="fas fa-history"></i>
+                        Henüz hiç işlem kaydı yok.
+                    </div>
+                    {% endfor %}
+                    </div>
+
+                </div>
+            </div>
+
+        </div><!-- /tab-denetim -->
