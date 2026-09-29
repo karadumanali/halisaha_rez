@@ -7,12 +7,12 @@ Flask-WTF==1.2.2
 WTForms==3.2.1
 SQLAlchemy==2.0.46
 Werkzeug==3.1.8
+Jinja2==3.1.6
 
 # ── Veritabanı Migration ──
 Flask-Migrate==4.1.0
 alembic==1.20.0
 Mako==1.4.3
-Jinja2==3.1.6
 
 # ── Zamanlayıcı ──
 APScheduler==3.11.2
@@ -32,7 +32,9 @@ requests==2.34.2
 
 # ── Dosya Tipi Doğrulama ──
 python-magic==0.4.27
-python-magic-bin==0.4.14
+# libmagic DLL'lerini içerir, sadece Windows'ta gerekir.
+# Linux sunucuda bunun yerine: sudo apt install libmagic1
+python-magic-bin==0.4.14; sys_platform == "win32"
 
 # ── Ortam Değişkenleri ──
 python-dotenv==1.2.1
@@ -49,6 +51,8 @@ colorama==0.4.6
 tzdata==2025.3
 tzlocal==5.3.1
 
-# ── Production (gerektiğinde aktif edin) ──
-# gunicorn==25.3.0
-# psycopg2-binary==2.9.11
+# ── Production ──
+# PostgreSQL sürücüsü
+psycopg2-binary==2.9.13
+# WSGI sunucusu (Windows'ta çalışmaz, sadece Linux sunucuda kurulur)
+gunicorn==25.3.0; sys_platform != "win32"

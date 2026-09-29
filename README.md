@@ -167,7 +167,8 @@ ALLOWED_ADMIN_IPS=sunucu_ip_adresi
 ### 2. Veritabanını Kurun
 
 ```bash
-pip install psycopg2-binary   # PostgreSQL sürücüsü
+sudo apt install libmagic1    # Dosya tipi doğrulaması için sistem kütüphanesi (Linux)
+pip install -r requirements.txt   # gunicorn + psycopg2 dahil
 flask db upgrade              # Tabloları oluşturur
 flask create-admin            # İlk admin hesabı (sadece ilk kurulumda)
 ```
@@ -177,7 +178,6 @@ flask create-admin            # İlk admin hesabı (sadece ilk kurulumda)
 ### 3. Gunicorn ile Çalıştırın
 
 ```bash
-pip install gunicorn
 gunicorn -w 1 --threads 4 -b 127.0.0.1:8000 "run:application"
 ```
 
