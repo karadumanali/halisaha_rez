@@ -30,6 +30,21 @@
 
 </div><!-- /admin-layout -->
 
+<!-- ═══ Özel Onay Modalı ═══ -->
+<div class="sys-modal-overlay" id="sysModal">
+    <div class="sys-modal">
+        <div class="sys-modal-icon" id="sysModalIcon">
+            <i class="fas fa-question-circle"></i>
+        </div>
+        <div class="sys-modal-title" id="sysModalTitle">Onay</div>
+        <div class="sys-modal-body" id="sysModalBody">Devam etmek istiyor musunuz?</div>
+        <div class="sys-modal-actions">
+            <button type="button" class="sys-modal-btn sys-btn-cancel" id="sysModalCancel">Vazgeç</button>
+            <button type="button" class="sys-modal-btn sys-btn-confirm" id="sysModalConfirm">Tamam</button>
+        </div>
+    </div>
+</div>
+
 <script nonce="{{ g.csp_nonce }}" src="{{ url_for('static', filename='js/admin.js') }}"></script>
 
 {%- include "admin/_modal_password.html" -%}

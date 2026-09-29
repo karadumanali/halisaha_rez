@@ -1,0 +1,298 @@
+{% extends "layout.html" %}
+{% block body %}
+<style nonce="{{ g.csp_nonce }}">
+/* ═══════════════════════════════════════════
+   RESERVATION SUCCESS — Takip Kodu Sayfasi
+═══════════════════════════════════════════ */
+
+.success-page {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 20px 0 40px;
+}
+
+/* ── Basarili ikonu ── */
+.success-icon-wrap {
+    text-align: center;
+    margin-bottom: 8px;
+}
+.success-icon {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981, #059669);
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 32px rgba(16,185,129,0.30);
+    animation: successPop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+.success-icon i {
+    font-size: 2.4rem;
+    color: #fff;
+}
+@keyframes successPop {
+    0%   { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.success-title {
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 16px 0 6px;
+}
+.success-subtitle {
+    text-align: center;
+    font-size: 0.95rem;
+    color: var(--gray-600);
+    margin-bottom: 28px;
+}
+
+/* ── Takip kodu karti ── */
+.tracking-card {
+    background: var(--white);
+    border: 2px solid var(--teal);
+    border-radius: var(--r);
+    box-shadow: var(--sh-md);
+    overflow: hidden;
+}
+.tracking-card-header {
+    background: linear-gradient(135deg, var(--teal), var(--teal-dk));
+    color: #fff;
+    padding: 14px 20px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 0.9rem; font-weight: 700;
+}
+.tracking-card-header i { font-size: 1rem; }
+
+.tracking-code-box {
+    padding: 24px 20px;
+    text-align: center;
+}
+.tracking-code-value {
+    font-family: 'Courier New', monospace;
+    font-size: clamp(1.6rem, 5vw, 2.2rem);
+    font-weight: 800;
+    color: var(--teal);
+    letter-spacing: 3px;
+    background: var(--teal-pale);
+    border: 2px dashed var(--teal);
+    border-radius: var(--r-sm);
+    padding: 16px 20px;
+    display: inline-block;
+    user-select: all;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+.tracking-code-value:hover {
+    background: #c0f0dd;
+    box-shadow: 0 0 0 4px rgba(14,168,116,0.15);
+}
+.copy-hint {
+    font-size: 0.78rem;
+    color: var(--gray-400);
+    margin-top: 8px;
+    font-family: var(--font);
+    font-weight: 500;
+}
+.copy-feedback {
+    display: none;
+    font-size: 0.82rem;
+    color: var(--teal);
+    font-weight: 700;
+    margin-top: 6px;
+}
+
+/* ── Rezervasyon detay ozeti ── */
+.res-summary {
+    padding: 0 20px 20px;
+}
+.res-summary-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 0.88rem;
+}
+.res-summary-row:last-child { border-bottom: none; }
+.res-summary-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; flex-shrink: 0;
+}
+.res-summary-icon.green { background: #d0f5e8; color: #059669; }
+.res-summary-icon.blue  { background: #dbeafe; color: #2563eb; }
+.res-summary-icon.amber { background: #fef3c7; color: #d97706; }
+.res-summary-label {
+    font-weight: 500; color: var(--gray-400); font-size: 0.78rem;
+}
+.res-summary-value {
+    font-weight: 700; color: var(--ink);
+}
+
+/* ── Uyari kutusu ── */
+.warning-box {
+    background: var(--warning-bg);
+    border: 1.5px solid var(--warning-bd);
+    border-radius: var(--r-sm);
+    padding: 14px 16px;
+    margin-top: 20px;
+    display: flex; gap: 12px; align-items: flex-start;
+}
+.warning-box i {
+    color: #d97706;
+    font-size: 1.1rem;
+    margin-top: 1px;
+    flex-shrink: 0;
+}
+.warning-box-text {
+    font-size: 0.85rem;
+    color: var(--warning-tx);
+    line-height: 1.5;
+    font-weight: 600;
+}
+.warning-box-text strong {
+    font-weight: 800;
+}
+
+/* ── Butonlar ── */
+.success-actions {
+    display: flex; gap: 10px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+.success-actions .btn { flex: 1; min-width: 140px; justify-content: center; }
+
+/* ── Mobil ── */
+@media (max-width: 480px) {
+    .success-page { padding: 12px 0 30px; }
+    .success-icon { width: 72px; height: 72px; }
+    .success-icon i { font-size: 2rem; }
+    .success-title { font-size: 1.25rem; }
+    .tracking-code-value { font-size: 1.3rem; letter-spacing: 2px; padding: 12px 14px; }
+    .success-actions { flex-direction: column; }
+    .success-actions .btn { min-width: 100%; }
+}
+</style>
+
+<div class="success-page">
+
+    <!-- Basari ikonu -->
+    <div class="success-icon-wrap">
+        <div class="success-icon">
+            <i class="fas fa-check"></i>
+        </div>
+    </div>
+    <div class="success-title">Rezervasyon Talebiniz Alindi!</div>
+    <div class="success-subtitle">Yonetici onayindan sonra rezervasyonunuz kesinlesecektir.</div>
+
+    <!-- Takip Kodu Karti -->
+    <div class="tracking-card">
+        <div class="tracking-card-header">
+            <i class="fas fa-ticket-alt"></i>
+            <span>Takip Kodunuz</span>
+        </div>
+
+        <div class="tracking-code-box">
+            <div class="tracking-code-value" id="trackingCode"
+                 title="Kopyalamak icin tiklayin">{{ tracking_code }}</div>
+            <div class="copy-hint" id="copyHint">
+                <i class="fas fa-copy"></i> Kopyalamak icin koda tiklayin
+            </div>
+            <div class="copy-feedback" id="copyFeedback">
+                <i class="fas fa-check-circle"></i> Kopyalandi!
+            </div>
+        </div>
+
+        <!-- Rezervasyon ozeti -->
+        <div class="res-summary">
+            <div class="res-summary-row">
+                <div class="res-summary-icon green"><i class="fas fa-futbol"></i></div>
+                <div>
+                    <div class="res-summary-label">Saha</div>
+                    <div class="res-summary-value">{{ pitch_name }}</div>
+                </div>
+            </div>
+            <div class="res-summary-row">
+                <div class="res-summary-icon blue"><i class="fas fa-calendar-alt"></i></div>
+                <div>
+                    <div class="res-summary-label">Tarih</div>
+                    <div class="res-summary-value">{{ date_str }}</div>
+                </div>
+            </div>
+            <div class="res-summary-row">
+                <div class="res-summary-icon amber"><i class="fas fa-clock"></i></div>
+                <div>
+                    <div class="res-summary-label">Saat</div>
+                    <div class="res-summary-value">{{ time_slot }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Uyari -->
+    <div class="warning-box">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div class="warning-box-text">
+            <strong>Bu kodu mutlaka kaydedin!</strong>
+            Rezervasyonunuzun durumunu bu kod ile sorgulayabilirsiniz.
+            Kodu kaybederseniz rezervasyonunuzu takip edemezsiniz.
+        </div>
+    </div>
+
+    <!-- Butonlar -->
+    <div class="success-actions">
+        <a href="{{ url_for('public.track_reservation_page') }}" class="btn btn-teal">
+            <i class="fas fa-search"></i> Rezervasyon Sorgula
+        </a>
+        <a href="{{ url_for('public.index') }}" class="btn btn-outline-teal">
+            <i class="fas fa-home"></i> Ana Sayfa
+        </a>
+    </div>
+
+</div>
+
+<script nonce="{{ g.csp_nonce }}">
+document.addEventListener('DOMContentLoaded', function() {
+    var codeEl    = document.getElementById('trackingCode');
+    var hintEl    = document.getElementById('copyHint');
+    var feedEl    = document.getElementById('copyFeedback');
+
+    if (codeEl) {
+        codeEl.addEventListener('click', function() {
+            var text = codeEl.textContent.trim();
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    showCopied();
+                }).catch(function() {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        });
+    }
+
+    function fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); showCopied(); }
+        catch(e) { /* silent */ }
+        document.body.removeChild(ta);
+    }
+
+    function showCopied() {
+        hintEl.style.display = 'none';
+        feedEl.style.display = 'block';
+        setTimeout(function() {
+            feedEl.style.display = 'none';
+            hintEl.style.display = 'block';
+        }, 2000);
+    }
+});
+</script>
+
+{% endblock %}

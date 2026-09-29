@@ -10,8 +10,18 @@ models.py — Veritabanı modelleri.
 from flask_login import UserMixin
 from datetime import datetime, timezone
 import uuid
+import secrets
+import string
 
 from extensions import db
+
+
+def generate_tracking_code():
+    """Benzersiz takip kodu uret: REZ-XXXX-XXXX formatinda."""
+    chars = string.ascii_uppercase + string.digits
+    part1 = ''.join(secrets.choice(chars) for _ in range(4))
+    part2 = ''.join(secrets.choice(chars) for _ in range(4))
+    return f"REZ-{part1}-{part2}"
 
 
 # Timezone-aware UTC yardımcı fonksiyon
@@ -75,6 +85,7 @@ class Reservation(db.Model):
     )
 
     id               = db.Column(db.String(36),  primary_key=True, default=lambda: str(uuid.uuid4()))
+    tracking_code    = db.Column(db.String(13),  unique=True, nullable=False, default=generate_tracking_code)
     pitch_id         = db.Column(db.Integer,     db.ForeignKey('pitches.id'), nullable=False)
     date             = db.Column(db.Date,        nullable=False)
     time_slot        = db.Column(db.String(20),  nullable=False)

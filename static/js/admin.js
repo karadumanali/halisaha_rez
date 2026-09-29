@@ -15,17 +15,153 @@ function switchTab(name) {
     if (activeBtn) activeBtn.classList.add('active');
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   ÖZEL MODAL SİSTEMİ — tarayıcı confirm/alert yerine
+   ──────────────────────────────────────────────────────────────
+   sysConfirm(opts)  → Promise<boolean>  (Tamam=true, Vazgeç=false)
+   sysAlert(opts)    → Promise<void>     (sadece Tamam butonu)
+══════════════════════════════════════════════════════════════════ */
+var _sysModalEl, _sysIconEl, _sysTitleEl, _sysBodyEl, _sysCancelBtn, _sysConfirmBtn, _sysActionsEl;
+var _sysResolve = null;
+
+function _initSysModal() {
+    _sysModalEl   = document.getElementById('sysModal');
+    _sysIconEl    = document.getElementById('sysModalIcon');
+    _sysTitleEl   = document.getElementById('sysModalTitle');
+    _sysBodyEl    = document.getElementById('sysModalBody');
+    _sysCancelBtn = document.getElementById('sysModalCancel');
+    _sysConfirmBtn= document.getElementById('sysModalConfirm');
+    _sysActionsEl = _sysConfirmBtn.parentElement;
+
+    /* Vazgeç */
+    _sysCancelBtn.addEventListener('click', function() { _closeSysModal(false); });
+    /* Tamam */
+    _sysConfirmBtn.addEventListener('click', function() { _closeSysModal(true); });
+    /* Overlay tıklama */
+    _sysModalEl.addEventListener('click', function(e) {
+        if (e.target === _sysModalEl) _closeSysModal(false);
+    });
+    /* ESC tuşu */
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && _sysModalEl.classList.contains('open')) _closeSysModal(false);
+    });
+}
+
+function _closeSysModal(result) {
+    _sysModalEl.classList.remove('open');
+    document.body.style.overflow = '';
+    if (_sysResolve) { _sysResolve(result); _sysResolve = null; }
+}
+
+/**
+ * Özel onay modalı göster
+ * @param {Object} opts
+ * @param {string} opts.title        — Modal başlığı (varsayılan: "Onay")
+ * @param {string} opts.body         — Mesaj metni
+ * @param {string} opts.icon         — İkon tipi: confirm|warning|danger|info|success
+ * @param {string} opts.iconClass    — FontAwesome ikon sınıfı (varsayılan: fa-question-circle)
+ * @param {string} opts.confirmText  — Onay butonu metni (varsayılan: "Tamam")
+ * @param {string} opts.cancelText   — İptal butonu metni (varsayılan: "Vazgeç")
+ * @param {string} opts.confirmStyle — Buton stili: ''|'btn-danger'|'btn-warning'
+ * @returns {Promise<boolean>}
+ */
+function sysConfirm(opts) {
+    opts = opts || {};
+    _sysTitleEl.textContent = opts.title || 'Onay';
+    _sysBodyEl.textContent  = opts.body  || 'Devam etmek istiyor musunuz?';
+
+    var iconType = opts.icon || 'confirm';
+    _sysIconEl.className = 'sys-modal-icon icon-' + iconType;
+    _sysIconEl.innerHTML = '<i class="fas ' + (opts.iconClass || 'fa-question-circle') + '"></i>';
+
+    _sysConfirmBtn.textContent = opts.confirmText || 'Tamam';
+    _sysCancelBtn.textContent  = opts.cancelText  || 'Vazgeç';
+
+    _sysConfirmBtn.className = 'sys-modal-btn sys-btn-confirm';
+    if (opts.confirmStyle) _sysConfirmBtn.classList.add(opts.confirmStyle);
+
+    _sysActionsEl.classList.remove('single-btn');
+    _sysModalEl.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    /* Tamam butonuna odaklan */
+    _sysConfirmBtn.focus();
+
+    return new Promise(function(resolve) { _sysResolve = resolve; });
+}
+
+/**
+ * Özel bilgilendirme/uyarı modalı (tek buton)
+ * @param {Object} opts — sysConfirm ile aynı, cancelText yok
+ * @returns {Promise<void>}
+ */
+function sysAlert(opts) {
+    opts = opts || {};
+    _sysTitleEl.textContent = opts.title || 'Bilgi';
+    _sysBodyEl.textContent  = opts.body  || '';
+
+    var iconType = opts.icon || 'info';
+    _sysIconEl.className = 'sys-modal-icon icon-' + iconType;
+    _sysIconEl.innerHTML = '<i class="fas ' + (opts.iconClass || 'fa-info-circle') + '"></i>';
+
+    _sysConfirmBtn.textContent = opts.confirmText || 'Tamam';
+    _sysConfirmBtn.className = 'sys-modal-btn sys-btn-confirm';
+    if (opts.confirmStyle) _sysConfirmBtn.classList.add(opts.confirmStyle);
+
+    _sysActionsEl.classList.add('single-btn');
+    _sysModalEl.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    _sysConfirmBtn.focus();
+
+    return new Promise(function(resolve) {
+        _sysResolve = function() { resolve(); };
+    });
+}
+
+/* ══════════════════════════════════════════
+   BUTON LOADING STATE
+   setButtonLoading(btn, text) → eski içeriği döner
+   clearButtonLoading(btn, oldHTML)
+══════════════════════════════════════════ */
+function setButtonLoading(btn, loadingText) {
+    if (!btn) return '';
+    var oldHTML = btn.innerHTML;
+    btn.classList.add('btn-loading');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span> ' + (loadingText || 'İşleniyor...');
+    return oldHTML;
+}
+
 /* ══════════════════════════════════════════
    FORM ONAY DİYALOĞU — data-msg bazlı
-   inline onclick YOK → CSP uyumlu
+   → Özel modal ile, loading state ile
 ══════════════════════════════════════════ */
 function bindConfirmForms() {
     document.querySelectorAll('.confirm-form').forEach(function(form) {
         form.addEventListener('submit', function(e) {
-            var msg = form.dataset.msg || 'Devam etmek istiyor musunuz?';
-            if (!confirm(msg)) {
-                e.preventDefault();
-            }
+            e.preventDefault();
+            var msg         = form.dataset.msg || 'Devam etmek istiyor musunuz?';
+            var submitBtn   = form.querySelector('button[type="submit"]');
+            var loadingText = submitBtn ? (submitBtn.dataset.loadingText || 'İşleniyor...') : 'İşleniyor...';
+
+            /* İkon ve stil: reddet formları için danger, diğerleri için confirm */
+            var isDanger = form.action && (form.action.indexOf('/reject') !== -1 || form.action.indexOf('/delete') !== -1);
+            var isPitch  = form.action && form.action.indexOf('/delete_pitch') !== -1;
+
+            sysConfirm({
+                title: isDanger ? 'Dikkat' : 'Onay',
+                body: msg.replace(/&#10;/g, '\n'),
+                icon: isDanger ? 'danger' : 'confirm',
+                iconClass: isDanger ? 'fa-exclamation-triangle' : 'fa-question-circle',
+                confirmText: isPitch ? 'Evet, Sil' : (isDanger ? 'Evet, Reddet' : 'Evet, Onayla'),
+                confirmStyle: isDanger ? 'btn-danger' : ''
+            }).then(function(ok) {
+                if (ok) {
+                    setButtonLoading(submitBtn, loadingText);
+                    form.submit();
+                }
+            });
         });
     });
 }
@@ -57,8 +193,15 @@ function initSessionTimer() {
     function tick() {
         remaining--;
         if (remaining <= 0) {
-            alert('Oturumunuzun süresi doldu.');
-            window.location.href = '/logout';
+            sysAlert({
+                title: 'Oturum Süresi Doldu',
+                body: 'Oturumunuzun süresi doldu. Giriş sayfasına yönlendirileceksiniz.',
+                icon: 'warning',
+                iconClass: 'fa-clock',
+                confirmText: 'Tamam'
+            }).then(function() {
+                window.location.href = '/logout';
+            });
             return;
         }
         var m = Math.floor(remaining / 60), s = remaining % 60;
@@ -185,20 +328,41 @@ function updateSummary() {
 }
 
 function submitBlock() {
-    if (selPitches.length === 0) { alert('En az 1 saha seçin!'); return; }
-    if (selDates.length === 0)   { alert('En az 1 tarih seçin!'); return; }
-    if (selSlots.length === 0)   { alert('En az 1 saat dilimi seçin!'); return; }
-    var total = selPitches.length * selDates.length * selSlots.length;
-    if (!confirm(total + ' slot kilitlenecek. Devam etmek istiyor musunuz?')) return;
-    var container = document.getElementById('blockHiddenInputs');
-    container.innerHTML = '';
-    function addInput(name, val) {
-        var inp = document.createElement('input'); inp.type='hidden'; inp.name=name; inp.value=val; container.appendChild(inp);
+    if (selPitches.length === 0) {
+        sysAlert({ title: 'Eksik Seçim', body: 'En az 1 saha seçin!', icon: 'warning', iconClass: 'fa-exclamation-circle' });
+        return;
     }
-    selPitches.forEach(function(p){ addInput('pitch_ids', p); });
-    selDates.forEach(function(d){   addInput('dates', d); });
-    selSlots.forEach(function(s){   addInput('time_slots', s); });
-    document.getElementById('blockForm').submit();
+    if (selDates.length === 0) {
+        sysAlert({ title: 'Eksik Seçim', body: 'En az 1 tarih seçin!', icon: 'warning', iconClass: 'fa-exclamation-circle' });
+        return;
+    }
+    if (selSlots.length === 0) {
+        sysAlert({ title: 'Eksik Seçim', body: 'En az 1 saat dilimi seçin!', icon: 'warning', iconClass: 'fa-exclamation-circle' });
+        return;
+    }
+    var total = selPitches.length * selDates.length * selSlots.length;
+    sysConfirm({
+        title: 'Slot Kilitleme',
+        body: total + ' slot kilitlenecek.\nDevam etmek istiyor musunuz?',
+        icon: 'warning',
+        iconClass: 'fa-lock',
+        confirmText: 'Kilitle',
+        confirmStyle: 'btn-warning'
+    }).then(function(ok) {
+        if (!ok) return;
+        var container = document.getElementById('blockHiddenInputs');
+        container.innerHTML = '';
+        function addInput(name, val) {
+            var inp = document.createElement('input'); inp.type='hidden'; inp.name=name; inp.value=val; container.appendChild(inp);
+        }
+        selPitches.forEach(function(p){ addInput('pitch_ids', p); });
+        selDates.forEach(function(d){   addInput('dates', d); });
+        selSlots.forEach(function(s){   addInput('time_slots', s); });
+        /* Loading state */
+        var btn = document.getElementById('btnSubmitBlock');
+        setButtonLoading(btn, 'Kilitleniyor...');
+        document.getElementById('blockForm').submit();
+    });
 }
 
 /* Karakter sayacı */
@@ -210,12 +374,22 @@ function bindCharCounter() {
     }
 }
 
-/* Çıkış onayı */
+/* Çıkış onayı → özel modal */
 function bindLogout() {
     var btn = document.getElementById('logoutBtn');
     if (btn) {
         btn.addEventListener('click', function(e) {
-            if (!confirm('Oturumu kapatmak istiyor musunuz?')) e.preventDefault();
+            e.preventDefault();
+            sysConfirm({
+                title: 'Çıkış',
+                body: 'Oturumu kapatmak istiyor musunuz?',
+                icon: 'warning',
+                iconClass: 'fa-sign-out-alt',
+                confirmText: 'Çıkış Yap',
+                confirmStyle: 'btn-danger'
+            }).then(function(ok) {
+                if (ok) window.location.href = btn.href || '/logout';
+            });
         });
     }
 }
@@ -451,16 +625,36 @@ function initBulkUnblock() {
     });
 
     form.addEventListener('submit', function(e) {
+        e.preventDefault();
         var checked = document.querySelectorAll('.block-check:checked').length;
-        if (checked === 0) { e.preventDefault(); return; }
-        if (!confirm('Seçili ' + checked + ' slot kilidini kaldırmak istiyor musunuz?\n\nBu işlem geri alınamaz.')) {
-            e.preventDefault();
-        }
+        if (checked === 0) return;
+        sysConfirm({
+            title: 'Toplu Kilit Kaldırma',
+            body: 'Seçili ' + checked + ' slot kilidini kaldırmak istiyor musunuz?\n\nBu işlem geri alınamaz.',
+            icon: 'danger',
+            iconClass: 'fa-unlock',
+            confirmText: 'Kilitleri Kaldır',
+            confirmStyle: 'btn-danger'
+        }).then(function(ok) {
+            if (ok) {
+                setButtonLoading(btnBulk, 'Kaldırılıyor...');
+                form.submit();
+            }
+        });
     });
 }
 
 /* ══ DOMContentLoaded — tüm bağlamalar burada ══ */
 document.addEventListener('DOMContentLoaded', function() {
+    /* Özel modal sistemi başlat */
+    _initSysModal();
+
+    /* ── Geri tuşuyla public sayfaya dönüşü engelle ── */
+    history.replaceState(null, '', location.href);
+    window.addEventListener('popstate', function() {
+        history.pushState(null, '', location.href);
+    });
+
     /* Tab navigasyon */
     document.querySelectorAll('.sidebar-nav-item[data-tab]').forEach(function(el) {
         el.addEventListener('click',   function(){ switchTab(el.dataset.tab); });

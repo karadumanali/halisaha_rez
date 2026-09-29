@@ -32,7 +32,47 @@
                 </div>
             </div>
 
-            <!-- Filtre butonları — data-filter ile, onclick YOK -->
+            <!-- ═══ Filtre Paneli ═══ -->
+            <div class="adv-filter-panel">
+                <!-- Tarih Filtresi -->
+                <div class="adv-filter-group">
+                    <div class="adv-filter-label"><i class="fas fa-calendar-alt"></i> Tarih</div>
+                    <div class="adv-filter-chips">
+                        <a href="{{ url_for('admin.admin_dashboard', date_range='today', pitch=request.args.get('pitch','all')) }}"
+                           class="filter-chip {{ 'active' if request.args.get('date_range') == 'today' else '' }}">Bugün</a>
+                        <a href="{{ url_for('admin.admin_dashboard', date_range='week', pitch=request.args.get('pitch','all')) }}"
+                           class="filter-chip {{ 'active' if request.args.get('date_range') == 'week' else '' }}">Bu Hafta</a>
+                        <a href="{{ url_for('admin.admin_dashboard', date_range='month', pitch=request.args.get('pitch','all')) }}"
+                           class="filter-chip {{ 'active' if request.args.get('date_range') == 'month' else '' }}">Bu Ay</a>
+                        <a href="{{ url_for('admin.admin_dashboard', pitch=request.args.get('pitch','all')) }}"
+                           class="filter-chip {{ 'active' if not request.args.get('date_range') else '' }}">Tümü</a>
+                    </div>
+                </div>
+                <!-- Saha Filtresi -->
+                <div class="adv-filter-group">
+                    <div class="adv-filter-label"><i class="fas fa-futbol"></i> Saha</div>
+                    <div class="adv-filter-chips">
+                        <a href="{{ url_for('admin.admin_dashboard', date_range=request.args.get('date_range',''), pitch='all') }}"
+                           class="filter-chip {{ 'active' if request.args.get('pitch','all') == 'all' else '' }}">Tümü</a>
+                        {% for p in pitches %}
+                        <a href="{{ url_for('admin.admin_dashboard', date_range=request.args.get('date_range',''), pitch=p.id) }}"
+                           class="filter-chip {{ 'active' if request.args.get('pitch','all')|string == p.id|string else '' }}">{{ p.name }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+                <!-- Aktif filtre göstergesi -->
+                {% if request.args.get('date_range') or (request.args.get('pitch') and request.args.get('pitch') != 'all') %}
+                <div class="adv-filter-active">
+                    <i class="fas fa-filter"></i>
+                    <span>Filtre aktif — {{ filtered_count }} sonuç</span>
+                    <a href="{{ url_for('admin.admin_dashboard') }}" class="filter-clear-link">
+                        <i class="fas fa-times"></i> Temizle
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Durum Filtresi (client-side) -->
             <div class="res-filter-row">
                 <button class="filter-btn active" data-filter="all">Tümü ({{ total_count }})</button>
                 <button class="filter-btn" data-filter="Pending">Bekliyor ({{ pending_count }})</button>
@@ -91,7 +131,7 @@
                         <form action="/admin/status/{{ res.id }}/approve" method="POST" class="d-inline confirm-form"
                               data-msg="Bu rezervasyonu ONAYLAMAK istiyor musunuz?&#10;&#10;Müşteriye onay e-postası gönderilecektir.">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn-approve">
+                            <button type="submit" class="btn-approve" data-loading-text="Onaylanıyor...">
                                 <i class="fas fa-check"></i> Onayla
                             </button>
                         </form>
@@ -99,7 +139,7 @@
                         <form action="/admin/status/{{ res.id }}/reject" method="POST" class="d-inline confirm-form"
                               data-msg="Bu rezervasyonu REDDETMEK istiyor musunuz?&#10;&#10;Bu işlem geri alınamaz.">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn-reject">
+                            <button type="submit" class="btn-reject" data-loading-text="Reddediliyor...">
                                 <i class="fas fa-times"></i> Reddet
                             </button>
                         </form>
@@ -125,7 +165,7 @@
             {% if pagination.pages > 1 %}
             <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:20px; flex-wrap:wrap;">
                 {% if pagination.has_prev %}
-                <a href="{{ url_for('admin.admin_dashboard', page=pagination.prev_num) }}"
+                <a href="{{ url_for('admin.admin_dashboard', page=pagination.prev_num, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all')) }}"
                    style="display:inline-flex; align-items:center; gap:5px; padding:8px 16px;
                           background:var(--white); border:1.5px solid var(--gray-300);
                           border-radius:var(--r-xs); color:var(--gray-600); font-size:0.85rem;
@@ -143,7 +183,7 @@
                             {{ p }}
                         </span>
                         {% else %}
-                        <a href="{{ url_for('admin.admin_dashboard', page=p) }}"
+                        <a href="{{ url_for('admin.admin_dashboard', page=p, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all')) }}"
                            style="display:inline-flex; align-items:center; justify-content:center;
                                   width:36px; height:36px; background:var(--white);
                                   border:1.5px solid var(--gray-300); border-radius:var(--r-xs);
@@ -158,7 +198,7 @@
                 {% endfor %}
 
                 {% if pagination.has_next %}
-                <a href="{{ url_for('admin.admin_dashboard', page=pagination.next_num) }}"
+                <a href="{{ url_for('admin.admin_dashboard', page=pagination.next_num, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all')) }}"
                    style="display:inline-flex; align-items:center; gap:5px; padding:8px 16px;
                           background:var(--white); border:1.5px solid var(--gray-300);
                           border-radius:var(--r-xs); color:var(--gray-600); font-size:0.85rem;

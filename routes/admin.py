@@ -8,7 +8,7 @@ URL prefix: /admin (Blueprint kayıt sırasında verilir)
 import os
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as date_type
 
 from flask import (
     Blueprint, render_template, request, redirect,
@@ -48,16 +48,49 @@ def admin_dashboard():
     auto_cleanup_blocked_slots()
 
     # Sayfalama
-    page     = request.args.get('page', 1, type=int)
-    per_page = 20
+    page       = request.args.get('page', 1, type=int)
+    per_page   = 20
+    date_range = request.args.get('date_range', '')
+    pitch_filter = request.args.get('pitch', 'all')
 
-    pitches    = Pitch.query.all()
-    pagination = Reservation.query.order_by(
+    pitches = Pitch.query.all()
+
+    # Temel sorgu
+    query = Reservation.query
+
+    # Tarih filtresi
+    today = date_type.today()
+    if date_range == 'today':
+        query = query.filter(Reservation.date == today)
+    elif date_range == 'week':
+        week_start = today - timedelta(days=today.weekday())  # Pazartesi
+        week_end   = week_start + timedelta(days=6)           # Pazar
+        query = query.filter(Reservation.date >= week_start, Reservation.date <= week_end)
+    elif date_range == 'month':
+        month_start = today.replace(day=1)
+        # Ayin son gunu
+        if today.month == 12:
+            month_end = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            month_end = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+        query = query.filter(Reservation.date >= month_start, Reservation.date <= month_end)
+
+    # Saha filtresi
+    if pitch_filter and pitch_filter != 'all':
+        try:
+            query = query.filter(Reservation.pitch_id == int(pitch_filter))
+        except (ValueError, TypeError):
+            pass
+
+    pagination = query.order_by(
         Reservation.created_at.desc()
     ).paginate(page=page, per_page=per_page, error_out=False)
     reservations = pagination.items
 
-    # İstatistikler
+    # Filtrelenmis toplam
+    filtered_count = pagination.total
+
+    # Genel istatistikler (filtresiz)
     status_counts = dict(
         db.session.query(Reservation.status, func.count(Reservation.id))
         .group_by(Reservation.status).all()
@@ -76,6 +109,7 @@ def admin_dashboard():
         pagination=pagination,
         status_counts=status_counts,
         total_count=total_count,
+        filtered_count=filtered_count,
         blocked_slots=blocked_slots,
         audit_logs=audit_logs,
         now=datetime.now()

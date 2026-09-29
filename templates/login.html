@@ -233,6 +233,16 @@ if (RECAPTCHA_SITE_KEY) {
         });
     });
 }
+
+/* ── Çıkış sonrası ileri/geri tuşuyla admin paneline dönüşü engelle ── */
+history.replaceState(null, '', location.href);
+window.addEventListener('popstate', function() {
+    history.pushState(null, '', location.href);
+});
+/* bfcache'den geri dönüşte sayfayı yeniden yükle */
+window.addEventListener('pageshow', function(e) {
+    if (e.persisted) location.reload();
+});
 </script>
 
 {% if recaptcha_site_key %}

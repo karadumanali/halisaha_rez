@@ -1,0 +1,369 @@
+{% extends "layout.html" %}
+{% block body %}
+<style nonce="{{ g.csp_nonce }}">
+/* ═══════════════════════════════════════════
+   TRACK PAGE — Rezervasyon Sorgulama
+═══════════════════════════════════════════ */
+
+.track-page {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 20px 0 40px;
+}
+
+/* ── Sayfa basligi ── */
+.track-hero {
+    text-align: center;
+    margin-bottom: 28px;
+}
+.track-hero-icon {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--teal), var(--teal-dk));
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 24px rgba(14,168,116,0.25);
+    margin-bottom: 14px;
+}
+.track-hero-icon i { font-size: 1.8rem; color: #fff; }
+.track-hero h1 {
+    font-size: clamp(1.4rem, 5vw, 1.8rem);
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+}
+.track-hero p {
+    font-size: 0.92rem;
+    color: var(--gray-600);
+    font-weight: 500;
+}
+
+/* ── Sorgulama formu ── */
+.track-form-card {
+    background: var(--white);
+    border: 1.5px solid rgba(0,0,0,0.07);
+    border-radius: var(--r);
+    box-shadow: var(--sh-md);
+    padding: 28px 24px;
+}
+.track-input-wrap {
+    position: relative;
+    margin-bottom: 16px;
+}
+.track-input-wrap .track-icon {
+    position: absolute;
+    left: 14px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-400);
+    font-size: 1rem;
+    pointer-events: none;
+    transition: color 0.2s;
+}
+.track-input {
+    width: 100%;
+    padding: 14px 16px 14px 44px;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--r-sm);
+    font-family: 'Courier New', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--white);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.track-input::placeholder {
+    font-family: var(--font);
+    font-weight: 500;
+    font-size: 0.9rem;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--gray-400);
+}
+.track-input:focus {
+    outline: none;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 4px rgba(14,168,116,0.12);
+}
+.track-input:focus ~ .track-icon { color: var(--teal); }
+
+.track-submit {
+    width: 100%;
+    padding: 14px;
+    font-size: 0.95rem;
+}
+
+.track-hint {
+    text-align: center;
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: var(--gray-400);
+    font-weight: 500;
+}
+.track-hint i { margin-right: 4px; }
+
+/* ── Sonuc karti — Bulundu ── */
+.result-card {
+    background: var(--white);
+    border-radius: var(--r);
+    box-shadow: var(--sh-md);
+    overflow: hidden;
+    margin-top: 24px;
+    animation: resultSlideUp 0.4s ease;
+}
+@keyframes resultSlideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.result-header {
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 12px;
+}
+.result-header.pending  { background: linear-gradient(135deg, #fef9c3, #fde68a); }
+.result-header.approved { background: linear-gradient(135deg, #d0f5e8, #a7f3d0); }
+.result-header.rejected { background: linear-gradient(135deg, #fee2e2, #fecaca); }
+.result-header.expired  { background: linear-gradient(135deg, var(--gray-100), var(--gray-200)); }
+
+.result-status-icon {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; flex-shrink: 0;
+}
+.result-header.pending  .result-status-icon { background: #fbbf24; color: #fff; }
+.result-header.approved .result-status-icon { background: #10b981; color: #fff; }
+.result-header.rejected .result-status-icon { background: #ef4444; color: #fff; }
+.result-header.expired  .result-status-icon { background: var(--gray-400); color: #fff; }
+
+.result-status-text { font-size: 0.82rem; color: var(--gray-600); font-weight: 500; }
+.result-status-label { font-size: 1.1rem; font-weight: 800; }
+.result-header.pending  .result-status-label { color: #92400e; }
+.result-header.approved .result-status-label { color: #065f3e; }
+.result-header.rejected .result-status-label { color: #9b2c2c; }
+.result-header.expired  .result-status-label { color: var(--gray-600); }
+
+.result-body { padding: 20px; }
+
+.result-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 0.88rem;
+}
+.result-row:last-child { border-bottom: none; }
+.result-row-icon {
+    width: 34px; height: 34px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.82rem; flex-shrink: 0;
+    background: var(--gray-50); color: var(--gray-600);
+}
+.result-row-label { font-weight: 500; color: var(--gray-400); font-size: 0.78rem; }
+.result-row-value { font-weight: 700; color: var(--ink); }
+
+/* ── Sonuc — Bulunamadi ── */
+.not-found-card {
+    background: var(--white);
+    border: 2px dashed var(--gray-300);
+    border-radius: var(--r);
+    padding: 36px 24px;
+    text-align: center;
+    margin-top: 24px;
+    animation: resultSlideUp 0.4s ease;
+}
+.not-found-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--gray-100);
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-bottom: 12px;
+}
+.not-found-icon i { font-size: 1.6rem; color: var(--gray-400); }
+.not-found-title {
+    font-size: 1.1rem; font-weight: 800; color: var(--ink);
+    margin-bottom: 6px;
+}
+.not-found-text {
+    font-size: 0.88rem; color: var(--gray-600); font-weight: 500;
+    line-height: 1.5;
+}
+.not-found-tips {
+    margin-top: 16px;
+    text-align: left;
+    display: inline-block;
+}
+.not-found-tips li {
+    font-size: 0.82rem;
+    color: var(--gray-600);
+    margin-bottom: 4px;
+    list-style: none;
+    padding-left: 0;
+}
+.not-found-tips li i {
+    color: var(--teal);
+    margin-right: 6px;
+    font-size: 0.72rem;
+}
+
+/* ── Alt link ── */
+.track-back {
+    text-align: center;
+    margin-top: 24px;
+}
+.track-back a {
+    font-size: 0.88rem;
+    color: var(--teal);
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: color 0.15s;
+}
+.track-back a:hover { color: var(--teal-dk); text-decoration: underline; }
+
+/* ── Mobil ── */
+@media (max-width: 480px) {
+    .track-page { padding: 12px 0 30px; }
+    .track-hero-icon { width: 60px; height: 60px; }
+    .track-hero-icon i { font-size: 1.4rem; }
+    .track-hero h1 { font-size: 1.3rem; }
+    .track-form-card { padding: 20px 16px; }
+    .track-input { font-size: 0.95rem; padding: 12px 12px 12px 40px; }
+    .result-header { padding: 14px 16px; }
+    .result-body { padding: 16px; }
+    .result-status-label { font-size: 1rem; }
+}
+</style>
+
+<div class="track-page">
+
+    <!-- Sayfa basligi -->
+    <div class="track-hero">
+        <div class="track-hero-icon">
+            <i class="fas fa-search"></i>
+        </div>
+        <h1>Rezervasyon Sorgula</h1>
+        <p>Takip kodunuzu girerek rezervasyonunuzun durumunu ogrenin</p>
+    </div>
+
+    <!-- Sorgulama formu -->
+    <div class="track-form-card">
+        <form action="{{ url_for('public.track_reservation') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="track-input-wrap">
+                <i class="fas fa-ticket-alt track-icon"></i>
+                <input type="text"
+                       name="tracking_code"
+                       class="track-input"
+                       placeholder="Ornek: REZ-A7X3-B9K2"
+                       value="{{ code if code else '' }}"
+                       maxlength="13"
+                       autocomplete="off"
+                       autofocus
+                       required>
+            </div>
+
+            <button type="submit" class="btn btn-teal track-submit">
+                <i class="fas fa-search"></i> Sorgula
+            </button>
+        </form>
+        <div class="track-hint">
+            <i class="fas fa-info-circle"></i>
+            Takip kodu, rezervasyon sonrasinda size verilen REZ-XXXX-XXXX formatindaki koddur.
+        </div>
+    </div>
+
+    <!-- Sonuc: Bulundu -->
+    {% if searched and reservation %}
+    {% set status_map = {
+        'Pending':  {'class': 'pending',  'icon': 'fas fa-hourglass-half', 'label': 'Onay Bekliyor',  'desc': 'Rezervasyonunuz yonetici onayini bekliyor.'},
+        'Approved': {'class': 'approved', 'icon': 'fas fa-check-circle',   'label': 'Onaylandi',      'desc': 'Rezervasyonunuz onaylandi! Iyi oyunlar.'},
+        'Rejected': {'class': 'rejected', 'icon': 'fas fa-times-circle',   'label': 'Reddedildi',     'desc': 'Rezervasyonunuz yonetici tarafindan reddedildi.'},
+        'Expired':  {'class': 'expired',  'icon': 'fas fa-clock',          'label': 'Suresi Doldu',   'desc': 'Rezervasyonunuzun suresi dolmustur.'}
+    } %}
+    {% set s = status_map.get(reservation.status, status_map['Pending']) %}
+
+    <div class="result-card">
+        <div class="result-header {{ s['class'] }}">
+            <div class="result-status-icon">
+                <i class="{{ s['icon'] }}"></i>
+            </div>
+            <div>
+                <div class="result-status-text">Rezervasyon Durumu</div>
+                <div class="result-status-label">{{ s['label'] }}</div>
+            </div>
+        </div>
+        <div class="result-body">
+            <div class="result-row">
+                <div class="result-row-icon"><i class="fas fa-ticket-alt"></i></div>
+                <div>
+                    <div class="result-row-label">Takip Kodu</div>
+                    <div class="result-row-value">{{ reservation.tracking_code }}</div>
+                </div>
+            </div>
+            <div class="result-row">
+                <div class="result-row-icon"><i class="fas fa-user"></i></div>
+                <div>
+                    <div class="result-row-label">Ad Soyad</div>
+                    <div class="result-row-value">{{ reservation.customer_name }}</div>
+                </div>
+            </div>
+            <div class="result-row">
+                <div class="result-row-icon"><i class="fas fa-futbol"></i></div>
+                <div>
+                    <div class="result-row-label">Saha</div>
+                    <div class="result-row-value">{{ reservation.pitch.name }}</div>
+                </div>
+            </div>
+            <div class="result-row">
+                <div class="result-row-icon"><i class="fas fa-calendar-alt"></i></div>
+                <div>
+                    <div class="result-row-label">Tarih</div>
+                    <div class="result-row-value">{{ reservation.date.strftime('%d.%m.%Y') }}</div>
+                </div>
+            </div>
+            <div class="result-row">
+                <div class="result-row-icon"><i class="fas fa-clock"></i></div>
+                <div>
+                    <div class="result-row-label">Saat</div>
+                    <div class="result-row-value">{{ reservation.time_slot }}</div>
+                </div>
+            </div>
+            <div class="result-row">
+                <div class="result-row-icon"><i class="fas fa-calendar-plus"></i></div>
+                <div>
+                    <div class="result-row-label">Olusturulma</div>
+                    <div class="result-row-value">{{ reservation.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Sonuc: Bulunamadi -->
+    {% if searched and not reservation %}
+    <div class="not-found-card">
+        <div class="not-found-icon">
+            <i class="fas fa-search-minus"></i>
+        </div>
+        <div class="not-found-title">Rezervasyon Bulunamadi</div>
+        <div class="not-found-text">
+            "<strong>{{ code }}</strong>" koduna ait bir rezervasyon bulunamadi.
+        </div>
+        <ul class="not-found-tips">
+            <li><i class="fas fa-check"></i> Takip kodunuzu dogru girdiginizden emin olun</li>
+            <li><i class="fas fa-check"></i> Kod formati: REZ-XXXX-XXXX</li>
+            <li><i class="fas fa-check"></i> Buyuk/kucuk harf farketmez</li>
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Ana sayfaya don -->
+    <div class="track-back">
+        <a href="{{ url_for('public.index') }}">
+            <i class="fas fa-arrow-left"></i> Ana Sayfaya Don
+        </a>
+    </div>
+
+</div>
+
+{% endblock %}

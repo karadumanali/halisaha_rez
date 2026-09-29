@@ -219,7 +219,88 @@
 .btn-reject:hover { background: var(--danger); color: var(--white); border-color: var(--danger); }
 .done-label { font-size: 0.8rem; color: var(--gray-400); font-weight: 600; display: flex; align-items: center; gap: 4px; }
 
-/* Filtre */
+/* ── Gelismis Filtre Paneli ── */
+.adv-filter-panel {
+    background: var(--gray-50);
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--r);
+    padding: 16px 18px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.adv-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.adv-filter-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--gray-600);
+    min-width: 56px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.adv-filter-label i { font-size: 0.72rem; color: var(--gray-400); }
+.adv-filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter-chip {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    border: 1.5px solid var(--gray-300);
+    background: var(--white);
+    color: var(--gray-600);
+    transition: all 0.15s;
+    font-family: var(--font);
+}
+.filter-chip:hover { border-color: var(--teal); color: var(--teal); }
+.filter-chip.active {
+    background: var(--teal);
+    color: var(--white);
+    border-color: var(--teal);
+    box-shadow: 0 2px 6px rgba(14,168,116,0.20);
+}
+.adv-filter-active {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--teal-dk);
+    padding: 8px 12px;
+    background: var(--teal-pale);
+    border-radius: var(--r-sm);
+}
+.adv-filter-active i:first-child { font-size: 0.72rem; }
+.filter-clear-link {
+    margin-left: auto;
+    color: var(--danger);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.76rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: opacity 0.15s;
+}
+.filter-clear-link:hover { opacity: 0.7; }
+
+@media (max-width: 600px) {
+    .adv-filter-group { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .adv-filter-panel { padding: 12px 14px; }
+    .filter-chip { padding: 5px 11px; font-size: 0.75rem; }
+}
+
+/* Durum Filtresi (client-side) */
 .res-filter-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 .filter-btn {
     padding: 7px 16px; border-radius: 20px;
@@ -880,6 +961,156 @@
     .report-info-card {
         padding: 20px;
     }
+}
+
+/* ══════════════════════════════════════════════════
+   SİSTEM ONAY MODALI — tarayıcı confirm/alert yerine
+══════════════════════════════════════════════════ */
+.sys-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.sys-modal-overlay.open { display: flex; }
+
+.sys-modal {
+    background: var(--white);
+    border-radius: var(--r);
+    padding: 32px 28px 24px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.10);
+    animation: sysModalIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-align: center;
+}
+@keyframes sysModalIn {
+    from { opacity: 0; transform: scale(0.90) translateY(12px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+.sys-modal-icon {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+    margin: 0 auto 16px;
+}
+/* Tip renkleri */
+.sys-modal-icon.icon-confirm {
+    background: #dbeafe; color: #2563eb;
+    border: 2px solid #93c5fd;
+}
+.sys-modal-icon.icon-warning {
+    background: #fef3c7; color: #d97706;
+    border: 2px solid #fcd34d;
+}
+.sys-modal-icon.icon-danger {
+    background: #fee2e2; color: #dc2626;
+    border: 2px solid #fca5a5;
+}
+.sys-modal-icon.icon-info {
+    background: var(--teal-pale); color: var(--teal-dk);
+    border: 2px solid var(--mint-mid);
+}
+.sys-modal-icon.icon-success {
+    background: #d1fae5; color: #059669;
+    border: 2px solid #6ee7b7;
+}
+
+.sys-modal-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+}
+.sys-modal-body {
+    font-size: 0.9rem;
+    color: var(--gray-600);
+    line-height: 1.65;
+    margin-bottom: 24px;
+    white-space: pre-line;
+}
+
+.sys-modal-actions {
+    display: flex;
+    gap: 10px;
+}
+.sys-modal-btn {
+    flex: 1;
+    padding: 11px 16px;
+    border-radius: var(--r-sm);
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font);
+    transition: all 0.15s;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.sys-btn-cancel {
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border: 1.5px solid var(--gray-200);
+}
+.sys-btn-cancel:hover { background: var(--gray-200); }
+
+.sys-btn-confirm {
+    background: var(--teal);
+    color: var(--white);
+}
+.sys-btn-confirm:hover { background: var(--teal-dk); }
+
+.sys-btn-confirm.btn-danger {
+    background: var(--danger);
+}
+.sys-btn-confirm.btn-danger:hover { background: #b91c1c; }
+
+.sys-btn-confirm.btn-warning {
+    background: #d97706;
+}
+.sys-btn-confirm.btn-warning:hover { background: #b45309; }
+
+/* Tek buton (alert modu) — sadece "Tamam" */
+.sys-modal-actions.single-btn { justify-content: center; }
+.sys-modal-actions.single-btn .sys-btn-cancel { display: none; }
+.sys-modal-actions.single-btn .sys-btn-confirm { flex: 0 1 180px; }
+
+/* ── Buton Loading State ── */
+.btn-loading {
+    pointer-events: none;
+    opacity: 0.7;
+    position: relative;
+}
+.btn-loading .btn-spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: btnSpin 0.6s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes btnSpin {
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 480px) {
+    .sys-modal { padding: 24px 20px 20px; max-width: 340px; }
+    .sys-modal-icon { width: 48px; height: 48px; font-size: 1.3rem; }
+    .sys-modal-title { font-size: 1rem; }
+    .sys-modal-body { font-size: 0.85rem; }
+    .sys-modal-btn { padding: 10px 12px; font-size: 0.82rem; }
 }
 
 /* ── MOBİL ── */

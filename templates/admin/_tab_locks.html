@@ -133,7 +133,7 @@
                                 <form action="/admin/unblock_slot/{{ block.id }}" method="POST" class="d-inline confirm-form"
                                       data-msg="Bu kilidi kaldırmak istiyor musunuz?">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="btn-unblock">
+                                    <button type="submit" class="btn-unblock" data-loading-text="Kaldırılıyor...">
                                         <i class="fas fa-unlock"></i> Kaldır
                                     </button>
                                 </form>

@@ -72,7 +72,7 @@
                                             <form action="/admin/delete_pitch/{{ pitch.id }}" method="POST" class="d-inline confirm-form"
                                                   data-msg="Bu saha silinecek. Emin misiniz?&#10;&#10;Sahaya bağlı rezervasyon varsa silinemez.">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit" class="btn-sm-danger">
+                                                <button type="submit" class="btn-sm-danger" data-loading-text="Siliniyor...">
                                                     <i class="fas fa-trash"></i> Sil
                                                 </button>
                                             </form>

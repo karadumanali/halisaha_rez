@@ -1,10 +1,11 @@
 """
-routes/public.py — Herkese açık (public) rotalar.
+routes/public.py — Herkese acik (public) rotalar.
 
 index        : Ana sayfa — sahalar + rezervasyon formu
-busy_slots   : AJAX — seçili tarih/saha için dolu slotlar
-reserve      : Yeni rezervasyon formu POST işlemi
-csp_report   : CSP ihlal raporu uç noktası
+busy_slots   : AJAX — secili tarih/saha icin dolu slotlar
+reserve      : Yeni rezervasyon formu POST islemi
+track        : Rezervasyon takip sayfasi
+csp_report   : CSP ihlal raporu uc noktasi
 """
 
 import os
@@ -14,7 +15,7 @@ from datetime import datetime, timedelta
 
 from flask import (
     Blueprint, render_template, request, redirect,
-    url_for, flash, jsonify, current_app, Response
+    url_for, flash, jsonify, current_app, Response, session
 )
 
 from extensions import db, limiter
@@ -223,8 +224,59 @@ def reserve():
         return redirect(url_for('public.index'))
 
     send_admin_notification(customer_name, date_obj, time_slot)
-    flash('Rezervasyon talebiniz alindi! Yonetici onayindan sonra kesinlesecektir.', 'success')
-    return redirect(url_for('public.index'))
+
+    # Takip kodunu session'a kaydet — redirect sonrasi success sayfasinda gosterilecek
+    session['tracking_code'] = new_res.tracking_code
+    session['tracking_pitch'] = new_res.pitch.name
+    session['tracking_date'] = date_obj.strftime('%d.%m.%Y')
+    session['tracking_slot'] = time_slot
+
+    return redirect(url_for('public.reservation_success'))
+
+
+# ── Rezervasyon basarili sayfasi ───────────────────────────────────
+
+@public_bp.route('/rezervasyon-basarili')
+def reservation_success():
+    """Rezervasyon basarili — takip kodunu goster."""
+    tracking_code  = session.pop('tracking_code', None)
+    tracking_pitch = session.pop('tracking_pitch', None)
+    tracking_date  = session.pop('tracking_date', None)
+    tracking_slot  = session.pop('tracking_slot', None)
+
+    if not tracking_code:
+        return redirect(url_for('public.index'))
+
+    return render_template(
+        'reservation_success.html',
+        tracking_code=tracking_code,
+        pitch_name=tracking_pitch,
+        date_str=tracking_date,
+        time_slot=tracking_slot,
+        hide_fab=True
+    )
+
+
+# ── Rezervasyon takip/sorgulama ───────────────────────────────────
+
+@public_bp.route('/rezervasyon-sorgula')
+def track_reservation_page():
+    """Rezervasyon takip sayfasi — form goster."""
+    return render_template('track.html', reservation=None, searched=False, hide_fab=True)
+
+
+@public_bp.route('/rezervasyon-sorgula', methods=['POST'])
+@limiter.limit("10 per minute")
+def track_reservation():
+    """Takip koduna gore rezervasyon durumunu sorgula."""
+    code = request.form.get('tracking_code', '').strip().upper()
+
+    if not code:
+        flash('Lutfen takip kodunuzu girin.', 'warning')
+        return render_template('track.html', reservation=None, searched=False, hide_fab=True)
+
+    reservation = Reservation.query.filter_by(tracking_code=code).first()
+    return render_template('track.html', reservation=reservation, searched=True, code=code, hide_fab=True)
 
 
 # ── security.txt ───────────────────────────────────────────────────

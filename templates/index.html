@@ -352,6 +352,60 @@ input[type="date"].form-control {
 }
 .lock-modal-close:hover { background: var(--teal-dk); }
 
+/* ── Özel Onay Modalı (Rezervasyon Talebi) ── */
+.sys-modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 10000;
+    background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px);
+    align-items: center; justify-content: center; padding: 20px;
+}
+.sys-modal-overlay.open { display: flex; }
+.sys-modal {
+    background: var(--white); border-radius: var(--r);
+    padding: 32px 28px 24px; width: 100%; max-width: 400px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+    animation: sysModalIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-align: center;
+}
+@keyframes sysModalIn { from { opacity:0; transform:scale(0.88) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+.sys-modal-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px; font-size: 1.5rem;
+}
+.sys-modal-icon.icon-confirm { background: rgba(14,168,116,0.12); color: var(--teal); }
+.sys-modal-icon.icon-warning { background: #fef3c7; color: #d97706; }
+.sys-modal-icon.icon-info    { background: #dbeafe; color: #2563eb; }
+.sys-modal-title { font-size: 1.15rem; font-weight: 800; color: var(--ink); margin-bottom: 8px; }
+.sys-modal-body { font-size: 0.95rem; color: var(--gray-600); line-height: 1.55; margin-bottom: 24px; white-space: pre-line; }
+.sys-modal-actions {
+    display: flex; gap: 10px; justify-content: center;
+}
+.sys-modal-actions.single-btn .sys-btn-cancel { display: none; }
+.sys-modal-btn {
+    flex: 1; padding: 11px 20px; border: none; border-radius: var(--r-sm);
+    font-size: 0.9rem; font-weight: 700; cursor: pointer;
+    font-family: var(--font); transition: all 0.15s;
+}
+.sys-btn-cancel {
+    background: var(--gray-100); color: var(--gray-700); border: 1.5px solid var(--gray-200);
+}
+.sys-btn-cancel:hover { background: var(--gray-200); }
+.sys-btn-confirm {
+    background: var(--teal); color: var(--white);
+}
+.sys-btn-confirm:hover { background: var(--teal-dk); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(14,168,116,0.35); }
+
+/* Buton loading state */
+.btn-loading { pointer-events: none; opacity: 0.75; }
+.btn-spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2.5px solid rgba(255,255,255,0.35);
+    border-top-color: #fff; border-radius: 50%;
+    animation: btnSpin 0.6s linear infinite;
+    vertical-align: middle;
+}
+@keyframes btnSpin { to { transform: rotate(360deg); } }
+
 </style>
 
 <div class="page-hero">
@@ -566,6 +620,80 @@ input[type="date"].form-control {
 </div>
 
 <script nonce="{{ g.csp_nonce }}">
+/* ── Özel Modal Sistemi (sysConfirm / sysAlert) ── */
+var _sysModalEl, _sysIconEl, _sysTitleEl, _sysBodyEl, _sysCancelBtn, _sysConfirmBtn, _sysActionsEl;
+var _sysResolve = null;
+
+function _initSysModal() {
+    _sysModalEl   = document.getElementById('sysModal');
+    _sysIconEl    = document.getElementById('sysModalIcon');
+    _sysTitleEl   = document.getElementById('sysModalTitle');
+    _sysBodyEl    = document.getElementById('sysModalBody');
+    _sysCancelBtn = document.getElementById('sysModalCancel');
+    _sysConfirmBtn= document.getElementById('sysModalConfirm');
+    _sysActionsEl = _sysConfirmBtn.parentElement;
+    _sysCancelBtn.addEventListener('click', function() { _closeSysModal(false); });
+    _sysConfirmBtn.addEventListener('click', function() { _closeSysModal(true); });
+    _sysModalEl.addEventListener('click', function(e) {
+        if (e.target === _sysModalEl) _closeSysModal(false);
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && _sysModalEl.classList.contains('open')) _closeSysModal(false);
+    });
+}
+
+function _closeSysModal(result) {
+    _sysModalEl.classList.remove('open');
+    document.body.style.overflow = '';
+    if (_sysResolve) { _sysResolve(result); _sysResolve = null; }
+}
+
+function sysConfirm(opts) {
+    opts = opts || {};
+    _sysTitleEl.textContent = opts.title || 'Onay';
+    _sysBodyEl.textContent  = opts.body  || 'Devam etmek istiyor musunuz?';
+    var iconType = opts.icon || 'confirm';
+    _sysIconEl.className = 'sys-modal-icon icon-' + iconType;
+    _sysIconEl.innerHTML = '<i class="fas ' + (opts.iconClass || 'fa-question-circle') + '"></i>';
+    _sysConfirmBtn.textContent = opts.confirmText || 'Tamam';
+    _sysCancelBtn.textContent  = opts.cancelText  || 'Vazgeç';
+    _sysConfirmBtn.className = 'sys-modal-btn sys-btn-confirm';
+    if (opts.confirmStyle) _sysConfirmBtn.classList.add(opts.confirmStyle);
+    _sysActionsEl.classList.remove('single-btn');
+    _sysModalEl.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    _sysConfirmBtn.focus();
+    return new Promise(function(resolve) { _sysResolve = resolve; });
+}
+
+function sysAlert(opts) {
+    opts = opts || {};
+    _sysTitleEl.textContent = opts.title || 'Bilgi';
+    _sysBodyEl.textContent  = opts.body  || '';
+    var iconType = opts.icon || 'info';
+    _sysIconEl.className = 'sys-modal-icon icon-' + iconType;
+    _sysIconEl.innerHTML = '<i class="fas ' + (opts.iconClass || 'fa-info-circle') + '"></i>';
+    _sysConfirmBtn.textContent = opts.confirmText || 'Tamam';
+    _sysConfirmBtn.className = 'sys-modal-btn sys-btn-confirm';
+    if (opts.confirmStyle) _sysConfirmBtn.classList.add(opts.confirmStyle);
+    _sysActionsEl.classList.add('single-btn');
+    _sysModalEl.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    _sysConfirmBtn.focus();
+    return new Promise(function(resolve) {
+        _sysResolve = function() { resolve(); };
+    });
+}
+
+function setButtonLoading(btn, loadingText) {
+    if (!btn) return '';
+    var oldHTML = btn.innerHTML;
+    btn.classList.add('btn-loading');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span> ' + (loadingText || 'İşleniyor...');
+    return oldHTML;
+}
+
 var state = { step:1, pitchId:null, pitchName:null, pitchPrice:null, date:null, slot:null };
 var busySlots = {};
 var blockedSlots = {};
@@ -774,17 +902,28 @@ function checkStep3() {
 
 function submitReservation() {
     fillHidden();
-    if (!confirm('Rezervasyon talebinizi göndermek istiyor musunuz?')) return;
+    sysConfirm({
+        title: 'Rezervasyon Onayı',
+        body: 'Rezervasyon talebinizi göndermek istiyor musunuz?',
+        icon: 'confirm',
+        iconClass: 'fa-calendar-check',
+        confirmText: 'Gönder',
+        cancelText: 'Vazgeç'
+    }).then(function(ok) {
+        if (!ok) return;
+        var btn = document.getElementById('btn3Submit');
+        setButtonLoading(btn, 'Gönderiliyor...');
 
-    var siteKey = '{{ recaptcha_site_key|default("") }}';
-    if (!siteKey) {
-        document.getElementById('reserveForm').submit();
-        return;
-    }
-    grecaptcha.ready(function() {
-        grecaptcha.execute(siteKey, {action: 'reserve'}).then(function(token) {
-            document.getElementById('gRecaptchaReserve').value = token;
+        var siteKey = '{{ recaptcha_site_key|default("") }}';
+        if (!siteKey) {
             document.getElementById('reserveForm').submit();
+            return;
+        }
+        grecaptcha.ready(function() {
+            grecaptcha.execute(siteKey, {action: 'reserve'}).then(function(token) {
+                document.getElementById('gRecaptchaReserve').value = token;
+                document.getElementById('reserveForm').submit();
+            });
         });
     });
 }
@@ -794,6 +933,9 @@ function formatDate(str) {
 }
 
 document.addEventListener('DOMContentLoaded',function(){
+    /* Özel modal sistemi başlat */
+    _initSysModal();
+
     /* Tarih max sınırını sayfa yüklenirken hemen ayarla */
     (function() {
         var maxDate = new Date();
@@ -864,6 +1006,21 @@ document.addEventListener('DOMContentLoaded',function(){
     });
 });
 </script>
+
+<!-- ═══ Özel Onay Modalı ═══ -->
+<div class="sys-modal-overlay" id="sysModal">
+    <div class="sys-modal">
+        <div class="sys-modal-icon" id="sysModalIcon">
+            <i class="fas fa-question-circle"></i>
+        </div>
+        <div class="sys-modal-title" id="sysModalTitle">Onay</div>
+        <div class="sys-modal-body" id="sysModalBody">Devam etmek istiyor musunuz?</div>
+        <div class="sys-modal-actions">
+            <button type="button" class="sys-modal-btn sys-btn-cancel" id="sysModalCancel">Vazgeç</button>
+            <button type="button" class="sys-modal-btn sys-btn-confirm" id="sysModalConfirm">Tamam</button>
+        </div>
+    </div>
+</div>
 
 {% if recaptcha_site_key %}
 <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}"></script>

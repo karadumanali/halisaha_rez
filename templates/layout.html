@@ -91,6 +91,74 @@
         .nav-brand-name { font-size: 1.1rem; font-weight: 800; color: var(--ink); letter-spacing: -0.01em; line-height: 1.2; }
         .nav-brand-sub  { font-size: 0.8rem; font-weight: 500; color: var(--gray-600); margin-top: 2px; }
 
+        /* ── Floating Action Button — Rezervasyon Sorgula ── */
+        .fab-track {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1050;
+            display: inline-flex; align-items: center; gap: 8px;
+            text-decoration: none;
+            font-size: 0.85rem; font-weight: 700;
+            color: var(--white);
+            background: linear-gradient(135deg, var(--teal), var(--teal-dk));
+            padding: 14px 22px;
+            border-radius: 50px;
+            box-shadow: 0 4px 20px rgba(14,168,116,0.35), 0 2px 6px rgba(0,0,0,0.10);
+            transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+            white-space: nowrap;
+            letter-spacing: 0.01em;
+        }
+        .fab-track:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 28px rgba(14,168,116,0.45), 0 4px 10px rgba(0,0,0,0.12);
+            background: linear-gradient(135deg, var(--teal-lt), var(--teal));
+            color: var(--white);
+        }
+        .fab-track:active { transform: translateY(0); }
+        .fab-track i { font-size: 0.85rem; }
+        @media (max-width: 480px) {
+            .fab-track { bottom: 18px; right: 16px; padding: 12px 18px; font-size: 0.8rem; gap: 7px; }
+        }
+
+        /* ── FAB Bilgi Baloncuğu ── */
+        .fab-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 1050; display: flex; flex-direction: column; align-items: flex-end; }
+        .fab-wrap .fab-track { position: static; }
+        .fab-bubble {
+            background: var(--white);
+            color: var(--gray-700);
+            font-size: 0.8rem; font-weight: 600; line-height: 1.45;
+            padding: 10px 32px 10px 14px;
+            border-radius: var(--r-sm);
+            border: 1.5px solid var(--mint-mid);
+            box-shadow: var(--sh-sm);
+            margin-bottom: 10px;
+            position: relative;
+            animation: bubbleIn 0.35s ease;
+            max-width: 250px;
+        }
+        .fab-bubble::after {
+            content: ''; position: absolute;
+            bottom: -7px; right: 28px;
+            width: 12px; height: 12px;
+            background: var(--white);
+            border-right: 1.5px solid var(--mint-mid);
+            border-bottom: 1.5px solid var(--mint-mid);
+            transform: rotate(45deg);
+        }
+        .fab-bubble-close {
+            position: absolute; top: 5px; right: 6px;
+            background: none; border: none; cursor: pointer;
+            color: var(--gray-400); font-size: 0.7rem; padding: 4px;
+            line-height: 1; transition: color 0.15s;
+        }
+        .fab-bubble-close:hover { color: var(--danger); }
+        @keyframes bubbleIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @media (max-width: 480px) {
+            .fab-wrap { bottom: 18px; right: 16px; }
+            .fab-bubble { max-width: 210px; font-size: 0.75rem; }
+        }
+
         main.site-main { flex: 1; padding: 36px 0 72px; }
 
         .card {
@@ -225,7 +293,9 @@
 
 <nav class="site-nav">
     <div class="nav-inner" style="padding: 0 24px;">
-        <a href="/" class="nav-home-link" title="Ana Sayfaya Dön">
+        <a href="{% if current_user.is_authenticated %}{{ url_for('admin.admin_dashboard') }}{% else %}/{% endif %}"
+           class="nav-home-link"
+           title="{% if current_user.is_authenticated %}Yönetim Paneli{% else %}Ana Sayfaya Dön{% endif %}">
             <div class="nav-logo">
                 <img src="{{ url_for('static', filename='uploads/site_logo.png') }}" alt="Logo"
                      onerror="this.style.display='none'; this.parentElement.querySelector('.nav-logo-fb').style.display='flex';">
@@ -298,7 +368,46 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 5000);
     });
+
+    /* ── FAB Bilgi Baloncuğu — localStorage 30 gün ── */
+    var bubble = document.getElementById('fabBubble');
+    var bubbleClose = document.getElementById('fabBubbleClose');
+    if (bubble) {
+        var BUBBLE_KEY = 'fab_bubble_dismissed';
+        var BUBBLE_DAYS = 30;
+        var show = true;
+        try {
+            var stored = localStorage.getItem(BUBBLE_KEY);
+            if (stored && Date.now() < parseInt(stored, 10)) { show = false; }
+        } catch(e) {}
+        if (show) {
+            bubble.style.display = '';
+        }
+        if (bubbleClose) {
+            bubbleClose.addEventListener('click', function() {
+                bubble.style.display = 'none';
+                try {
+                    localStorage.setItem(BUBBLE_KEY, String(Date.now() + BUBBLE_DAYS * 86400000));
+                } catch(e) {}
+            });
+        }
+    }
 });
 </script>
+
+<!-- Floating Rezervasyon Sorgula Butonu + Bilgi Baloncuğu -->
+{% if not hide_fab %}
+<div class="fab-wrap">
+    <div class="fab-bubble" id="fabBubble" style="display:none;">
+        Rezervasyon durumunuzu buradan sorgulayabilirsiniz
+        <button type="button" class="fab-bubble-close" id="fabBubbleClose" aria-label="Kapat"><i class="fas fa-times"></i></button>
+    </div>
+    <a href="{{ url_for('public.track_reservation_page') }}" class="fab-track" title="Rezervasyon Sorgula">
+        <i class="fas fa-search"></i>
+        <span>Rezervasyon Sorgula</span>
+    </a>
+</div>
+{% endif %}
+
 </body>
 </html>
