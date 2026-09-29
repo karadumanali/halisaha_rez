@@ -6,16 +6,14 @@ bir araya getirir. Modüler mimari sayesinde her parça bağımsız test edilebi
 """
 
 import os
-import secrets
 import logging
 
 from flask import Flask, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import get_config
-from extensions import db, csrf, limiter, login_manager
+from extensions import db, migrate, csrf, limiter, login_manager
 from models import Admin
-from utils.helpers import ph_hash
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +48,7 @@ def create_app(config_class=None):
 
     # ── 2. Extension'ları başlat ──────────────────────────────────
     db.init_app(app)
+    migrate.init_app(app, db, render_as_batch=True)
     csrf.init_app(app)
     limiter.init_app(app)
     login_manager.init_app(app)
@@ -103,28 +102,37 @@ def create_app(config_class=None):
     from services.scheduler import init_scheduler
     init_scheduler(app)
 
-    # ── 10. Veritabanı & ilk admin ────────────────────────────────
-    with app.app_context():
-        db.create_all()
-        logger.info("Veritabani tablolari kontrol edildi.")
-
-        admin_var_mi = Admin.query.filter_by(username='yonetici').first()
-        if not admin_var_mi:
-            import string as _string
-            _alfabe   = _string.ascii_letters + _string.digits + "!@#$%^&*"
-            ilk_sifre = ''.join(secrets.choice(_alfabe) for _ in range(20))
-            hashed_password = ph_hash(ilk_sifre)
-            yeni_admin = Admin(username='yonetici', password_hash=hashed_password)
-            db.session.add(yeni_admin)
-            db.session.commit()
-            print("=" * 60)
-            print("  YENI ADMIN HESABI OLUSTURULDU")
-            print("  Kullanici adi : yonetici")
-            print(f"  Sifre         : {ilk_sifre}")
-            print("  !! Giris yapip sifrenizi hemen degistirin !!")
-            print("=" * 60)
-            logger.info("Yeni admin hesabi olusturuldu (sifre konsola yazildi).")
-        else:
-            logger.info("Yonetici hesabi zaten mevcut, atlandi.")
+    # ── 10. CLI komutları ─────────────────────────────────────────
+    # Şema: `flask db upgrade`  |  İlk admin: `flask create-admin`
+    from cli import register_commands
+    register_commands(app)
 
     return app
+
+
+def check_db_revision(app):
+    """
+    Veritabanı şeması en son migration'da değilse uyarı ver.
+
+    Şema artık açılışta otomatik oluşturulmaz (create_all kaldırıldı);
+    `flask db upgrade` unutulursa hata sayfaları yerine bu net uyarı görülür.
+    """
+    from alembic.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    try:
+        with app.app_context():
+            config = app.extensions['migrate'].migrate.get_config()
+            heads  = set(ScriptDirectory.from_config(config).get_heads())
+            with db.engine.connect() as conn:
+                current = set(MigrationContext.configure(conn).get_current_heads())
+    except Exception as e:
+        logger.warning(f"Veritabani surum kontrolu yapilamadi: {e}")
+        return
+
+    if current != heads:
+        logger.warning(
+            "VERITABANI SEMASI GUNCEL DEGIL (mevcut: %s, beklenen: %s). "
+            "Uygulamayi baslatmadan once `flask db upgrade` calistirin.",
+            ', '.join(sorted(current)) or 'yok', ', '.join(sorted(heads)),
+        )

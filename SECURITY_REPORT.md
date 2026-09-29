@@ -222,7 +222,7 @@ server {
 
 `app.run()` asla production'da kullanılmaz:
 ```bash
-gunicorn --workers 4 --bind 127.0.0.1:8000 --timeout 30 app:app
+gunicorn --workers 1 --threads 4 --bind 127.0.0.1:8000 --timeout 30 "run:application"
 ```
 
 systemd service önerisi:
@@ -230,7 +230,7 @@ systemd service önerisi:
 [Service]
 User=www-data
 WorkingDirectory=/var/www/halisaha_rez
-ExecStart=/var/www/halisaha_rez/.venv/bin/gunicorn --workers 4 --bind 127.0.0.1:8000 app:app
+ExecStart=/var/www/halisaha_rez/.venv/bin/gunicorn --workers 1 --threads 4 --bind 127.0.0.1:8000 "run:application"
 EnvironmentFile=/var/www/halisaha_rez/.env
 Restart=always
 ```

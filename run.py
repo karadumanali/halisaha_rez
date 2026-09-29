@@ -5,7 +5,10 @@ Kullanım:
     python run.py
 
 Production'da gunicorn veya waitress kullanılmalıdır:
-    gunicorn "app:create_app()"
+    gunicorn "run:application"
+
+Başlatmadan önce veritabanı şeması güncellenmelidir:
+    flask db upgrade
 """
 
 import os
@@ -21,9 +24,10 @@ if hasattr(os, 'add_dll_directory'):
     os.add_dll_directory(base_dir)
 os.environ['PATH'] = base_dir + os.pathsep + os.environ.get('PATH', '')
 
-from app import create_app
+from app import create_app, check_db_revision
 
 application = create_app()
+check_db_revision(application)
 
 if __name__ == '__main__':
     application.run(

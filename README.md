@@ -54,7 +54,8 @@ Bu proje güvenlik odaklı geliştirilmiştir. Uygulanan önlemler:
 halisaha_rez/
 ├── app.py                  # Ana uygulama (rotalar, güvenlik, iş mantığı)
 ├── models.py               # Veritabanı modelleri (SQLAlchemy)
-├── setup_db.py             # Veritabanı kurulum scripti
+├── cli.py                  # Özel komutlar (flask create-admin)
+├── migrations/             # Veritabanı migration dosyaları (Flask-Migrate / Alembic)
 ├── .env.example            # Ortam değişkenleri şablonu
 ├── .env                    # Gerçek ayarlar (Git'e PUSHLANMAZ)
 ├── .gitignore
@@ -132,7 +133,8 @@ python -c "import secrets; print(secrets.token_hex(32))"
 ### 5. Veritabanını Oluşturun
 
 ```bash
-python setup_db.py
+flask db upgrade        # Tabloları oluşturur / günceller
+flask create-admin      # İlk 'yonetici' hesabını oluşturur
 ```
 
 > ⚠️ Terminalde çıkan admin şifresini not alın! Bir daha gösterilmez.
@@ -141,7 +143,7 @@ python setup_db.py
 
 ```bash
 # Geliştirme (development):
-python app.py
+python run.py
 
 # Tarayıcıda açın: http://127.0.0.1:5000
 ```
@@ -150,7 +152,7 @@ python app.py
 
 ## 🏭 Production Kurulumu
 
-Development sunucusu (`python app.py`) production'da kullanılmaz. Gerçek ortam için:
+Development sunucusu (`python run.py`) production'da kullanılmaz. Gerçek ortam için:
 
 ### 1. .env Dosyasını Production İçin Ayarlayın
 
@@ -162,14 +164,26 @@ PROXY_COUNT=1
 ALLOWED_ADMIN_IPS=sunucu_ip_adresi
 ```
 
-### 2. Gunicorn ile Çalıştırın
+### 2. Veritabanını Kurun
+
+```bash
+pip install psycopg2-binary   # PostgreSQL sürücüsü
+flask db upgrade              # Tabloları oluşturur
+flask create-admin            # İlk admin hesabı (sadece ilk kurulumda)
+```
+
+> Her güncellemede (`git pull` sonrası) uygulamayı yeniden başlatmadan önce `flask db upgrade` çalıştırın.
+
+### 3. Gunicorn ile Çalıştırın
 
 ```bash
 pip install gunicorn
-gunicorn -w 4 -b 127.0.0.1:8000 app:app
+gunicorn -w 1 --threads 4 -b 127.0.0.1:8000 "run:application"
 ```
 
-### 3. Nginx Yapılandırması
+> ⚠️ `-w 1` bilinçli olarak tek worker'dır: zamanlanmış görevler (APScheduler) ve rate limiter sayaçları her worker'da ayrı çalışır. Birden fazla worker, müşteriye tekrarlı mail gitmesine ve limitlerin zayıflamasına yol açar. Eşzamanlılık `--threads` ile sağlanır.
+
+### 4. Nginx Yapılandırması
 
 ```nginx
 server {
@@ -191,7 +205,7 @@ server {
 }
 ```
 
-### 4. SSL Sertifikası (HTTPS)
+### 5. SSL Sertifikası (HTTPS)
 
 ```bash
 sudo apt install certbot python3-certbot-nginx
@@ -212,6 +226,27 @@ login_attempts      → Giriş denemeleri (brute-force koruması)
 audit_logs          → Denetim kayıtları (tüm admin işlemleri)
 ```
 
+### Şema Değişikliği (Migration)
+
+Veritabanı şeması [Flask-Migrate](https://flask-migrate.readthedocs.io/) ile yönetilir. `models.py`'de bir değişiklik yaptığınızda:
+
+```bash
+flask db migrate -m "rezervasyona not alani eklendi"   # migrations/versions/ altına dosya üretir
+# Üretilen dosyayı açıp kontrol edin!
+flask db upgrade                                       # Değişikliği veritabanına uygular
+```
+
+Üretilen migration dosyasını modelle birlikte commit edin. Sunucuda sadece `flask db upgrade` çalıştırılır.
+
+| Komut | Ne yapar |
+|-------|----------|
+| `flask db upgrade` | Bekleyen tüm migration'ları uygular |
+| `flask db downgrade` | Son migration'ı geri alır |
+| `flask db current` | Veritabanının hangi sürümde olduğunu gösterir |
+| `flask db check` | Modeller ile veritabanı arasında fark var mı kontrol eder |
+
+> ⚠️ Uygulama açılışta tabloları artık otomatik oluşturmaz. Şema güncel değilse başlangıçta uyarı verir.
+
 ---
 
 ## ⏰ Otomatik İşlemler
@@ -229,7 +264,7 @@ Sistem arka planda şu işlemleri otomatik yapar:
 
 ## 🔑 Varsayılan Giriş
 
-İlk kurulumda `setup_db.py` terminalde admin bilgilerini gösterir:
+İlk kurulumda `flask create-admin` terminalde admin bilgilerini gösterir (hesap zaten varsa dokunmaz):
 
 ```
 ════════════════════════════════════════════════════════
@@ -273,6 +308,6 @@ Mustafa AYYILDIZ
 ---
 
 <p align="center">
-  <strong>⚽ AYBÜ SKS Spor Tesisleri Rezervasyon Sistemi</strong><br>
-  <em>Güvenlik öncelikli, modern, kullanıcı dostu</em>
+  <strong> AYBÜ SKS Spor Tesisleri Rezervasyon Sistemi</strong><br>
+  
 </p>
