@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, date as date_type
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, flash, send_from_directory, make_response,
-    current_app
+    current_app, jsonify
 )
 from flask_login import login_required, current_user
 from sqlalchemy import func
@@ -22,9 +22,9 @@ from PIL import Image
 from extensions import db, limiter
 from models import (
     Pitch, PitchImage, Reservation, BlockedSlot,
-    AuditLog
+    AuditLog, PitchTimeSlot
 )
-from utils.constants import VALID_SLOTS
+from utils.constants import SLOT_GROUPS, SLOT_START_HOURS
 from utils.helpers import audit, get_real_ip
 from services.security import detect_mime
 from services.file_handler import allowed_file, save_secure_pitch_image
@@ -112,6 +112,7 @@ def admin_dashboard():
         filtered_count=filtered_count,
         blocked_slots=blocked_slots,
         audit_logs=audit_logs,
+        slot_groups=SLOT_GROUPS,
         now=datetime.now()
     )
 
@@ -217,40 +218,96 @@ def bulk_unblock_slots():
 
 # ── Saha yönetimi ─────────────────────────────────────────────────
 
+def _parse_price(value):
+    """Formdaki ücreti doğrula; geçersizse None döner."""
+    value = (value or '').strip()
+    if not value.isdigit() or int(value) > 99999:
+        return None
+    return int(value)
+
+
+def _parse_slot_hours(values):
+    """Formdaki slot_hours değerlerini doğrula; geçerli saatleri sıralı döndür."""
+    hours = set()
+    for v in values:
+        try:
+            h = int(v)
+        except (ValueError, TypeError):
+            continue
+        if h in SLOT_START_HOURS:
+            hours.add(h)
+    return sorted(hours)
+
+
 @admin_bp.route('/add_pitch', methods=['POST'])
 @login_required
 def add_pitch():
-    """Yeni saha ekle."""
-    name  = request.form.get('name', '').strip()
-    price = request.form.get('price', '')
-    if not name or not price.isdigit():
+    """Yeni saha ekle — ad, ücret ve saat aralıkları tek adımda kaydedilir."""
+    name       = request.form.get('name', '').strip()
+    price      = _parse_price(request.form.get('price'))
+    slot_hours = _parse_slot_hours(request.form.getlist('slot_hours'))
+    if not name or price is None:
         flash('Gecersiz saha adi veya ucret!', 'danger')
         return redirect(url_for('admin.admin_dashboard'))
     if not re.match(r'^[a-zA-Z0-9\s\-çÇğĞıİöÖşŞüÜ]+$', name) or len(name) > 100:
         flash('Saha adi sadece harf, rakam, bosluk ve tire icerebilir!', 'danger')
         return redirect(url_for('admin.admin_dashboard'))
-    db.session.add(Pitch(name=name, price=int(price)))
+    if not slot_hours:
+        flash('En az bir saat aralığı seçmelisiniz!', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
+
+    pitch = Pitch(name=name, price=price)
+    pitch.time_slots = [PitchTimeSlot(start_hour=h, end_hour=h + 1) for h in slot_hours]
+    db.session.add(pitch)
     db.session.commit()
-    audit('saha_ekle', f'saha={name} | fiyat={price} TL/sa')
-    flash(f'"{name}" basariyla eklendi!', 'success')
+    audit('saha_ekle',
+          f'saha={name} | fiyat={price} TL/sa '
+          f'| saatler={", ".join(PitchTimeSlot.ranges(slot_hours))}')
+    flash(f'"{name}" {len(slot_hours)} saat aralığıyla eklendi!', 'success')
     return redirect(url_for('admin.admin_dashboard'))
 
 
 @admin_bp.route('/update_pitch/<int:pitch_id>', methods=['POST'])
 @login_required
 def update_pitch(pitch_id):
-    """Saha fiyatını güncelle."""
-    pitch     = db.get_or_404(Pitch, pitch_id)
-    new_price = request.form.get('new_price', '')
-    if new_price and new_price.isdigit():
-        old_price   = pitch.price
-        pitch.price = int(new_price)
-        db.session.commit()
-        audit('saha_fiyat_guncelle',
-              f'saha={pitch.name} | eski={old_price} TL → yeni={new_price} TL')
-        flash(f'"{pitch.name}" fiyati guncellendi: {pitch.price} TL', 'success')
-    else:
+    """Saha ücretini ve saat aralıklarını güncelle."""
+    pitch      = db.get_or_404(Pitch, pitch_id)
+    new_price  = _parse_price(request.form.get('new_price'))
+    slot_hours = _parse_slot_hours(request.form.getlist('slot_hours'))
+    if new_price is None:
         flash('Gecersiz ucret!', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
+    if not slot_hours:
+        flash('En az bir saat aralığı seçmelisiniz!', 'danger')
+        return redirect(url_for('admin.admin_dashboard'))
+
+    changes = []
+    if new_price != pitch.price:
+        changes.append(f'fiyat: {pitch.price} TL → {new_price} TL')
+        pitch.price = new_price
+
+    old_hours = set(pitch.slot_hours)
+    new_hours = set(slot_hours)
+    added     = sorted(new_hours - old_hours)
+    removed   = sorted(old_hours - new_hours)
+    if added or removed:
+        # delete-orphan cascade: listeden çıkan slotlar silinir
+        pitch.time_slots = (
+            [ts for ts in pitch.time_slots if ts.start_hour in new_hours]
+            + [PitchTimeSlot(start_hour=h, end_hour=h + 1) for h in added]
+        )
+        if added:
+            changes.append(f'eklenen saatler: {", ".join(PitchTimeSlot.ranges(added))}')
+        if removed:
+            changes.append(f'kaldırılan saatler: {", ".join(PitchTimeSlot.ranges(removed))}')
+
+    if not changes:
+        flash('Herhangi bir değişiklik yapılmadı.', 'info')
+        return redirect(url_for('admin.admin_dashboard'))
+
+    db.session.commit()
+    audit('saha_guncelle', f'saha={pitch.name} | ' + ' | '.join(changes))
+    flash(f'"{pitch.name}" güncellendi.', 'success')
     return redirect(url_for('admin.admin_dashboard'))
 
 
@@ -453,3 +510,19 @@ def generate_report_pdf():
     return response
 
 
+# ── Saha saat dilimi API (kilit formu için) ─────────────────────────
+
+@admin_bp.route('/api/pitch/<int:pitch_id>/time_slots')
+@login_required
+def get_pitch_time_slots(pitch_id):
+    """Sahaya ait saat dilimlerini JSON olarak döndür (AJAX için)."""
+    pitch = db.session.get(Pitch, pitch_id)
+    if not pitch:
+        return jsonify({'slots': []})
+
+    slots = PitchTimeSlot.query.filter_by(pitch_id=pitch_id)\
+        .order_by(PitchTimeSlot.start_hour).all()
+
+    return jsonify({
+        'slots': [{'label': s.label, 'start_hour': s.start_hour} for s in slots]
+    })

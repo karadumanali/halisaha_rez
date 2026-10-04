@@ -232,7 +232,63 @@ function togglePick(el) {
     var idx  = arr.indexOf(val);
     if (idx === -1) { arr.push(val);    el.classList.add('selected'); }
     else            { arr.splice(idx,1); el.classList.remove('selected'); }
+    // Saha seçimi değiştiğinde slot listesini güncelle
+    if (type === 'pitch') { loadSlotsForSelectedPitches(); }
     updateSummary();
+}
+
+/* Seçili sahaların ortak saat dilimlerini yükle */
+function loadSlotsForSelectedPitches() {
+    var picker = document.getElementById('slotPicker');
+    var emptyEl = document.getElementById('slotPickerEmpty');
+    selSlots = []; // seçili slotları sıfırla
+
+    if (selPitches.length === 0) {
+        picker.innerHTML = '<div id="slotPickerEmpty" style="padding:12px;color:var(--gray-400);font-size:0.85rem;">Önce bir saha seçin.</div>';
+        updateSummary();
+        return;
+    }
+
+    picker.innerHTML = '<div style="padding:12px;color:var(--gray-400);font-size:0.85rem;">Yükleniyor...</div>';
+
+    // Tüm seçili sahaların slotlarını çek, sonra ortak olanları göster
+    var promises = selPitches.map(function(pid) {
+        return fetch('/admin/api/pitch/' + pid + '/time_slots')
+            .then(function(r) { return r.ok ? r.json() : { slots: [] }; })
+            .then(function(d) { return d.slots.map(function(s) { return s.label; }); });
+    });
+
+    Promise.all(promises).then(function(results) {
+        // Tüm seçili sahaların ortak slotlarını bul
+        var commonSlots;
+        if (results.length === 1) {
+            commonSlots = results[0];
+        } else {
+            commonSlots = results[0].filter(function(slot) {
+                return results.every(function(r) { return r.indexOf(slot) !== -1; });
+            });
+        }
+
+        picker.innerHTML = '';
+        if (commonSlots.length === 0) {
+            picker.innerHTML = '<div style="padding:12px;color:var(--gray-400);font-size:0.85rem;">Seçili sahalar için ortak saat dilimi bulunamadı.</div>';
+            updateSummary();
+            return;
+        }
+
+        commonSlots.forEach(function(slotLabel) {
+            var div = document.createElement('div');
+            div.className = 'multi-pick-item';
+            div.dataset.val = slotLabel;
+            div.dataset.pickType = 'slot';
+            div.innerHTML = '<i class="fas fa-clock"></i> ' + slotLabel + ' <i class="fas fa-check pick-check"></i>';
+            div.addEventListener('click', function() { togglePick(div); });
+            picker.appendChild(div);
+        });
+        updateSummary();
+    }).catch(function() {
+        picker.innerHTML = '<div style="padding:12px;color:#ef4444;font-size:0.85rem;">Slotlar yüklenirken hata oluştu.</div>';
+    });
 }
 
 /* TAKVİM */
@@ -644,6 +700,176 @@ function initBulkUnblock() {
     });
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   SAAT SEÇİCİ (hour-picker) — saha ekleme sihirbazı & düzenleme modalı
+   ──────────────────────────────────────────────────────────────
+   Her çip bir checkbox (name="slot_hours"); seçim → .selected
+   Değişiklikte picker üzerinde 'hp:change' olayı tetiklenir.
+══════════════════════════════════════════════════════════════════ */
+function _pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+function hpSelectedHours(picker) {
+    return Array.prototype.map.call(
+        picker.querySelectorAll('input[name="slot_hours"]:checked'),
+        function(inp) { return parseInt(inp.value, 10); }
+    ).sort(function(a, b) { return a - b; });
+}
+
+/* [9,10,11,17,18] → ['09:00–12:00', '17:00–19:00'] */
+function hpRanges(hours) {
+    var ranges = [], start = null, prev = null;
+    hours.forEach(function(h) {
+        if (start !== null && h === prev + 1) { prev = h; return; }
+        if (start !== null) ranges.push(_pad2(start) + ':00–' + _pad2(prev + 1) + ':00');
+        start = prev = h;
+    });
+    if (start !== null) ranges.push(_pad2(start) + ':00–' + _pad2(prev + 1) + ':00');
+    return ranges;
+}
+
+function hpRefresh(picker) {
+    picker.querySelectorAll('.hour-chip').forEach(function(chip) {
+        chip.classList.toggle('selected', chip.querySelector('input').checked);
+    });
+    picker.querySelectorAll('.hp-group').forEach(function(group) {
+        var inputs = group.querySelectorAll('input[name="slot_hours"]');
+        var allOn  = Array.prototype.every.call(inputs, function(i) { return i.checked; });
+        var btn    = group.querySelector('.hp-group-toggle');
+        btn.textContent = allOn ? 'Kaldır' : 'Tümünü seç';
+        btn.classList.toggle('on', allOn);
+    });
+    var hours = hpSelectedHours(picker);
+    picker.querySelector('.hp-count-num').textContent = hours.length;
+    picker.querySelector('.hp-count').classList.toggle('zero', hours.length === 0);
+    picker.querySelector('.hp-summary').classList.toggle('empty', hours.length === 0);
+    picker.querySelector('.hp-summary-text').textContent = hours.length
+        ? 'Açık saatler: ' + hpRanges(hours).join('  ·  ')
+        : 'Henüz saat seçilmedi';
+    picker.dispatchEvent(new CustomEvent('hp:change', { detail: { count: hours.length } }));
+}
+
+function hpSetHours(picker, hours) {
+    picker.querySelectorAll('input[name="slot_hours"]').forEach(function(inp) {
+        inp.checked = hours.indexOf(parseInt(inp.value, 10)) !== -1;
+    });
+    hpRefresh(picker);
+}
+
+function initHourPickers() {
+    document.querySelectorAll('.hour-picker').forEach(function(picker) {
+        picker.addEventListener('change', function(e) {
+            if (e.target.name === 'slot_hours') hpRefresh(picker);
+        });
+        picker.querySelectorAll('[data-hp-action]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var on = btn.dataset.hpAction === 'all';
+                picker.querySelectorAll('input[name="slot_hours"]').forEach(function(i) { i.checked = on; });
+                hpRefresh(picker);
+            });
+        });
+        picker.querySelectorAll('.hp-group').forEach(function(group) {
+            group.querySelector('.hp-group-toggle').addEventListener('click', function() {
+                var inputs = group.querySelectorAll('input[name="slot_hours"]');
+                var allOn  = Array.prototype.every.call(inputs, function(i) { return i.checked; });
+                inputs.forEach(function(i) { i.checked = !allOn; });
+                hpRefresh(picker);
+            });
+        });
+        hpRefresh(picker);
+    });
+}
+
+/* ══ Saha ekleme sihirbazı: 1) ad + ücret → 2) saat aralıkları ══ */
+function initPitchWizard() {
+    var form = document.getElementById('addPitchForm');
+    if (!form) return;
+    var nameInp   = document.getElementById('pitchName');
+    var priceInp  = document.getElementById('pitchPrice');
+    var picker    = document.getElementById('addPitchPicker');
+    var nextBtn   = document.getElementById('wzNext');
+    var submitBtn = document.getElementById('wzSubmit');
+
+    function goStep(n) {
+        form.querySelectorAll('.wz-panel').forEach(function(p) {
+            p.classList.toggle('active', p.dataset.step === String(n));
+        });
+        document.querySelectorAll('#pitchWizard .wz-step').forEach(function(s) {
+            var i = parseInt(s.dataset.stepInd, 10);
+            s.classList.toggle('active', i === n);
+            s.classList.toggle('done', i < n);
+        });
+    }
+
+    nextBtn.addEventListener('click', function() {
+        nameInp.value = nameInp.value.trim();
+        if (!nameInp.reportValidity() || !priceInp.reportValidity()) return;
+        document.getElementById('wzRecapName').textContent  = nameInp.value;
+        document.getElementById('wzRecapPrice').textContent = priceInp.value + ' TL / saat';
+        goStep(2);
+    });
+    /* 1. adımda Enter → formu göndermek yerine ilerle */
+    [nameInp, priceInp].forEach(function(inp) {
+        inp.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); nextBtn.click(); }
+        });
+    });
+    document.getElementById('wzBack').addEventListener('click', function() { goStep(1); });
+    document.getElementById('wzEdit').addEventListener('click', function() { goStep(1); nameInp.focus(); });
+
+    picker.addEventListener('hp:change', function(e) { submitBtn.disabled = e.detail.count === 0; });
+    submitBtn.disabled = hpSelectedHours(picker).length === 0;
+
+    form.addEventListener('submit', function(e) {
+        if (hpSelectedHours(picker).length === 0) { e.preventDefault(); return; }
+        setButtonLoading(submitBtn, 'Oluşturuluyor...');
+    });
+}
+
+/* ══ Saha düzenleme modalı: ücret + saat aralıkları ══ */
+function initPitchEditModal() {
+    var modal = document.getElementById('pitchEditModal');
+    if (!modal) return;
+    var form     = document.getElementById('pitchEditForm');
+    var priceInp = document.getElementById('pitchEditPrice');
+    var picker   = document.getElementById('pitchEditPicker');
+    var saveBtn  = document.getElementById('btnSavePitchEdit');
+
+    function openModal(btn) {
+        form.action = '/admin/update_pitch/' + btn.dataset.pitchId;
+        document.getElementById('pitchEditName').textContent = btn.dataset.pitchName;
+        priceInp.value = btn.dataset.pitchPrice;
+        var hours = (btn.dataset.pitchHours || '').split(',').filter(Boolean).map(Number);
+        hpSetHours(picker, hours);
+        modal.querySelector('.pe-modal-body').scrollTop = 0;
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal() {
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('.btn-edit-pitch').forEach(function(btn) {
+        btn.addEventListener('click', function() { openModal(btn); });
+    });
+    document.getElementById('btnClosePitchEdit').addEventListener('click', closeModal);
+    document.getElementById('btnCancelPitchEdit').addEventListener('click', closeModal);
+    modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+    });
+
+    picker.addEventListener('hp:change', function(e) { saveBtn.disabled = e.detail.count === 0; });
+
+    form.addEventListener('submit', function(e) {
+        if (!priceInp.reportValidity() || hpSelectedHours(picker).length === 0) {
+            e.preventDefault();
+            return;
+        }
+        setButtonLoading(saveBtn, 'Kaydediliyor...');
+    });
+}
+
 /* ══ DOMContentLoaded — tüm bağlamalar burada ══ */
 document.addEventListener('DOMContentLoaded', function() {
     /* Özel modal sistemi başlat */
@@ -671,6 +897,11 @@ document.addEventListener('DOMContentLoaded', function() {
     bindAuditSearch();
     bindPasswordModal();
     bindReportForm();
+
+    /* Sahalar: saat seçici, ekleme sihirbazı, düzenleme modalı */
+    initHourPickers();
+    initPitchWizard();
+    initPitchEditModal();
 
     /* Kilitle butonu */
     var btnBlock = document.getElementById('btnSubmitBlock');

@@ -1,0 +1,49 @@
+{% from "admin/_hour_picker.html" import hour_picker %}
+<!-- ══ SAHA DÜZENLE MODAL — ücret + saat aralıkları (body'nin doğrudan çocuğu) ══ -->
+<div id="pitchEditModal" class="pw-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pitchEditTitle">
+    <div class="pw-modal-box pe-modal-box">
+
+        <div class="pw-modal-header pe-modal-header">
+            <div class="pw-modal-icon"><i class="fas fa-futbol"></i></div>
+            <div>
+                <div class="pw-modal-title" id="pitchEditTitle">Sahayı Düzenle</div>
+                <div class="pw-modal-sub" id="pitchEditName"></div>
+            </div>
+            <button type="button" class="pw-modal-close" id="btnClosePitchEdit" aria-label="Kapat">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="pitchEditForm" method="POST" action="" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="pe-modal-body">
+                <div class="pe-section">
+                    <label class="pe-section-title" for="pitchEditPrice">
+                        <i class="fas fa-lira-sign"></i> Saatlik Ücret
+                    </label>
+                    <div class="price-input">
+                        <input type="number" id="pitchEditPrice" name="new_price" class="pw-input"
+                               required min="0" max="99999">
+                        <span class="price-input-suffix">TL / saat</span>
+                    </div>
+                </div>
+
+                <div class="pe-section">
+                    <div class="pe-section-title">
+                        <i class="fas fa-clock"></i> Saat Aralıkları
+                    </div>
+                    {{ hour_picker('pitchEditPicker', slot_groups) }}
+                </div>
+            </div>
+
+            <div class="pw-modal-actions pe-modal-actions">
+                <button type="button" class="pw-btn-cancel" id="btnCancelPitchEdit">İptal</button>
+                <button type="submit" class="pw-btn-submit" id="btnSavePitchEdit">
+                    <i class="fas fa-save"></i> Değişiklikleri Kaydet
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>

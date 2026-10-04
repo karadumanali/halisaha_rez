@@ -19,8 +19,7 @@ from flask import (
 )
 
 from extensions import db, limiter
-from models import Pitch, Reservation, BlockedSlot
-from utils.constants import VALID_SLOTS
+from models import Pitch, Reservation, BlockedSlot, PitchTimeSlot
 from utils.helpers import get_real_ip
 from services.security import verify_recaptcha
 from services.file_handler import save_secure_receipt
@@ -94,7 +93,16 @@ def busy_slots():
     blocked = BlockedSlot.query.filter_by(pitch_id=pitch_id, date=date_obj).all()
     blocked_dict = {b.time_slot: b.reason for b in blocked}
 
-    return jsonify({'busy': busy_dict, 'blocked': blocked_dict})
+    # Sahaya özel tanımlı saat dilimlerini de döndür
+    time_slots = PitchTimeSlot.query.filter_by(pitch_id=pitch_id)\
+        .order_by(PitchTimeSlot.start_hour).all()
+    available_slots = [ts.label for ts in time_slots]
+
+    return jsonify({
+        'busy': busy_dict,
+        'blocked': blocked_dict,
+        'available_slots': available_slots
+    })
 
 
 # ── Rezervasyon oluşturma ──────────────────────────────────────────
@@ -121,16 +129,18 @@ def reserve():
     time_slot     = request.form.get('time_slot')
     customer_name = request.form.get('customer_name', '').strip()
 
-    # Saat dilimi doğrulama
-    if time_slot not in VALID_SLOTS:
-        flash('Gecersiz saat dilimi!', 'danger')
-        return redirect(url_for('public.index'))
-
     # Saha ID doğrulama
     try:
         pitch_id = int(pitch_id)
     except (ValueError, TypeError):
         flash('Gecersiz saha!', 'danger')
+        return redirect(url_for('public.index'))
+
+    # Saat dilimi doğrulama — sahaya özel tanımlı slotlardan mı?
+    valid_slots = [ts.label for ts in
+                   PitchTimeSlot.query.filter_by(pitch_id=pitch_id).all()]
+    if time_slot not in valid_slots:
+        flash('Gecersiz saat dilimi!', 'danger')
         return redirect(url_for('public.index'))
 
     # İsim doğrulama

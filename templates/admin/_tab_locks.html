@@ -55,13 +55,9 @@
                         <div>
                             <label class="form-label"><i class="fas fa-clock"></i> Saat Dilimi <span class="multi-hint">(çoklu)</span></label>
                             <div class="multi-pick-list" id="slotPicker">
-                                {% set slots = ['16:00 - 17:00','17:00 - 18:00','18:00 - 19:00','19:00 - 20:00','20:00 - 21:00','21:00 - 22:00','22:00 - 23:00'] %}
-                                {% for s in slots %}
-                                <div class="multi-pick-item" data-val="{{ s }}" data-pick-type="slot">
-                                    <i class="fas fa-clock"></i> {{ s }}
-                                    <i class="fas fa-check pick-check"></i>
+                                <div id="slotPickerEmpty" style="padding:12px;color:var(--gray-400);font-size:0.85rem;">
+                                    Önce bir saha seçin.
                                 </div>
-                                {% endfor %}
                             </div>
                         </div>
 

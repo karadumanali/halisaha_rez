@@ -1,3 +1,4 @@
+        {% from "admin/_hour_picker.html" import hour_picker %}
         <!-- ══ TAB 2: SAHALAR ══ -->
         <div class="tab-panel" id="tab-sahalar">
 
@@ -10,64 +11,137 @@
             </div>
 
             <div class="pitches-layout">
-                <!-- Saha Ekle -->
-                <div class="card">
+                <!-- Saha Ekle — 2 adımlı sihirbaz -->
+                <div class="card pitch-wizard" id="pitchWizard">
                     <div class="section-head-inline">
-                        <i class="fas fa-plus-circle" style="color:var(--teal)"></i>
+                        <i class="fas fa-plus-circle wz-head-icon"></i>
                         <h3>Yeni Saha Ekle</h3>
                     </div>
-                    <div style="padding:22px;">
-                        <form action="/admin/add_pitch" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="wz-steps">
+                        <div class="wz-step active" data-step-ind="1">
+                            <span class="wz-step-num"><span>1</span><i class="fas fa-check"></i></span>
+                            <span class="wz-step-label">Saha Bilgileri</span>
+                        </div>
+                        <div class="wz-step-line"></div>
+                        <div class="wz-step" data-step-ind="2">
+                            <span class="wz-step-num"><span>2</span><i class="fas fa-check"></i></span>
+                            <span class="wz-step-label">Saat Aralıkları</span>
+                        </div>
+                    </div>
+
+                    <form id="addPitchForm" action="/admin/add_pitch" method="POST" novalidate>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <!-- ADIM 1: Ad + ücret -->
+                        <div class="wz-panel active" data-step="1">
                             <div class="mb-3">
                                 <label class="form-label" for="pitchName">
                                     <i class="fas fa-futbol"></i> Saha Adı
                                 </label>
                                 <input type="text" id="pitchName" name="name" class="form-control"
-                                       required maxlength="100" placeholder="Örn: Etlik Halı Saha">
+                                       required maxlength="100" placeholder="Örn: Etlik Halı Saha"
+                                       pattern="[a-zA-Z0-9 çÇğĞıİöÖşŞüÜ\-]+"
+                                       title="Sadece harf, rakam, boşluk ve tire kullanılabilir">
                             </div>
                             <div class="mb-4">
                                 <label class="form-label" for="pitchPrice">
-                                    <i class="fas fa-lira-sign"></i> Saatlik Ücret (TL)
+                                    <i class="fas fa-lira-sign"></i> Saatlik Ücret
                                 </label>
-                                <input type="number" id="pitchPrice" name="price" class="form-control"
-                                       required min="0" max="99999" placeholder="1500">
+                                <div class="price-input">
+                                    <input type="number" id="pitchPrice" name="price" class="form-control"
+                                           required min="0" max="99999" placeholder="1500">
+                                    <span class="price-input-suffix">TL / saat</span>
+                                </div>
                             </div>
-                            <button type="submit" class="btn-sm-teal w-100" style="justify-content:center;padding:13px;">
-                                <i class="fas fa-plus"></i> Saha Ekle
+                            <button type="button" class="btn-sm-teal wz-btn-full" id="wzNext">
+                                Devam Et: Saat Aralıkları <i class="fas fa-arrow-right"></i>
                             </button>
-                        </form>
-                    </div>
+                        </div>
+
+                        <!-- ADIM 2: Saat aralıkları -->
+                        <div class="wz-panel" data-step="2">
+                            <div class="wz-recap">
+                                <div class="wz-recap-icon"><i class="fas fa-futbol"></i></div>
+                                <div class="wz-recap-info">
+                                    <div class="wz-recap-name" id="wzRecapName"></div>
+                                    <div class="wz-recap-price" id="wzRecapPrice"></div>
+                                </div>
+                                <button type="button" class="wz-recap-edit" id="wzEdit" title="Bilgileri düzenle">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                            </div>
+
+                            <p class="wz-hint">
+                                <i class="fas fa-info-circle"></i>
+                                Rezervasyona açık olacak saatleri seçin. Her kutu 1 saatlik bir dilimdir.
+                            </p>
+
+                            {{ hour_picker('addPitchPicker', slot_groups) }}
+
+                            <div class="wz-actions">
+                                <button type="button" class="btn-sm-ghost" id="wzBack">
+                                    <i class="fas fa-arrow-left"></i> Geri
+                                </button>
+                                <button type="submit" class="btn-sm-teal" id="wzSubmit" disabled>
+                                    <i class="fas fa-check"></i> Sahayı Oluştur
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
 
                 <!-- Mevcut Sahalar -->
-                <div class="card" style="overflow:hidden;">
+                <div class="card pitch-list-card">
                     <div class="section-head-inline">
-                        <i class="fas fa-list" style="color:var(--teal)"></i>
+                        <i class="fas fa-list wz-head-icon"></i>
                         <h3>Mevcut Sahalar</h3>
                         <span class="head-count">{{ pitches|length }} saha</span>
                     </div>
-                    <div style="overflow-x:auto;">
+                    <div class="pitch-table-wrap">
                         <table class="pitch-table">
                             <thead>
                                 <tr>
-                                    <th>Saha Adı</th>
+                                    <th>Saha</th>
                                     <th>Ücret</th>
-                                    <th>Rezervasyon</th>
-                                    <th style="text-align:right;">İşlemler</th>
+                                    <th>Saat Aralıkları</th>
+                                    <th class="text-end">İşlemler</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for pitch in pitches %}
                                 <tr>
-                                    <td class="pitch-name-cell">{{ pitch.name }}</td>
+                                    <td>
+                                        <div class="pitch-name-cell">{{ pitch.name }}</div>
+                                        <div class="pitch-meta">{{ pitch.reservations|length }} rezervasyon</div>
+                                    </td>
                                     <td><span class="pitch-price-badge">{{ pitch.price }} TL/sa</span></td>
-                                    <td style="color:var(--gray-400);font-size:0.85rem;">{{ pitch.reservations|length }} adet</td>
-                                    <td style="text-align:right;">
-                                        <div style="display:flex;gap:6px;justify-content:flex-end;">
-                                            <button class="btn-sm-ghost" data-bs-toggle="modal"
-                                                    data-bs-target="#priceModal{{ pitch.id }}" title="Fiyat Güncelle">
-                                                <i class="fas fa-pen"></i> Fiyat
+                                    <td>
+                                        {% if pitch.time_slots %}
+                                        <div class="slot-summary">
+                                            <span class="slot-count-badge">
+                                                <i class="fas fa-clock"></i> {{ pitch.time_slots|length }} saat
+                                            </span>
+                                            <div class="slot-range-tags">
+                                                {% for r in pitch.slot_ranges %}
+                                                <span class="slot-range-tag">{{ r }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <span class="slot-empty-badge">
+                                            <i class="fas fa-exclamation-triangle"></i> Saat tanımlı değil
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="pitch-actions">
+                                            <button type="button" class="btn-sm-ghost btn-edit-pitch"
+                                                    data-pitch-id="{{ pitch.id }}"
+                                                    data-pitch-name="{{ pitch.name }}"
+                                                    data-pitch-price="{{ pitch.price }}"
+                                                    data-pitch-hours="{{ pitch.slot_hours|join(',') }}">
+                                                <i class="fas fa-pen"></i> Düzenle
                                             </button>
                                             <form action="/admin/delete_pitch/{{ pitch.id }}" method="POST" class="d-inline confirm-form"
                                                   data-msg="Bu saha silinecek. Emin misiniz?&#10;&#10;Sahaya bağlı rezervasyon varsa silinemez.">
@@ -91,36 +165,5 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Fiyat Modalleri -->
-            {% for pitch in pitches %}
-            <div class="modal fade" id="priceModal{{ pitch.id }}" tabindex="-1">
-                <div class="modal-dialog modal-sm modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" style="font-size:0.95rem;font-weight:800;">
-                                <i class="fas fa-pen me-2" style="color:var(--teal)"></i>Fiyat Güncelle
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <form action="/admin/update_pitch/{{ pitch.id }}" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <div class="modal-body">
-                                <p style="font-size:0.9rem;color:var(--gray-700);"><strong>{{ pitch.name }}</strong> için yeni ücret:</p>
-                                <div class="input-group mt-2">
-                                    <span class="input-group-text fw-bold">TL</span>
-                                    <input type="number" class="form-control" name="new_price"
-                                           value="{{ pitch.price }}" required min="0" max="99999">
-                                </div>
-                            </div>
-                            <div class="modal-footer gap-2">
-                                <button type="button" class="btn-sm-ghost" data-bs-dismiss="modal">İptal</button>
-                                <button type="submit" class="btn-sm-teal"><i class="fas fa-save"></i> Kaydet</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
 
         </div><!-- /tab-sahalar -->

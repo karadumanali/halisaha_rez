@@ -57,6 +57,18 @@ class Pitch(db.Model):
     reservations  = db.relationship('Reservation',  backref='pitch', lazy=True, cascade='all, delete-orphan')
     images        = db.relationship('PitchImage',   backref='pitch', lazy=True, cascade='all, delete-orphan')
     blocked_slots = db.relationship('BlockedSlot',  backref='pitch', lazy=True, cascade='all, delete-orphan')
+    time_slots    = db.relationship('PitchTimeSlot', backref='pitch', lazy=True, cascade='all, delete-orphan',
+                                     order_by='PitchTimeSlot.start_hour')
+
+    @property
+    def slot_hours(self):
+        """Tanımlı slotların başlangıç saatleri: [9, 10, 11, ...]"""
+        return [ts.start_hour for ts in self.time_slots]
+
+    @property
+    def slot_ranges(self):
+        """Ardışık slotları birleştirir: ['09:00–12:00', '17:00–22:00']"""
+        return PitchTimeSlot.ranges(self.slot_hours)
 
     def __repr__(self):
         return f'<Pitch {self.name}>'
@@ -146,3 +158,44 @@ class AuditLog(db.Model):
 
     def __repr__(self):
         return f'<AuditLog {self.admin} | {self.action} | {self.created_at}>'
+
+
+# ── 8. SAHA SAAT DİLİMLERİ TABLOSU ──────────────────────────────
+
+class PitchTimeSlot(db.Model):
+    __tablename__ = 'pitch_time_slots'
+
+    __table_args__ = (
+        db.UniqueConstraint('pitch_id', 'start_hour',
+                            name='uq_pitch_time_slot'),
+    )
+
+    id         = db.Column(db.Integer, primary_key=True)
+    pitch_id   = db.Column(db.Integer, db.ForeignKey('pitches.id'), nullable=False)
+    start_hour = db.Column(db.Integer, nullable=False)  # 0-23
+    end_hour   = db.Column(db.Integer, nullable=False)   # 1-24
+
+    @property
+    def label(self):
+        """'09:00 - 10:00' formatında etiket döndürür."""
+        return f'{self.start_hour:02d}:00 - {self.end_hour:02d}:00'
+
+    @staticmethod
+    def ranges(hours):
+        """Başlangıç saatlerini ardışık aralıklara birleştirir.
+        [9, 10, 11, 17, 18] → ['09:00–12:00', '17:00–19:00']"""
+        result = []
+        start = prev = None
+        for h in sorted(hours):
+            if start is not None and h == prev + 1:
+                prev = h
+                continue
+            if start is not None:
+                result.append(f'{start:02d}:00–{prev + 1:02d}:00')
+            start = prev = h
+        if start is not None:
+            result.append(f'{start:02d}:00–{prev + 1:02d}:00')
+        return result
+
+    def __repr__(self):
+        return f'<PitchTimeSlot {self.label} pitch={self.pitch_id}>'

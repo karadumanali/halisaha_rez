@@ -1,0 +1,52 @@
+{#
+  Saat aralığı seçici — saha ekleme sihirbazı ve saha düzenleme modalında ortak.
+  Her çip bir checkbox'tır (name="slot_hours", value=başlangıç saati),
+  seçim mantığı multi-pick-item ile aynı: tıkla → .selected
+  Davranış: static/js/admin.js → initHourPickers()
+#}
+{% macro hour_picker(picker_id, groups) %}
+<div class="hour-picker" id="{{ picker_id }}">
+
+    <div class="hp-toolbar">
+        <div class="hp-count zero">
+            <i class="fas fa-clock"></i>
+            <span><span class="hp-count-num">0</span> saat seçili</span>
+        </div>
+        <div class="hp-quick">
+            <button type="button" class="hp-quick-btn" data-hp-action="all">
+                <i class="fas fa-check-double"></i> Tümü
+            </button>
+            <button type="button" class="hp-quick-btn" data-hp-action="clear">
+                <i class="fas fa-eraser"></i> Temizle
+            </button>
+        </div>
+    </div>
+
+    {% for label, icon, hours in groups %}
+    <div class="hp-group">
+        <div class="hp-group-head">
+            <span class="hp-group-icon"><i class="fas {{ icon }}"></i></span>
+            <span class="hp-group-title">{{ label }}</span>
+            <span class="hp-group-range">{{ '%02d:00'|format(hours[0]) }} – {{ '%02d:00'|format(hours[-1] + 1) }}</span>
+            <button type="button" class="hp-group-toggle">Tümünü seç</button>
+        </div>
+        <div class="hp-grid">
+            {% for h in hours %}
+            <label class="hour-chip" title="{{ '%02d:00 – %02d:00'|format(h, h + 1) }}">
+                <input type="checkbox" name="slot_hours" value="{{ h }}">
+                <span class="hc-start">{{ '%02d:00'|format(h) }}</span>
+                <span class="hc-end"><i class="fas fa-arrow-right-long"></i> {{ '%02d:00'|format(h + 1) }}</span>
+                <span class="hc-check"><i class="fas fa-check"></i></span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="hp-summary empty">
+        <i class="fas fa-calendar-check"></i>
+        <span class="hp-summary-text">Henüz saat seçilmedi</span>
+    </div>
+
+</div>
+{% endmacro %}

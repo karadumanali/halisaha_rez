@@ -22,7 +22,7 @@ from flask_login import login_required, current_user
 
 from models import db, Pitch, Reservation, BlockedSlot
 from extensions import limiter
-from utils.constants import VALID_SLOTS
+from models import PitchTimeSlot
 from utils.helpers import audit
 
 
@@ -183,7 +183,12 @@ def generate_report(pitch: Pitch, report_date, reservations: list,
             res_by_slot[r.time_slot] = []
         res_by_slot[r.time_slot].append(r)
 
-    for slot in VALID_SLOTS:
+    # Sahaya özel saat dilimlerini çek
+    pitch_slots = PitchTimeSlot.query.filter_by(pitch_id=pitch.id)\
+        .order_by(PitchTimeSlot.start_hour).all()
+    valid_slots = [ts.label for ts in pitch_slots]
+
+    for slot in valid_slots:
         if slot in blocked_dict:
             table_data.append([
                 slot, f'KİLİTLİ: {blocked_dict[slot]}', '-', '-', '-'

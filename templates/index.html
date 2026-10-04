@@ -852,7 +852,7 @@ function setButtonLoading(btn, loadingText) {
 var state = { step:1, pitchId:null, pitchName:null, pitchPrice:null, date:null, slot:null };
 var busySlots = {};
 var blockedSlots = {};
-var SLOTS = ['16:00 - 17:00','17:00 - 18:00','18:00 - 19:00','19:00 - 20:00','20:00 - 21:00','21:00 - 22:00','22:00 - 23:00'];
+var SLOTS = []; // Sahaya özel slotlar — fetchBusy ile DB'den yüklenir
 
 function goStep(n) {
     document.querySelectorAll('.step-panel').forEach(function(p){ p.classList.remove('active'); });
@@ -923,12 +923,13 @@ function checkStep1() {
 
 function fetchBusy() {
     fetch('/busy_slots?pitch_id='+state.pitchId+'&date='+state.date)
-        .then(function(r){return r.ok?r.json():{busy:{},blocked:{}};})
+        .then(function(r){return r.ok?r.json():{busy:{},blocked:{},available_slots:[]};})
         .then(function(d){
             busySlots    = d.busy    || {};
             blockedSlots = d.blocked || {};
+            SLOTS        = d.available_slots || [];
         })
-        .catch(function(){busySlots={};blockedSlots={};});
+        .catch(function(){busySlots={};blockedSlots={};SLOTS=[];});
 }
 
 function renderSlots() {
@@ -939,6 +940,14 @@ function renderSlots() {
     document.getElementById('btn2Next').disabled=true;
     var now=new Date(), selDate=new Date(state.date+'T00:00:00');
     var isToday=selDate.toDateString()===now.toDateString();
+
+    if(SLOTS.length===0){
+        var emptyDiv=document.createElement('div');
+        emptyDiv.style.cssText='text-align:center;padding:30px 16px;color:#94a3b8;font-size:0.9rem;';
+        emptyDiv.innerHTML='<i class="fas fa-clock" style="font-size:1.8rem;margin-bottom:10px;display:block;color:#cbd5e1;"></i>Bu saha için henüz saat dilimi tanımlanmamış.<br><span style="font-size:0.78rem;">Lütfen yöneticiyle iletişime geçin.</span>';
+        list.appendChild(emptyDiv);
+        return;
+    }
 
     SLOTS.forEach(function(slot){
         var startHour=parseInt(slot.split(':')[0]);

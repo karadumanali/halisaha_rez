@@ -17,6 +17,16 @@ VALID_SLOTS = [
     '21:00 - 22:00',
 ]
 
+# ── Admin panelinde seçilebilen saat aralıkları ─────────────────────
+# (grup adı, ikon, başlangıç saatleri) — her saat 1 saatlik slottur.
+
+SLOT_GROUPS = [
+    ('Sabah',         'fa-sun',       list(range(8, 12))),
+    ('Öğleden Sonra', 'fa-cloud-sun', list(range(12, 17))),
+    ('Akşam',         'fa-moon',      list(range(17, 24))),
+]
+SLOT_START_HOURS = [h for _, _, hours in SLOT_GROUPS for h in hours]
+
 # ── İzin verilen dosya uzantıları ───────────────────────────────────
 
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
