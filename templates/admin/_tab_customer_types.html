@@ -1,0 +1,128 @@
+        {% from "admin/_type_price_fields.html" import ctype_icon %}
+        <!-- ══ TAB: MÜŞTERİ TİPLERİ ══ -->
+        <div class="tab-panel" id="tab-musteri-tipleri">
+
+            <div class="panel-heading">
+                <div class="panel-icon teal"><i class="fas fa-id-badge"></i></div>
+                <div>
+                    <div class="panel-title">Müşteri Tipleri</div>
+                    <div class="panel-sub">{{ customer_types|length }} tip tanımlı — her tipin sahalarda ayrı ücreti olur</div>
+                </div>
+            </div>
+
+            <div class="pitches-layout">
+                <!-- Yeni tip -->
+                <div class="ct-side">
+                    <div class="card">
+                        <div class="section-head-inline">
+                            <i class="fas fa-plus-circle wz-head-icon"></i>
+                            <h3>Yeni Müşteri Tipi</h3>
+                        </div>
+                        <form action="/admin/customer_types/add" method="POST" class="ct-form" id="addCtypeForm">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label class="form-label" for="ctName">
+                                    <i class="fas fa-id-badge"></i> Tip Adı
+                                </label>
+                                <input type="text" id="ctName" name="name" class="form-control"
+                                       required minlength="2" maxlength="60"
+                                       placeholder="Örn: Mezun, Misafir">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label" for="ctDefaultPrice">
+                                    <i class="fas fa-lira-sign"></i> Varsayılan Ücret
+                                    <span class="multi-hint">(isteğe bağlı)</span>
+                                </label>
+                                <div class="price-input">
+                                    <input type="number" id="ctDefaultPrice" name="default_price" class="form-control"
+                                           min="0" max="99999" placeholder="Örn: 1000">
+                                    <span class="price-input-suffix">TL / saat</span>
+                                </div>
+                            </div>
+                            <p class="ct-form-hint">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Doldurursanız bu ücret <strong>tüm sahalara</strong> uygulanır. Boş bırakırsanız
+                                tip, Sahalar sekmesinden ücret belirlenene kadar rezervasyonda görünmez.</span>
+                            </p>
+                            <button type="submit" class="btn-sm-teal wz-btn-full" data-loading-text="Ekleniyor...">
+                                <i class="fas fa-plus"></i> Tipi Ekle
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="ct-info-card">
+                        <div class="ct-info-title"><i class="fas fa-lightbulb"></i> Nasıl çalışır?</div>
+                        <ul>
+                            <li>Kullanıcı önce sahayı, sonra müşteri tipini seçer; ücret tipe göre otomatik gelir.</li>
+                            <li>Saat dilimleri tüm tipler için <strong>ortaktır</strong> — bir saat dolunca herkes için dolar.</li>
+                            <li>Bir sahada ücreti boş bırakılan tip o sahayı rezerve edemez.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Tanımlı tipler -->
+                <div class="card pitch-list-card">
+                    <div class="section-head-inline">
+                        <i class="fas fa-list wz-head-icon"></i>
+                        <h3>Tanımlı Tipler</h3>
+                        <span class="head-count">{{ customer_types|length }} tip</span>
+                    </div>
+
+                    <div class="ct-list">
+                        {% for ct in customer_types %}
+                        {% set priced = ct.pricing|map(attribute='pitch_id')|list %}
+                        {% set missing = pitches|rejectattr('id', 'in', priced)|list %}
+                        {% set res_count = ct.reservations|length %}
+                        <div class="ct-item">
+                            <div class="ct-item-icon">
+                                <i class="fas {{ ctype_icon(ct.name) }}"></i>
+                            </div>
+                            <div class="ct-item-body">
+                                <div class="ct-item-name">{{ ct.name }}</div>
+                                <div class="ct-item-meta">
+                                    <span><i class="fas fa-futbol"></i> {{ priced|length }} / {{ pitches|length }} sahada ücretli</span>
+                                    <span><i class="fas fa-clipboard-list"></i> {{ res_count }} rezervasyon</span>
+                                </div>
+                                <div class="ct-price-tags">
+                                    {% for pp in ct.pricing|sort(attribute='pitch.name') %}
+                                    <span class="ct-price-tag">{{ pp.pitch.name }} <strong>{{ pp.price }} TL</strong></span>
+                                    {% endfor %}
+                                    {% for p in missing %}
+                                    <span class="ct-price-tag missing" title="Bu sahada ücret tanımlı değil — tip bu sahayı rezerve edemez">
+                                        <i class="fas fa-exclamation-triangle"></i> {{ p.name }}: ücret yok
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="pitch-actions">
+                                <button type="button" class="btn-sm-ghost btn-edit-ctype"
+                                        data-ctype-id="{{ ct.id }}" data-ctype-name="{{ ct.name }}">
+                                    <i class="fas fa-pen"></i> Düzenle
+                                </button>
+                                {% if res_count %}
+                                <button type="button" class="btn-sm-danger" disabled
+                                        title="Rezervasyonu olan tip silinemez">
+                                    <i class="fas fa-trash"></i> Sil
+                                </button>
+                                {% else %}
+                                <form action="/admin/customer_types/{{ ct.id }}/delete" method="POST" class="d-inline confirm-form"
+                                      data-msg="&quot;{{ ct.name }}&quot; müşteri tipi ve tüm sahalardaki ücretleri silinecek. Emin misiniz?">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn-sm-danger" data-loading-text="Siliniyor...">
+                                        <i class="fas fa-trash"></i> Sil
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="empty-state-sm">
+                            <i class="fas fa-id-badge"></i>
+                            Henüz müşteri tipi yok. Saha eklemeden önce en az bir tip tanımlayın.
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /tab-musteri-tipleri -->

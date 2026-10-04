@@ -1,4 +1,5 @@
 {% from "admin/_hour_picker.html" import hour_picker %}
+{% from "admin/_type_price_fields.html" import type_price_fields %}
 <!-- ══ SAHA DÜZENLE MODAL — ücret + saat aralıkları (body'nin doğrudan çocuğu) ══ -->
 <div id="pitchEditModal" class="pw-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pitchEditTitle">
     <div class="pw-modal-box pe-modal-box">
@@ -19,14 +20,11 @@
 
             <div class="pe-modal-body">
                 <div class="pe-section">
-                    <label class="pe-section-title" for="pitchEditPrice">
-                        <i class="fas fa-lira-sign"></i> Saatlik Ücret
-                    </label>
-                    <div class="price-input">
-                        <input type="number" id="pitchEditPrice" name="new_price" class="pw-input"
-                               required min="0" max="99999">
-                        <span class="price-input-suffix">TL / saat</span>
+                    <div class="pe-section-title">
+                        <i class="fas fa-lira-sign"></i> Saatlik Ücretler
+                        <span class="multi-hint">(müşteri tipine göre)</span>
                     </div>
+                    {{ type_price_fields('pitchEditPrice', customer_types, 'pw-input') }}
                 </div>
 
                 <div class="pe-section">

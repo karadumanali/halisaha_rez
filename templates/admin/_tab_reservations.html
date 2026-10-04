@@ -38,13 +38,13 @@
                 <div class="adv-filter-group">
                     <div class="adv-filter-label"><i class="fas fa-calendar-alt"></i> Tarih</div>
                     <div class="adv-filter-chips">
-                        <a href="{{ url_for('admin.admin_dashboard', date_range='today', pitch=request.args.get('pitch','all')) }}"
+                        <a href="{{ url_for('admin.admin_dashboard', date_range='today', pitch=request.args.get('pitch','all'), ctype=request.args.get('ctype','all')) }}"
                            class="filter-chip {{ 'active' if request.args.get('date_range') == 'today' else '' }}">Bugün</a>
-                        <a href="{{ url_for('admin.admin_dashboard', date_range='week', pitch=request.args.get('pitch','all')) }}"
+                        <a href="{{ url_for('admin.admin_dashboard', date_range='week', pitch=request.args.get('pitch','all'), ctype=request.args.get('ctype','all')) }}"
                            class="filter-chip {{ 'active' if request.args.get('date_range') == 'week' else '' }}">Bu Hafta</a>
-                        <a href="{{ url_for('admin.admin_dashboard', date_range='month', pitch=request.args.get('pitch','all')) }}"
+                        <a href="{{ url_for('admin.admin_dashboard', date_range='month', pitch=request.args.get('pitch','all'), ctype=request.args.get('ctype','all')) }}"
                            class="filter-chip {{ 'active' if request.args.get('date_range') == 'month' else '' }}">Bu Ay</a>
-                        <a href="{{ url_for('admin.admin_dashboard', pitch=request.args.get('pitch','all')) }}"
+                        <a href="{{ url_for('admin.admin_dashboard', pitch=request.args.get('pitch','all'), ctype=request.args.get('ctype','all')) }}"
                            class="filter-chip {{ 'active' if not request.args.get('date_range') else '' }}">Tümü</a>
                     </div>
                 </div>
@@ -52,16 +52,31 @@
                 <div class="adv-filter-group">
                     <div class="adv-filter-label"><i class="fas fa-futbol"></i> Saha</div>
                     <div class="adv-filter-chips">
-                        <a href="{{ url_for('admin.admin_dashboard', date_range=request.args.get('date_range',''), pitch='all') }}"
+                        <a href="{{ url_for('admin.admin_dashboard', date_range=request.args.get('date_range',''), pitch='all', ctype=request.args.get('ctype','all')) }}"
                            class="filter-chip {{ 'active' if request.args.get('pitch','all') == 'all' else '' }}">Tümü</a>
                         {% for p in pitches %}
-                        <a href="{{ url_for('admin.admin_dashboard', date_range=request.args.get('date_range',''), pitch=p.id) }}"
+                        <a href="{{ url_for('admin.admin_dashboard', date_range=request.args.get('date_range',''), pitch=p.id, ctype=request.args.get('ctype','all')) }}"
                            class="filter-chip {{ 'active' if request.args.get('pitch','all')|string == p.id|string else '' }}">{{ p.name }}</a>
                         {% endfor %}
                     </div>
                 </div>
+                <!-- Müşteri Tipi Filtresi -->
+                {% if customer_types %}
+                <div class="adv-filter-group">
+                    <div class="adv-filter-label"><i class="fas fa-id-badge"></i> Müşteri Tipi</div>
+                    <div class="adv-filter-chips">
+                        <a href="{{ url_for('admin.admin_dashboard', date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all'), ctype='all') }}"
+                           class="filter-chip {{ 'active' if request.args.get('ctype','all') == 'all' else '' }}">Tümü</a>
+                        {% for ct in customer_types %}
+                        <a href="{{ url_for('admin.admin_dashboard', date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all'), ctype=ct.id) }}"
+                           class="filter-chip {{ 'active' if request.args.get('ctype','all')|string == ct.id|string else '' }}">{{ ct.name }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
                 <!-- Aktif filtre göstergesi -->
-                {% if request.args.get('date_range') or (request.args.get('pitch') and request.args.get('pitch') != 'all') %}
+                {% if request.args.get('date_range') or (request.args.get('pitch') and request.args.get('pitch') != 'all')
+                      or (request.args.get('ctype') and request.args.get('ctype') != 'all') %}
                 <div class="adv-filter-active">
                     <i class="fas fa-filter"></i>
                     <span>Filtre aktif — {{ filtered_count }} sonuç</span>
@@ -110,6 +125,13 @@
                     <div class="res-field">
                         <span class="rf-label">Saha</span>
                         <span class="rf-val">{{ res.pitch.name }}</span>
+                    </div>
+                    <div class="res-field">
+                        <span class="rf-label">Müşteri Tipi</span>
+                        <span class="rf-val">
+                            {% if res.customer_type %}<span class="res-ctype-badge">{{ res.customer_type.name }}</span>{% else %}—{% endif %}
+                            {% if res.price is not none %}<span class="res-price">{{ res.price }} TL</span>{% endif %}
+                        </span>
                     </div>
                     <div class="res-field">
                         <span class="rf-label">Telefon</span>
@@ -165,7 +187,7 @@
             {% if pagination.pages > 1 %}
             <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:20px; flex-wrap:wrap;">
                 {% if pagination.has_prev %}
-                <a href="{{ url_for('admin.admin_dashboard', page=pagination.prev_num, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all')) }}"
+                <a href="{{ url_for('admin.admin_dashboard', page=pagination.prev_num, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all'), ctype=request.args.get('ctype','all')) }}"
                    style="display:inline-flex; align-items:center; gap:5px; padding:8px 16px;
                           background:var(--white); border:1.5px solid var(--gray-300);
                           border-radius:var(--r-xs); color:var(--gray-600); font-size:0.85rem;
@@ -183,7 +205,7 @@
                             {{ p }}
                         </span>
                         {% else %}
-                        <a href="{{ url_for('admin.admin_dashboard', page=p, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all')) }}"
+                        <a href="{{ url_for('admin.admin_dashboard', page=p, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all'), ctype=request.args.get('ctype','all')) }}"
                            style="display:inline-flex; align-items:center; justify-content:center;
                                   width:36px; height:36px; background:var(--white);
                                   border:1.5px solid var(--gray-300); border-radius:var(--r-xs);
@@ -198,7 +220,7 @@
                 {% endfor %}
 
                 {% if pagination.has_next %}
-                <a href="{{ url_for('admin.admin_dashboard', page=pagination.next_num, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all')) }}"
+                <a href="{{ url_for('admin.admin_dashboard', page=pagination.next_num, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all'), ctype=request.args.get('ctype','all')) }}"
                    style="display:inline-flex; align-items:center; gap:5px; padding:8px 16px;
                           background:var(--white); border:1.5px solid var(--gray-300);
                           border-radius:var(--r-xs); color:var(--gray-600); font-size:0.85rem;

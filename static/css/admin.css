@@ -170,7 +170,7 @@
 
 .res-card-body {
     padding: 14px 18px;
-    display: grid; grid-template-columns: repeat(5, 1fr);
+    display: grid; grid-template-columns: repeat(6, 1fr);
     gap: 10px;
 }
 .res-field .rf-label { font-weight: 700; color: var(--gray-400); font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 3px; }
@@ -331,7 +331,8 @@
 .pitch-table tr:last-child td { border-bottom: none; }
 .pitch-table tr:hover td { background: var(--gray-50); }
 .pitch-name-cell { font-weight: 700; color: var(--ink); }
-.pitch-meta { font-size: 0.74rem; color: var(--gray-400); font-weight: 600; margin-top: 2px; }
+.pitch-meta { font-size: 0.74rem; color: var(--gray-400); font-weight: 600; margin-top: 2px; white-space: nowrap; }
+.pitch-table td:first-child { min-width: 130px; }
 .pitch-price-badge {
     background: var(--teal); color: var(--white);
     font-size: 0.8rem; font-weight: 800;
@@ -432,6 +433,129 @@
 .wz-actions { display: flex; gap: 8px; margin-top: 16px; }
 .wz-actions .btn-sm-ghost { padding: 11px 16px; }
 .wz-actions .btn-sm-teal { flex: 1; justify-content: center; padding: 12px; }
+
+/* ── MÜŞTERİ TİPİ BAZLI ÜCRET ALANLARI ── */
+.type-price-list {
+    border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
+    background: var(--white); overflow: hidden;
+}
+.type-price-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-bottom: 1px solid var(--gray-200);
+    transition: background 0.15s;
+}
+.type-price-row:last-child { border-bottom: none; }
+.type-price-row:focus-within { background: #f6fdfa; }
+.type-price-name {
+    flex: 1; min-width: 0; margin: 0; cursor: pointer;
+    display: flex; align-items: center; gap: 9px;
+    font-size: 0.85rem; font-weight: 700; color: var(--ink); line-height: 1.3;
+}
+.type-price-icon {
+    width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+    background: var(--teal-pale); color: var(--teal-dk);
+    display: flex; align-items: center; justify-content: center; font-size: 0.8rem;
+}
+.type-price-input { width: 150px; flex-shrink: 0; }
+.type-price-input input { padding-top: 9px !important; padding-bottom: 9px !important; padding-right: 64px !important; }
+.type-price-input input:placeholder-shown { background: var(--gray-50); }
+.type-price-error {
+    display: none; align-items: center; gap: 6px; margin-top: 8px;
+    font-size: 0.78rem; font-weight: 700; color: var(--danger);
+}
+.type-price-error.visible { display: flex; }
+.type-price-hint { margin: 8px 0 0; }
+.type-price-empty {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 12px 14px; border-radius: var(--r-sm);
+    background: #fffbeb; border: 1.5px solid #fcd34d;
+    font-size: 0.82rem; color: #92400e; line-height: 1.5;
+}
+.type-price-empty i { margin-top: 3px; }
+.link-btn {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font: inherit; font-weight: 800; color: var(--teal-dk); text-decoration: underline;
+}
+
+.wz-recap-prices { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; }
+.wz-recap-prices span { font-size: 0.75rem; font-weight: 600; color: var(--gray-600); }
+.wz-recap-prices strong { color: var(--teal-dk); font-weight: 800; }
+
+/* Tablo — tip bazlı ücret çipleri */
+.type-price-chips { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.tp-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--teal-pale); border: 1px solid var(--mint-mid);
+    border-radius: 7px; padding: 3px 4px 3px 9px;
+    font-size: 0.74rem; white-space: nowrap;
+}
+.tp-chip-name { color: var(--teal-dk); font-weight: 700; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.tp-chip strong {
+    background: var(--teal); color: var(--white);
+    border-radius: 5px; padding: 1px 7px; font-weight: 800;
+}
+.tp-chip.off { background: var(--gray-50); border-color: var(--gray-200); }
+.tp-chip.off .tp-chip-name { color: var(--gray-400); }
+.tp-chip.off strong { background: var(--gray-200); color: var(--gray-600); }
+
+/* ── MÜŞTERİ TİPLERİ SEKMESİ ── */
+.ct-side { display: flex; flex-direction: column; gap: 16px; }
+.ct-form { padding: 20px 22px 22px; }
+.ct-form-hint {
+    display: flex; gap: 7px; align-items: flex-start;
+    font-size: 0.76rem; color: var(--gray-600); line-height: 1.5; margin: 0 0 16px;
+}
+.ct-form-hint i { color: var(--teal); margin-top: 3px; }
+.ct-info-card {
+    background: linear-gradient(135deg, var(--teal-pale) 0%, #f0fdf8 100%);
+    border: 1.5px solid var(--mint-mid); border-radius: var(--r);
+    padding: 16px 18px;
+}
+.ct-info-title {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 0.85rem; font-weight: 800; color: var(--teal-dk); margin-bottom: 8px;
+}
+.ct-info-card ul { margin: 0; padding-left: 18px; font-size: 0.8rem; color: var(--gray-700); line-height: 1.6; }
+.ct-info-card li + li { margin-top: 4px; }
+
+.ct-list { display: flex; flex-direction: column; }
+.ct-item {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 18px 20px; border-bottom: 1px solid var(--gray-200);
+    transition: background 0.12s;
+}
+.ct-item:last-child { border-bottom: none; }
+.ct-item:hover { background: var(--gray-50); }
+.ct-item-icon {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    background: var(--teal); color: var(--white);
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+    box-shadow: 0 2px 8px rgba(14,168,116,0.25);
+}
+.ct-item-body { flex: 1; min-width: 0; }
+.ct-item-name { font-size: 0.98rem; font-weight: 800; color: var(--ink); }
+.ct-item-meta {
+    display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 3px;
+    font-size: 0.75rem; font-weight: 600; color: var(--gray-400);
+}
+.ct-item-meta i { margin-right: 3px; }
+.ct-price-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.ct-price-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--white); border: 1px solid var(--gray-200); border-radius: 7px;
+    padding: 3px 9px; font-size: 0.74rem; font-weight: 600; color: var(--gray-600);
+}
+.ct-price-tag strong { color: var(--teal-dk); font-weight: 800; }
+.ct-price-tag.missing { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+.btn-sm-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-sm-danger:disabled:hover { background: var(--danger-bg); color: var(--danger); }
+
+/* Rezervasyon kartı — tip rozeti */
+.res-ctype-badge {
+    display: inline-block; background: var(--teal-pale); color: var(--teal-dk);
+    border-radius: 6px; padding: 1px 8px; font-size: 0.78rem; font-weight: 700;
+}
+.res-price { display: block; font-size: 0.78rem; font-weight: 800; color: var(--gray-600); margin-top: 2px; }
 
 /* ── SAAT SEÇİCİ (hour-picker) ── */
 .hour-picker { display: flex; flex-direction: column; gap: 12px; }
@@ -1026,7 +1150,7 @@
 /* İki input yan yana, eşit genişlik, üst hizada */
 .report-inputs-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 24px;
     align-items: start;
 }
@@ -1360,4 +1484,8 @@
 }
 @media (max-width: 900px) {
     .audit-item { grid-template-columns: 120px 110px 140px 1fr; }
+}@media (max-width: 600px) {
+    .ct-item { flex-wrap: wrap; }
+    .ct-item .pitch-actions { width: 100%; justify-content: flex-start; padding-left: 58px; }
+    .type-price-input { width: 130px; }
 }

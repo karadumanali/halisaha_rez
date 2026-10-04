@@ -1,4 +1,5 @@
         {% from "admin/_hour_picker.html" import hour_picker %}
+        {% from "admin/_type_price_fields.html" import type_price_fields %}
         <!-- ══ TAB 2: SAHALAR ══ -->
         <div class="tab-panel" id="tab-sahalar">
 
@@ -33,7 +34,7 @@
                     <form id="addPitchForm" action="/admin/add_pitch" method="POST" novalidate>
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-                        <!-- ADIM 1: Ad + ücret -->
+                        <!-- ADIM 1: Ad + müşteri tipine göre ücretler -->
                         <div class="wz-panel active" data-step="1">
                             <div class="mb-3">
                                 <label class="form-label" for="pitchName">
@@ -44,17 +45,15 @@
                                        pattern="[a-zA-Z0-9 çÇğĞıİöÖşŞüÜ\-]+"
                                        title="Sadece harf, rakam, boşluk ve tire kullanılabilir">
                             </div>
-                            <div class="mb-4">
-                                <label class="form-label" for="pitchPrice">
-                                    <i class="fas fa-lira-sign"></i> Saatlik Ücret
-                                </label>
-                                <div class="price-input">
-                                    <input type="number" id="pitchPrice" name="price" class="form-control"
-                                           required min="0" max="99999" placeholder="1500">
-                                    <span class="price-input-suffix">TL / saat</span>
+                            <div class="mb-3">
+                                <div class="form-label">
+                                    <i class="fas fa-lira-sign"></i> Saatlik Ücretler
+                                    <span class="multi-hint">(müşteri tipine göre)</span>
                                 </div>
+                                {{ type_price_fields('pitchPrice', customer_types) }}
                             </div>
-                            <button type="button" class="btn-sm-teal wz-btn-full" id="wzNext">
+                            <button type="button" class="btn-sm-teal wz-btn-full" id="wzNext"
+                                    {{ 'disabled' if not customer_types }}>
                                 Devam Et: Saat Aralıkları <i class="fas fa-arrow-right"></i>
                             </button>
                         </div>
@@ -65,7 +64,7 @@
                                 <div class="wz-recap-icon"><i class="fas fa-futbol"></i></div>
                                 <div class="wz-recap-info">
                                     <div class="wz-recap-name" id="wzRecapName"></div>
-                                    <div class="wz-recap-price" id="wzRecapPrice"></div>
+                                    <div class="wz-recap-prices" id="wzRecapPrices"></div>
                                 </div>
                                 <button type="button" class="wz-recap-edit" id="wzEdit" title="Bilgileri düzenle">
                                     <i class="fas fa-pen"></i>
@@ -103,7 +102,7 @@
                             <thead>
                                 <tr>
                                     <th>Saha</th>
-                                    <th>Ücret</th>
+                                    <th>Ücretler</th>
                                     <th>Saat Aralıkları</th>
                                     <th class="text-end">İşlemler</th>
                                 </tr>
@@ -115,7 +114,18 @@
                                         <div class="pitch-name-cell">{{ pitch.name }}</div>
                                         <div class="pitch-meta">{{ pitch.reservations|length }} rezervasyon</div>
                                     </td>
-                                    <td><span class="pitch-price-badge">{{ pitch.price }} TL/sa</span></td>
+                                    <td>
+                                        {% set pm = pitch.price_map %}
+                                        <div class="type-price-chips">
+                                            {% for ct in customer_types %}
+                                            {% if ct.id in pm %}
+                                            <span class="tp-chip"><span class="tp-chip-name" title="{{ ct.name }}">{{ ct.name }}</span><strong>{{ pm[ct.id] }} TL</strong></span>
+                                            {% else %}
+                                            <span class="tp-chip off" title="{{ ct.name }}: bu sahayı rezerve edemez"><span class="tp-chip-name">{{ ct.name }}</span><strong>kapalı</strong></span>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </td>
                                     <td>
                                         {% if pitch.time_slots %}
                                         <div class="slot-summary">
@@ -139,7 +149,7 @@
                                             <button type="button" class="btn-sm-ghost btn-edit-pitch"
                                                     data-pitch-id="{{ pitch.id }}"
                                                     data-pitch-name="{{ pitch.name }}"
-                                                    data-pitch-price="{{ pitch.price }}"
+                                                    data-pitch-prices='{{ pitch.price_map|tojson }}'
                                                     data-pitch-hours="{{ pitch.slot_hours|join(',') }}">
                                                 <i class="fas fa-pen"></i> Düzenle
                                             </button>

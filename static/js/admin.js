@@ -146,15 +146,16 @@ function bindConfirmForms() {
             var loadingText = submitBtn ? (submitBtn.dataset.loadingText || 'İşleniyor...') : 'İşleniyor...';
 
             /* İkon ve stil: reddet formları için danger, diğerleri için confirm */
-            var isDanger = form.action && (form.action.indexOf('/reject') !== -1 || form.action.indexOf('/delete') !== -1);
-            var isPitch  = form.action && form.action.indexOf('/delete_pitch') !== -1;
+            var isReject = form.action && form.action.indexOf('/reject') !== -1;
+            var isDelete = form.action && form.action.indexOf('/delete') !== -1;
+            var isDanger = isReject || isDelete;
 
             sysConfirm({
                 title: isDanger ? 'Dikkat' : 'Onay',
                 body: msg.replace(/&#10;/g, '\n'),
                 icon: isDanger ? 'danger' : 'confirm',
                 iconClass: isDanger ? 'fa-exclamation-triangle' : 'fa-question-circle',
-                confirmText: isPitch ? 'Evet, Sil' : (isDanger ? 'Evet, Reddet' : 'Evet, Onayla'),
+                confirmText: isDelete ? 'Evet, Sil' : (isReject ? 'Evet, Reddet' : 'Evet, Onayla'),
                 confirmStyle: isDanger ? 'btn-danger' : ''
             }).then(function(ok) {
                 if (ok) {
@@ -779,15 +780,52 @@ function initHourPickers() {
     });
 }
 
-/* ══ Saha ekleme sihirbazı: 1) ad + ücret → 2) saat aralıkları ══ */
+/* ══ Müşteri tipi bazlı ücret alanları (price_<tip_id>) ══
+   Boş alan = tip o sahada kapalı. En az bir ücret zorunlu. */
+function tpInputs(prefix) {
+    var list = document.getElementById(prefix + 'List');
+    return list ? Array.prototype.slice.call(list.querySelectorAll('input[type="number"]')) : [];
+}
+
+/* Geçerliyse true; değilse hatayı gösterir */
+function tpValidate(prefix) {
+    var inputs = tpInputs(prefix);
+    var errEl  = document.getElementById(prefix + 'Error');
+    if (!inputs.length) return false;
+    for (var i = 0; i < inputs.length; i++) {
+        if (!inputs[i].reportValidity()) return false;
+    }
+    var filled = inputs.some(function(inp) { return inp.value.trim() !== ''; });
+    if (errEl) errEl.classList.toggle('visible', !filled);
+    if (!filled) inputs[0].focus();
+    return filled;
+}
+
+function tpSetPrices(prefix, prices) {
+    tpInputs(prefix).forEach(function(inp) {
+        var p = prices[inp.dataset.ctypeId];
+        inp.value = (p === undefined || p === null) ? '' : p;
+    });
+    var errEl = document.getElementById(prefix + 'Error');
+    if (errEl) errEl.classList.remove('visible');
+}
+
+function tpBindErrorReset(prefix) {
+    var errEl = document.getElementById(prefix + 'Error');
+    tpInputs(prefix).forEach(function(inp) {
+        inp.addEventListener('input', function() { if (errEl) errEl.classList.remove('visible'); });
+    });
+}
+
+/* ══ Saha ekleme sihirbazı: 1) ad + tip ücretleri → 2) saat aralıkları ══ */
 function initPitchWizard() {
     var form = document.getElementById('addPitchForm');
     if (!form) return;
     var nameInp   = document.getElementById('pitchName');
-    var priceInp  = document.getElementById('pitchPrice');
     var picker    = document.getElementById('addPitchPicker');
     var nextBtn   = document.getElementById('wzNext');
     var submitBtn = document.getElementById('wzSubmit');
+    tpBindErrorReset('pitchPrice');
 
     function goStep(n) {
         form.querySelectorAll('.wz-panel').forEach(function(p) {
@@ -800,15 +838,29 @@ function initPitchWizard() {
         });
     }
 
+    function renderRecap() {
+        document.getElementById('wzRecapName').textContent = nameInp.value;
+        var box = document.getElementById('wzRecapPrices');
+        box.innerHTML = '';
+        tpInputs('pitchPrice').forEach(function(inp) {
+            if (inp.value.trim() === '') return;
+            var span = document.createElement('span');
+            span.textContent = inp.dataset.ctypeName + ' ';
+            var strong = document.createElement('strong');
+            strong.textContent = inp.value + ' TL';
+            span.appendChild(strong);
+            box.appendChild(span);
+        });
+    }
+
     nextBtn.addEventListener('click', function() {
         nameInp.value = nameInp.value.trim();
-        if (!nameInp.reportValidity() || !priceInp.reportValidity()) return;
-        document.getElementById('wzRecapName').textContent  = nameInp.value;
-        document.getElementById('wzRecapPrice').textContent = priceInp.value + ' TL / saat';
+        if (!nameInp.reportValidity() || !tpValidate('pitchPrice')) return;
+        renderRecap();
         goStep(2);
     });
     /* 1. adımda Enter → formu göndermek yerine ilerle */
-    [nameInp, priceInp].forEach(function(inp) {
+    [nameInp].concat(tpInputs('pitchPrice')).forEach(function(inp) {
         inp.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') { e.preventDefault(); nextBtn.click(); }
         });
@@ -825,19 +877,19 @@ function initPitchWizard() {
     });
 }
 
-/* ══ Saha düzenleme modalı: ücret + saat aralıkları ══ */
+/* ══ Saha düzenleme modalı: tip ücretleri + saat aralıkları ══ */
 function initPitchEditModal() {
     var modal = document.getElementById('pitchEditModal');
     if (!modal) return;
-    var form     = document.getElementById('pitchEditForm');
-    var priceInp = document.getElementById('pitchEditPrice');
-    var picker   = document.getElementById('pitchEditPicker');
-    var saveBtn  = document.getElementById('btnSavePitchEdit');
+    var form    = document.getElementById('pitchEditForm');
+    var picker  = document.getElementById('pitchEditPicker');
+    var saveBtn = document.getElementById('btnSavePitchEdit');
+    tpBindErrorReset('pitchEditPrice');
 
     function openModal(btn) {
         form.action = '/admin/update_pitch/' + btn.dataset.pitchId;
         document.getElementById('pitchEditName').textContent = btn.dataset.pitchName;
-        priceInp.value = btn.dataset.pitchPrice;
+        tpSetPrices('pitchEditPrice', JSON.parse(btn.dataset.pitchPrices || '{}'));
         var hours = (btn.dataset.pitchHours || '').split(',').filter(Boolean).map(Number);
         hpSetHours(picker, hours);
         modal.querySelector('.pe-modal-body').scrollTop = 0;
@@ -862,11 +914,56 @@ function initPitchEditModal() {
     picker.addEventListener('hp:change', function(e) { saveBtn.disabled = e.detail.count === 0; });
 
     form.addEventListener('submit', function(e) {
-        if (!priceInp.reportValidity() || hpSelectedHours(picker).length === 0) {
+        if (!tpValidate('pitchEditPrice') || hpSelectedHours(picker).length === 0) {
             e.preventDefault();
             return;
         }
         setButtonLoading(saveBtn, 'Kaydediliyor...');
+    });
+}
+
+/* ══ Müşteri tipleri: ekleme formu + yeniden adlandırma modalı ══ */
+function initCustomerTypes() {
+    var addForm = document.getElementById('addCtypeForm');
+    if (addForm) {
+        addForm.addEventListener('submit', function(e) {
+            var nameInp = document.getElementById('ctName');
+            nameInp.value = nameInp.value.trim();
+            if (!addForm.checkValidity()) { e.preventDefault(); addForm.reportValidity(); return; }
+            var btn = addForm.querySelector('button[type="submit"]');
+            setButtonLoading(btn, btn.dataset.loadingText);
+        });
+    }
+
+    var modal = document.getElementById('ctypeEditModal');
+    if (!modal) return;
+    var form    = document.getElementById('ctypeEditForm');
+    var nameInp = document.getElementById('ctypeEditName');
+
+    function closeModal() {
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+    document.querySelectorAll('.btn-edit-ctype').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            form.action   = '/admin/customer_types/' + btn.dataset.ctypeId + '/update';
+            nameInp.value = btn.dataset.ctypeName;
+            modal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            nameInp.focus();
+            nameInp.select();
+        });
+    });
+    document.getElementById('btnCloseCtypeEdit').addEventListener('click', closeModal);
+    document.getElementById('btnCancelCtypeEdit').addEventListener('click', closeModal);
+    modal.addEventListener('click', function(e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+    });
+    form.addEventListener('submit', function(e) {
+        nameInp.value = nameInp.value.trim();
+        if (!form.checkValidity()) { e.preventDefault(); form.reportValidity(); return; }
+        setButtonLoading(document.getElementById('btnSaveCtypeEdit'), 'Kaydediliyor...');
     });
 }
 
@@ -902,6 +999,16 @@ document.addEventListener('DOMContentLoaded', function() {
     initHourPickers();
     initPitchWizard();
     initPitchEditModal();
+    initCustomerTypes();
+
+    /* Sekmeler arası kısayol butonları (data-goto-tab) */
+    document.querySelectorAll('[data-goto-tab]').forEach(function(el) {
+        el.addEventListener('click', function() { switchTab(el.dataset.gotoTab); });
+    });
+
+    /* İşlem sonrası doğru sekmeye dön: /admin/?tab=sahalar */
+    var initialTab = new URLSearchParams(location.search).get('tab');
+    if (initialTab && document.getElementById('tab-' + initialTab)) switchTab(initialTab);
 
     /* Kilitle butonu */
     var btnBlock = document.getElementById('btnSubmitBlock');

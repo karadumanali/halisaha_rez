@@ -106,10 +106,16 @@ FONT_REGULAR = 'Turkish'
 FONT_BOLD    = 'TurkishBd'
 
 
+def _tl(amount):
+    """1500 → '1.500 TL'"""
+    return f'{amount:,}'.replace(',', '.') + ' TL'
+
+
 def generate_report(pitch: Pitch, report_date, reservations: list,
-                    blocked_dict: dict) -> bytes:
+                    blocked_dict: dict, customer_types=None, ctype=None) -> bytes:
     """
     Verilen saha ve tarih için PDF rapor üret.
+    ctype verilirse yalnızca o müşteri tipinin rezervasyonları listelenir.
 
     Returns: PDF dosyasının byte içeriği.
     """
@@ -138,6 +144,10 @@ def generate_report(pitch: Pitch, report_date, reservations: list,
         'InfoText', parent=styles['Normal'],
         fontName=FONT_REGULAR, fontSize=9, leading=12, textColor=colors.HexColor('#4a5568')
     )
+    cell_style = ParagraphStyle(
+        'Cell', parent=styles['Normal'],
+        fontName=FONT_REGULAR, fontSize=8, leading=10
+    )
     footer_style = ParagraphStyle(
         'FooterText', parent=styles['Normal'],
         fontName=FONT_REGULAR, fontSize=7, leading=10, textColor=colors.HexColor('#8f97a8'),
@@ -149,10 +159,10 @@ def generate_report(pitch: Pitch, report_date, reservations: list,
 
     # Başlık
     story.append(Paragraph('AYBU SKS Spor Tesisleri', title_style))
-    story.append(Paragraph(
-        f'Günlük Rezervasyon Raporu &mdash; {pitch.name} &mdash; {formatted_date}',
-        subtitle_style
-    ))
+    subtitle = f'Günlük Rezervasyon Raporu &mdash; {pitch.name} &mdash; {formatted_date}'
+    if ctype:
+        subtitle += f' &mdash; Müşteri tipi: <b>{ctype.name}</b>'
+    story.append(Paragraph(subtitle, subtitle_style))
 
     # Özet
     total    = len(reservations)
@@ -171,10 +181,31 @@ def generate_report(pitch: Pitch, report_date, reservations: list,
         f'<font color="#6b21a8">Kilitli Slot: <b>{blocked_count}</b></font>'
     )
     story.append(Paragraph(summary_text, info_style))
+
+    # Müşteri tipi kırılımı — aktif (onaylı + bekleyen) rezervasyon ve onaylı gelir
+    type_names = {ct.id: ct.name for ct in (customer_types or [])}
+    breakdown = {}
+    for r in reservations:
+        if r.status not in ('Approved', 'Pending'):
+            continue
+        key = type_names.get(r.customer_type_id, 'Tip belirtilmemiş')
+        count, revenue = breakdown.get(key, (0, 0))
+        breakdown[key] = (count + 1,
+                          revenue + ((r.price or 0) if r.status == 'Approved' else 0))
+    if breakdown:
+        parts = [f'{name}: <b>{count}</b> rezervasyon, <b>{_tl(revenue)}</b> onaylı gelir'
+                 for name, (count, revenue) in breakdown.items()]
+        total_revenue = sum(rev for _, rev in breakdown.values())
+        story.append(Spacer(1, 2*mm))
+        story.append(Paragraph(
+            'Tip kırılımı &mdash; ' + ' | '.join(parts)
+            + f' | Toplam onaylı gelir: <b>{_tl(total_revenue)}</b>',
+            info_style
+        ))
     story.append(Spacer(1, 8*mm))
 
     # Tablo
-    header = ['Saat Dilimi', 'Durum', 'Müşteri', 'Telefon', 'E-posta']
+    header = ['Saat Dilimi', 'Durum', 'Müşteri Tipi / Ücret', 'Müşteri', 'Telefon', 'E-posta']
     table_data = [header]
 
     res_by_slot = {}
@@ -188,24 +219,40 @@ def generate_report(pitch: Pitch, report_date, reservations: list,
         .order_by(PitchTimeSlot.start_hour).all()
     valid_slots = [ts.label for ts in pitch_slots]
 
-    for slot in valid_slots:
-        if slot in blocked_dict:
-            table_data.append([
-                slot, f'KİLİTLİ: {blocked_dict[slot]}', '-', '-', '-'
-            ])
-        elif slot in res_by_slot:
-            for r in res_by_slot[slot]:
-                table_data.append([
-                    slot,
-                    STATUS_TR.get(r.status, r.status),
-                    r.customer_name[:30],
-                    r.customer_phone,
-                    r.customer_email[:35]
-                ])
-        else:
-            table_data.append([slot, 'Müsait', '-', '-', '-'])
+    def res_row(slot, r):
+        type_txt = type_names.get(r.customer_type_id, '—')
+        if r.price is not None:
+            type_txt += f' · {_tl(r.price)}'
+        return [
+            slot,
+            STATUS_TR.get(r.status, r.status),
+            Paragraph(type_txt, cell_style),
+            Paragraph(r.customer_name[:40], cell_style),
+            r.customer_phone,
+            r.customer_email[:30]
+        ]
 
-    col_widths = [35*mm, 35*mm, 40*mm, 30*mm, 45*mm]
+    if ctype:
+        # Tip filtresi: yalnızca bu tipin rezervasyonları (slot ortak olduğundan
+        # "Müsait" satırı yanıltıcı olur, gösterilmez)
+        for slot in valid_slots:
+            for r in res_by_slot.get(slot, []):
+                table_data.append(res_row(slot, r))
+        if len(table_data) == 1:
+            table_data.append(['-', 'Kayıt yok', '-', '-', '-', '-'])
+    else:
+        for slot in valid_slots:
+            if slot in blocked_dict:
+                table_data.append([
+                    slot, f'KİLİTLİ: {blocked_dict[slot]}', '-', '-', '-', '-'
+                ])
+            elif slot in res_by_slot:
+                for r in res_by_slot[slot]:
+                    table_data.append(res_row(slot, r))
+            else:
+                table_data.append([slot, 'Müsait', '-', '-', '-', '-'])
+
+    col_widths = [25*mm, 28*mm, 34*mm, 32*mm, 24*mm, 37*mm]
     table = Table(table_data, colWidths=col_widths, repeatRows=1)
 
     style_cmds = [

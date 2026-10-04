@@ -19,7 +19,7 @@ from flask import (
 )
 
 from extensions import db, limiter
-from models import Pitch, Reservation, BlockedSlot, PitchTimeSlot
+from models import Pitch, Reservation, BlockedSlot, PitchTimeSlot, CustomerType
 from utils.helpers import get_real_ip
 from services.security import verify_recaptcha
 from services.file_handler import save_secure_receipt
@@ -55,13 +55,15 @@ def csp_report():
 
 @public_bp.route('/')
 def index():
-    """Ana sayfa: tüm sahaları listele, rezervasyon formu göster."""
-    pitches = Pitch.query.all()
+    """Ana sayfa: fiyatı tanımlı sahaları listele, rezervasyon formu göster."""
+    pitches = [p for p in Pitch.query.order_by(Pitch.id).all() if p.pricing]
+    customer_types = CustomerType.query.order_by(CustomerType.id).all()
     today_date = datetime.now().date().isoformat()
     recaptcha_site_key = os.getenv('RECAPTCHA_SITE_KEY', '')
     return render_template(
         'index.html',
         pitches=pitches,
+        customer_types=customer_types,
         today_date=today_date,
         recaptcha_site_key=recaptcha_site_key,
         site_iban=os.getenv('SITE_IBAN', '')
@@ -125,6 +127,7 @@ def reserve():
         return redirect(url_for('public.index'))
 
     pitch_id      = request.form.get('pitch_id')
+    ctype_id      = request.form.get('customer_type_id')
     date_str      = request.form.get('date')
     time_slot     = request.form.get('time_slot')
     customer_name = request.form.get('customer_name', '').strip()
@@ -136,9 +139,20 @@ def reserve():
         flash('Gecersiz saha!', 'danger')
         return redirect(url_for('public.index'))
 
+    # Müşteri tipi + ücret doğrulama — ücret istemciden değil, DB'den alınır
+    pitch = db.session.get(Pitch, pitch_id)
+    try:
+        ctype_id = int(ctype_id)
+    except (ValueError, TypeError):
+        ctype_id = None
+    price = pitch.price_for(ctype_id) if pitch and ctype_id else None
+    if price is None:
+        flash('Lutfen gecerli bir musteri tipi secin!', 'danger')
+        return redirect(url_for('public.index'))
+
     # Saat dilimi doğrulama — sahaya özel tanımlı slotlardan mı?
-    valid_slots = [ts.label for ts in
-                   PitchTimeSlot.query.filter_by(pitch_id=pitch_id).all()]
+    # (Slotlar müşteri tipinden bağımsız ortaktır: fiziksel saha tek)
+    valid_slots = [ts.label for ts in pitch.time_slots]
     if time_slot not in valid_slots:
         flash('Gecersiz saat dilimi!', 'danger')
         return redirect(url_for('public.index'))
@@ -221,7 +235,8 @@ def reserve():
     new_res = Reservation(
         pitch_id=pitch_id, date=date_obj, time_slot=time_slot,
         customer_name=customer_name, customer_phone=clean_phone,
-        customer_email=customer_email, receipt_filename=saved_filename
+        customer_email=customer_email, receipt_filename=saved_filename,
+        customer_type_id=ctype_id, price=price
     )
     db.session.add(new_res)
 
@@ -240,6 +255,8 @@ def reserve():
     session['tracking_pitch'] = new_res.pitch.name
     session['tracking_date'] = date_obj.strftime('%d.%m.%Y')
     session['tracking_slot'] = time_slot
+    session['tracking_ctype'] = new_res.customer_type.name
+    session['tracking_price'] = price
 
     return redirect(url_for('public.reservation_success'))
 
@@ -253,6 +270,8 @@ def reservation_success():
     tracking_pitch = session.pop('tracking_pitch', None)
     tracking_date  = session.pop('tracking_date', None)
     tracking_slot  = session.pop('tracking_slot', None)
+    tracking_ctype = session.pop('tracking_ctype', None)
+    tracking_price = session.pop('tracking_price', None)
 
     if not tracking_code:
         return redirect(url_for('public.index'))
@@ -263,6 +282,8 @@ def reservation_success():
         pitch_name=tracking_pitch,
         date_str=tracking_date,
         time_slot=tracking_slot,
+        ctype_name=tracking_ctype,
+        price=tracking_price,
         hide_fab=True
     )
 

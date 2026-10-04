@@ -1,0 +1,47 @@
+{#
+  Müşteri tipi başına ücret alanları — saha ekleme sihirbazı ve düzenleme modalında ortak.
+  Alan adı: price_<tip_id>. Boş bırakılan tip o sahayı rezerve edemez.
+#}
+{% macro ctype_icon(name) -%}
+    {%- set lname = name|lower -%}
+    {{ 'fa-user-graduate' if 'öğrenci' in lname
+       else 'fa-user-tie' if ('personel' in lname or 'akademisyen' in lname)
+       else 'fa-user' }}
+{%- endmacro %}
+
+{% macro type_price_fields(id_prefix, customer_types, input_class='form-control') %}
+{% if customer_types %}
+<div class="type-price-list" id="{{ id_prefix }}List">
+    {% for ct in customer_types %}
+    <div class="type-price-row">
+        <label class="type-price-name" for="{{ id_prefix }}{{ ct.id }}">
+            <span class="type-price-icon"><i class="fas {{ ctype_icon(ct.name) }}"></i></span>
+            <span>{{ ct.name }}</span>
+        </label>
+        <div class="price-input type-price-input">
+            <input type="number" id="{{ id_prefix }}{{ ct.id }}" name="price_{{ ct.id }}"
+                   class="{{ input_class }}" min="0" max="99999" placeholder="Kapalı"
+                   data-ctype-id="{{ ct.id }}" data-ctype-name="{{ ct.name }}">
+            <span class="price-input-suffix">TL / sa</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+<div class="type-price-error" id="{{ id_prefix }}Error">
+    <i class="fas fa-exclamation-circle"></i> En az bir müşteri tipi için ücret girin.
+</div>
+<p class="wz-hint type-price-hint">
+    <i class="fas fa-info-circle"></i>
+    Boş bırakılan tip bu sahayı rezerve edemez.
+</p>
+{% else %}
+<div class="type-price-empty">
+    <i class="fas fa-exclamation-triangle"></i>
+    <div>
+        Henüz müşteri tipi yok. Ücret girebilmek için önce
+        <button type="button" class="link-btn" data-goto-tab="musteri-tipleri">Müşteri Tipleri</button>
+        sekmesinden tip ekleyin.
+    </div>
+</div>
+{% endif %}
+{% endmacro %}

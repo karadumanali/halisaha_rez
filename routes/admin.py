@@ -22,7 +22,7 @@ from PIL import Image
 from extensions import db, limiter
 from models import (
     Pitch, PitchImage, Reservation, BlockedSlot,
-    AuditLog, PitchTimeSlot
+    AuditLog, PitchTimeSlot, CustomerType, PitchPricing
 )
 from utils.constants import SLOT_GROUPS, SLOT_START_HOURS
 from utils.helpers import audit, get_real_ip
@@ -52,8 +52,10 @@ def admin_dashboard():
     per_page   = 20
     date_range = request.args.get('date_range', '')
     pitch_filter = request.args.get('pitch', 'all')
+    ctype_filter = request.args.get('ctype', 'all')
 
-    pitches = Pitch.query.all()
+    pitches        = Pitch.query.all()
+    customer_types = CustomerType.query.order_by(CustomerType.id).all()
 
     # Temel sorgu
     query = Reservation.query
@@ -82,6 +84,13 @@ def admin_dashboard():
         except (ValueError, TypeError):
             pass
 
+    # Müşteri tipi filtresi
+    if ctype_filter and ctype_filter != 'all':
+        try:
+            query = query.filter(Reservation.customer_type_id == int(ctype_filter))
+        except (ValueError, TypeError):
+            pass
+
     pagination = query.order_by(
         Reservation.created_at.desc()
     ).paginate(page=page, per_page=per_page, error_out=False)
@@ -105,6 +114,7 @@ def admin_dashboard():
     return render_template(
         'admin.html',
         pitches=pitches,
+        customer_types=customer_types,
         reservations=reservations,
         pagination=pagination,
         status_counts=status_counts,
@@ -239,59 +249,101 @@ def _parse_slot_hours(values):
     return sorted(hours)
 
 
+def _parse_pricing(form, customer_types):
+    """Formdaki price_<tip_id> alanlarını oku.
+    Boş bırakılan tip o sahayı rezerve edemez. → ({tip_id: fiyat}, hata)"""
+    prices = {}
+    for ct in customer_types:
+        raw = (form.get(f'price_{ct.id}') or '').strip()
+        if not raw:
+            continue
+        price = _parse_price(raw)
+        if price is None:
+            return None, f'"{ct.name}" için geçersiz ücret!'
+        prices[ct.id] = price
+    if not prices:
+        return None, 'En az bir müşteri tipi için ücret girmelisiniz!'
+    return prices, None
+
+
+def _pricing_label(prices, customer_types):
+    """{1: 500, 2: 800} → 'Öğrenci=500 TL, İdari Personel=800 TL'"""
+    return ', '.join(f'{ct.name}={prices[ct.id]} TL'
+                     for ct in customer_types if ct.id in prices)
+
+
+def _fmt_price(price, empty='—'):
+    return empty if price is None else f'{price} TL'
+
+
 @admin_bp.route('/add_pitch', methods=['POST'])
 @login_required
 def add_pitch():
-    """Yeni saha ekle — ad, ücret ve saat aralıkları tek adımda kaydedilir."""
+    """Yeni saha ekle — ad, tip bazlı ücretler ve saat aralıkları tek adımda kaydedilir."""
+    customer_types = CustomerType.query.order_by(CustomerType.id).all()
     name       = request.form.get('name', '').strip()
-    price      = _parse_price(request.form.get('price'))
     slot_hours = _parse_slot_hours(request.form.getlist('slot_hours'))
-    if not name or price is None:
-        flash('Gecersiz saha adi veya ucret!', 'danger')
-        return redirect(url_for('admin.admin_dashboard'))
-    if not re.match(r'^[a-zA-Z0-9\s\-çÇğĞıİöÖşŞüÜ]+$', name) or len(name) > 100:
+    if not name or not re.match(r'^[a-zA-Z0-9\s\-çÇğĞıİöÖşŞüÜ]+$', name) or len(name) > 100:
         flash('Saha adi sadece harf, rakam, bosluk ve tire icerebilir!', 'danger')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
+    prices, error = _parse_pricing(request.form, customer_types)
+    if error:
+        flash(error, 'danger')
+        return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
     if not slot_hours:
         flash('En az bir saat aralığı seçmelisiniz!', 'danger')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
 
-    pitch = Pitch(name=name, price=price)
+    pitch = Pitch(name=name)
+    pitch.pricing    = [PitchPricing(customer_type_id=t, price=p) for t, p in prices.items()]
     pitch.time_slots = [PitchTimeSlot(start_hour=h, end_hour=h + 1) for h in slot_hours]
     db.session.add(pitch)
     db.session.commit()
     audit('saha_ekle',
-          f'saha={name} | fiyat={price} TL/sa '
+          f'saha={name} | fiyatlar={_pricing_label(prices, customer_types)} '
           f'| saatler={", ".join(PitchTimeSlot.ranges(slot_hours))}')
     flash(f'"{name}" {len(slot_hours)} saat aralığıyla eklendi!', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
 
 
 @admin_bp.route('/update_pitch/<int:pitch_id>', methods=['POST'])
 @login_required
 def update_pitch(pitch_id):
-    """Saha ücretini ve saat aralıklarını güncelle."""
-    pitch      = db.get_or_404(Pitch, pitch_id)
-    new_price  = _parse_price(request.form.get('new_price'))
-    slot_hours = _parse_slot_hours(request.form.getlist('slot_hours'))
-    if new_price is None:
-        flash('Gecersiz ucret!', 'danger')
-        return redirect(url_for('admin.admin_dashboard'))
+    """Saha ücretlerini (tip bazlı) ve saat aralıklarını güncelle."""
+    pitch          = db.get_or_404(Pitch, pitch_id)
+    customer_types = CustomerType.query.order_by(CustomerType.id).all()
+    slot_hours     = _parse_slot_hours(request.form.getlist('slot_hours'))
+    prices, error  = _parse_pricing(request.form, customer_types)
+    if error:
+        flash(error, 'danger')
+        return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
     if not slot_hours:
         flash('En az bir saat aralığı seçmelisiniz!', 'danger')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
 
     changes = []
-    if new_price != pitch.price:
-        changes.append(f'fiyat: {pitch.price} TL → {new_price} TL')
-        pitch.price = new_price
+
+    old_prices = pitch.price_map
+    if old_prices != prices:
+        kept = []
+        for pp in pitch.pricing:
+            if pp.customer_type_id in prices:
+                pp.price = prices[pp.customer_type_id]
+                kept.append(pp)
+        kept += [PitchPricing(customer_type_id=t, price=p)
+                 for t, p in prices.items() if t not in old_prices]
+        # delete-orphan cascade: listeden çıkan fiyatlar silinir
+        pitch.pricing = kept
+        for ct in customer_types:
+            old, new = old_prices.get(ct.id), prices.get(ct.id)
+            if old != new:
+                changes.append(f'{ct.name}: {_fmt_price(old)} → {_fmt_price(new, "kapalı")}')
 
     old_hours = set(pitch.slot_hours)
     new_hours = set(slot_hours)
     added     = sorted(new_hours - old_hours)
     removed   = sorted(old_hours - new_hours)
     if added or removed:
-        # delete-orphan cascade: listeden çıkan slotlar silinir
         pitch.time_slots = (
             [ts for ts in pitch.time_slots if ts.start_hour in new_hours]
             + [PitchTimeSlot(start_hour=h, end_hour=h + 1) for h in added]
@@ -303,12 +355,112 @@ def update_pitch(pitch_id):
 
     if not changes:
         flash('Herhangi bir değişiklik yapılmadı.', 'info')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
 
     db.session.commit()
     audit('saha_guncelle', f'saha={pitch.name} | ' + ' | '.join(changes))
     flash(f'"{pitch.name}" güncellendi.', 'success')
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
+
+
+# ── Müşteri tipi yönetimi ─────────────────────────────────────────
+
+_CTYPE_NAME_RE = re.compile(r'^[a-zA-Z0-9\s\-/().çÇğĞıİöÖşŞüÜ]+$')
+
+
+def _validate_ctype_name(name, exclude_id=None):
+    """Müşteri tipi adını doğrula; hata mesajı ya da None döner."""
+    if len(name) < 2 or len(name) > 60 or not _CTYPE_NAME_RE.match(name):
+        return 'Tip adı 2-60 karakter olmalı; harf, rakam, boşluk ve - / ( ) . içerebilir!'
+    # Büyük/küçük harf duyarsız karşılaştırma Python'da (SQLite lower() Türkçe harfleri küçültmez)
+    key = _tr_lower(name)
+    for ct in CustomerType.query.all():
+        if ct.id != exclude_id and _tr_lower(ct.name) == key:
+            return f'"{name}" adında bir müşteri tipi zaten var!'
+    return None
+
+
+def _tr_lower(text):
+    """Türkçe kurallarıyla küçük harf: 'İ' → 'i', 'I' → 'ı'."""
+    return text.replace('İ', 'i').replace('I', 'ı').lower()
+
+
+def _ctype_redirect():
+    return redirect(url_for('admin.admin_dashboard', tab='musteri-tipleri'))
+
+
+@admin_bp.route('/customer_types/add', methods=['POST'])
+@login_required
+def add_customer_type():
+    """Yeni müşteri tipi ekle; isteğe bağlı varsayılan ücret tüm sahalara uygulanır."""
+    name  = ' '.join(request.form.get('name', '').split())
+    error = _validate_ctype_name(name)
+    if error:
+        flash(error, 'danger')
+        return _ctype_redirect()
+
+    raw_price     = request.form.get('default_price', '').strip()
+    default_price = _parse_price(raw_price) if raw_price else None
+    if raw_price and default_price is None:
+        flash('Geçersiz varsayılan ücret!', 'danger')
+        return _ctype_redirect()
+
+    ctype = CustomerType(name=name)
+    if default_price is not None:
+        ctype.pricing = [PitchPricing(pitch_id=p.id, price=default_price)
+                         for p in Pitch.query.all()]
+    db.session.add(ctype)
+    db.session.commit()
+
+    detail = f'tip={name}'
+    if default_price is not None:
+        detail += f' | varsayılan ücret={default_price} TL ({len(ctype.pricing)} sahaya uygulandı)'
+    audit('musteri_tipi_ekle', detail)
+    if default_price is None:
+        flash(f'"{name}" eklendi. Sahalar sekmesinden bu tip için ücret belirleyin.', 'success')
+    else:
+        flash(f'"{name}" eklendi ve tüm sahalara {default_price} TL olarak tanımlandı.', 'success')
+    return _ctype_redirect()
+
+
+@admin_bp.route('/customer_types/<int:ctype_id>/update', methods=['POST'])
+@login_required
+def update_customer_type(ctype_id):
+    """Müşteri tipini yeniden adlandır."""
+    ctype = db.get_or_404(CustomerType, ctype_id)
+    name  = ' '.join(request.form.get('name', '').split())
+    error = _validate_ctype_name(name, exclude_id=ctype.id)
+    if error:
+        flash(error, 'danger')
+        return _ctype_redirect()
+    if name == ctype.name:
+        flash('Herhangi bir değişiklik yapılmadı.', 'info')
+        return _ctype_redirect()
+
+    old_name   = ctype.name
+    ctype.name = name
+    db.session.commit()
+    audit('musteri_tipi_guncelle', f'{old_name} → {name}')
+    flash(f'"{old_name}" artık "{name}" olarak görünecek.', 'success')
+    return _ctype_redirect()
+
+
+@admin_bp.route('/customer_types/<int:ctype_id>/delete', methods=['POST'])
+@login_required
+def delete_customer_type(ctype_id):
+    """Müşteri tipini sil — rezervasyonu olan tip silinemez (raporlar bozulmasın)."""
+    ctype = db.get_or_404(CustomerType, ctype_id)
+    if ctype.reservations:
+        flash(f'"{ctype.name}" tipine ait {len(ctype.reservations)} rezervasyon var, silinemez. '
+              f'Yeni rezervasyonları durdurmak için sahalardaki ücretini boş bırakın.', 'danger')
+        return _ctype_redirect()
+
+    name = ctype.name
+    db.session.delete(ctype)
+    db.session.commit()
+    audit('musteri_tipi_sil', f'tip={name}')
+    flash(f'"{name}" müşteri tipi silindi.', 'success')
+    return _ctype_redirect()
 
 
 @admin_bp.route('/delete_pitch/<int:pitch_id>', methods=['POST'])
@@ -325,7 +477,7 @@ def delete_pitch(pitch_id):
     except Exception:
         db.session.rollback()
         flash('Bu sahaya ait rezervasyonlar var! Once onlari silin.', 'danger')
-    return redirect(url_for('admin.admin_dashboard'))
+    return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
 
 
 # ── Rezervasyon durum değiştirme ──────────────────────────────────
@@ -476,10 +628,23 @@ def generate_report_pdf():
         flash('Saha bulunamadi!', 'danger')
         return redirect(url_for('admin.admin_dashboard'))
 
+    # Müşteri tipi filtresi (boş/all = tüm tipler)
+    ctype = None
+    ctype_raw = request.form.get('report_ctype_id', 'all')
+    if ctype_raw and ctype_raw != 'all':
+        try:
+            ctype = db.session.get(CustomerType, int(ctype_raw))
+        except (ValueError, TypeError):
+            ctype = None
+        if ctype is None:
+            flash('Gecersiz musteri tipi!', 'danger')
+            return redirect(url_for('admin.admin_dashboard', tab='rapor'))
+
     # Veri çekme
-    reservations = Reservation.query.filter_by(
-        pitch_id=pitch_id, date=report_date
-    ).order_by(Reservation.time_slot.asc()).all()
+    query = Reservation.query.filter_by(pitch_id=pitch_id, date=report_date)
+    if ctype:
+        query = query.filter_by(customer_type_id=ctype.id)
+    reservations = query.order_by(Reservation.time_slot.asc()).all()
 
     blocked_slots = BlockedSlot.query.filter_by(
         pitch_id=pitch_id, date=report_date
@@ -487,7 +652,9 @@ def generate_report_pdf():
     blocked_dict = {b.time_slot: b.reason for b in blocked_slots}
 
     # PDF üret
-    pdf_bytes = generate_report(pitch, report_date, reservations, blocked_dict)
+    customer_types = CustomerType.query.order_by(CustomerType.id).all()
+    pdf_bytes = generate_report(pitch, report_date, reservations, blocked_dict,
+                                customer_types=customer_types, ctype=ctype)
 
     # Audit log
     formatted_date = report_date.strftime('%d.%m.%Y')
@@ -496,6 +663,7 @@ def generate_report_pdf():
     pending  = sum(1 for r in reservations if r.status == 'Pending')
     audit('rapor_indir',
           f'saha={pitch.name} | tarih={formatted_date} | '
+          f'tip={ctype.name if ctype else "tümü"} | '
           f'rezervasyon={total} | onay={approved} | bekleyen={pending}')
 
     # Response

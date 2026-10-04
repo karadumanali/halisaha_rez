@@ -226,6 +226,15 @@
                     <div class="res-summary-value">{{ time_slot }}</div>
                 </div>
             </div>
+            {% if ctype_name %}
+            <div class="res-summary-row">
+                <div class="res-summary-icon green"><i class="fas fa-id-badge"></i></div>
+                <div>
+                    <div class="res-summary-label">Müşteri Tipi / Ücret</div>
+                    <div class="res-summary-value">{{ ctype_name }} · {{ price }} ₺</div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 

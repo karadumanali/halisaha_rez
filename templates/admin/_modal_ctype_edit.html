@@ -1,0 +1,32 @@
+<!-- ══ MÜŞTERİ TİPİ DÜZENLE MODAL (body'nin doğrudan çocuğu) ══ -->
+<div id="ctypeEditModal" class="pw-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ctypeEditTitle">
+    <div class="pw-modal-box">
+
+        <div class="pw-modal-header">
+            <div class="pw-modal-icon"><i class="fas fa-id-badge"></i></div>
+            <div>
+                <div class="pw-modal-title" id="ctypeEditTitle">Müşteri Tipini Düzenle</div>
+                <div class="pw-modal-sub">Yeni ad tüm sahalarda ve rezervasyon ekranında görünür</div>
+            </div>
+            <button type="button" class="pw-modal-close" id="btnCloseCtypeEdit" aria-label="Kapat">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="ctypeEditForm" method="POST" action="">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="pw-field">
+                <label class="pw-label" for="ctypeEditName">Tip Adı</label>
+                <input type="text" id="ctypeEditName" name="name" class="pw-input"
+                       required minlength="2" maxlength="60">
+            </div>
+            <div class="pw-modal-actions">
+                <button type="button" class="pw-btn-cancel" id="btnCancelCtypeEdit">İptal</button>
+                <button type="submit" class="pw-btn-submit" id="btnSaveCtypeEdit">
+                    <i class="fas fa-save"></i> Kaydet
+                </button>
+            </div>
+        </form>
+
+    </div>
+</div>

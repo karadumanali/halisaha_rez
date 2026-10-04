@@ -46,6 +46,18 @@
                                 {% endfor %}
                             </select>
                         </div>
+
+                        <div class="report-field-group">
+                            <label for="reportCtype">
+                                <i class="fas fa-id-badge"></i> Müşteri Tipi
+                            </label>
+                            <select id="reportCtype" name="report_ctype_id" class="form-control form-select">
+                                <option value="all">Tüm tipler</option>
+                                {% for ct in customer_types %}
+                                <option value="{{ ct.id }}">{{ ct.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Hint solda, buton sağda -->
@@ -72,7 +84,8 @@
                     <i class="fas fa-table"></i>
                     <div>
                         <strong>Rapor içeriği:</strong> Seçilen tarih ve saha için tüm saat dilimlerinin
-                        durumunu ve rezervasyon yapan müşterilerin bilgilerini içerir.
+                        durumunu ve rezervasyon yapan müşterilerin bilgilerini içerir. Müşteri tipi seçerseniz
+                        yalnızca o tipin rezervasyonları listelenir; her raporda tip bazlı rezervasyon ve gelir kırılımı yer alır.
                         Her durum farklı renkle gösterilir (yeşil=onaylı, sarı=bekleyen, kırmızı=reddedildi).
                     </div>
                 </div>

@@ -1,8 +1,9 @@
 """
 models.py — Veritabanı modelleri.
 
-7 tablo: admins, pitches, pitch_images, reservations,
-         blocked_slots, login_attempts, audit_logs
+10 tablo: admins, pitches, pitch_images, reservations,
+          blocked_slots, login_attempts, audit_logs,
+          pitch_time_slots, customer_types, pitch_pricing
 
 Önemli: db nesnesi extensions.py'den import edilir (circular import önlemi).
 """
@@ -52,13 +53,30 @@ class Pitch(db.Model):
 
     id    = db.Column(db.Integer,     primary_key=True)
     name  = db.Column(db.String(100), nullable=False)
-    price = db.Column(db.Integer,     nullable=False)
+    # Fiyat sahada değil, müşteri tipine göre pitch_pricing tablosunda tutulur
 
     reservations  = db.relationship('Reservation',  backref='pitch', lazy=True, cascade='all, delete-orphan')
     images        = db.relationship('PitchImage',   backref='pitch', lazy=True, cascade='all, delete-orphan')
     blocked_slots = db.relationship('BlockedSlot',  backref='pitch', lazy=True, cascade='all, delete-orphan')
     time_slots    = db.relationship('PitchTimeSlot', backref='pitch', lazy=True, cascade='all, delete-orphan',
                                      order_by='PitchTimeSlot.start_hour')
+    pricing       = db.relationship('PitchPricing', backref='pitch', lazy=True, cascade='all, delete-orphan',
+                                     order_by='PitchPricing.customer_type_id')
+
+    @property
+    def price_map(self):
+        """{customer_type_id: price}"""
+        return {pp.customer_type_id: pp.price for pp in self.pricing}
+
+    def price_for(self, customer_type_id):
+        """Bu müşteri tipi için saatlik ücret; tanımlı değilse None."""
+        return self.price_map.get(customer_type_id)
+
+    @property
+    def price_range(self):
+        """(en düşük, en yüksek) ücret; fiyat tanımlı değilse None."""
+        prices = [pp.price for pp in self.pricing]
+        return (min(prices), max(prices)) if prices else None
 
     @property
     def slot_hours(self):
@@ -105,6 +123,8 @@ class Reservation(db.Model):
     customer_phone   = db.Column(db.String(15),  nullable=False)
     customer_email   = db.Column(db.String(120), nullable=False)
     receipt_filename = db.Column(db.String(255), nullable=False)
+    customer_type_id = db.Column(db.Integer,     db.ForeignKey('customer_types.id'), nullable=True)
+    price            = db.Column(db.Integer,     nullable=True)  # rezervasyon anındaki ücret (TL)
     status           = db.Column(db.String(20),  default='Pending', nullable=False)
     created_at       = db.Column(db.DateTime,    default=utcnow)
 
@@ -199,3 +219,40 @@ class PitchTimeSlot(db.Model):
 
     def __repr__(self):
         return f'<PitchTimeSlot {self.label} pitch={self.pitch_id}>'
+
+
+# ── 9. MÜŞTERİ TİPİ TABLOSU ──────────────────────────────────────
+
+class CustomerType(db.Model):
+    """Öğrenci, İdari Personel / Akademisyen vb. — her tipin sahada ayrı fiyatı olur."""
+    __tablename__ = 'customer_types'
+
+    id         = db.Column(db.Integer,    primary_key=True)
+    name       = db.Column(db.String(60), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime,   default=utcnow)
+
+    pricing      = db.relationship('PitchPricing', backref='customer_type', lazy=True,
+                                   cascade='all, delete-orphan')
+    reservations = db.relationship('Reservation', backref='customer_type', lazy=True)
+
+    def __repr__(self):
+        return f'<CustomerType {self.name}>'
+
+
+# ── 10. SAHA FİYATLANDIRMA TABLOSU (saha × müşteri tipi) ─────────
+
+class PitchPricing(db.Model):
+    __tablename__ = 'pitch_pricing'
+
+    __table_args__ = (
+        db.UniqueConstraint('pitch_id', 'customer_type_id',
+                            name='uq_pitch_pricing'),
+    )
+
+    id               = db.Column(db.Integer, primary_key=True)
+    pitch_id         = db.Column(db.Integer, db.ForeignKey('pitches.id'), nullable=False)
+    customer_type_id = db.Column(db.Integer, db.ForeignKey('customer_types.id'), nullable=False)
+    price            = db.Column(db.Integer, nullable=False)  # TL / saat
+
+    def __repr__(self):
+        return f'<PitchPricing pitch={self.pitch_id} type={self.customer_type_id} {self.price} TL>'

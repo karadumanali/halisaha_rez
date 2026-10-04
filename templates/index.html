@@ -113,7 +113,7 @@
 }
 .res-summary-card .rs-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
     gap: 0 16px;
 }
 .res-summary-card .rs-field .rs-lbl {
@@ -161,7 +161,7 @@ input[type="date"].form-control {
 .pitch-option {
     border: 2px solid var(--gray-200); border-radius: var(--r-sm);
     padding: 16px 18px; cursor: pointer;
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
     transition: all 0.18s; background: var(--white);
     -webkit-tap-highlight-color: transparent; touch-action: manipulation;
 }
@@ -173,11 +173,55 @@ input[type="date"].form-control {
 }
 .pitch-option-name  { font-weight: 700; font-size: 1rem; color: var(--ink); }
 .pitch-option-price {
+    flex-shrink: 0; white-space: nowrap;
     background: var(--teal); color: var(--white);
     font-size: 0.85rem; font-weight: 800;
     padding: 5px 14px; border-radius: 20px;
 }
 .pitch-option.selected .pitch-option-price { background: var(--teal-dk); }
+
+/* ── Müşteri tipi kartları ── */
+.ctype-section { display: none; }
+.ctype-section.visible { display: block; animation: ctypeIn 0.25s ease; }
+@keyframes ctypeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.ctype-label { margin-top: 22px !important; }
+.ctype-hint { font-size: 0.82rem; color: var(--gray-400); margin: -4px 0 12px; }
+.ctype-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.ctype-option {
+    position: relative; display: flex; align-items: center; gap: 14px;
+    border: 2px solid var(--gray-200); border-radius: var(--r-sm);
+    padding: 16px 18px; cursor: pointer; background: var(--white);
+    transition: all 0.18s; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.ctype-option[hidden] { display: none; }
+.ctype-option:hover { border-color: var(--teal); background: var(--teal-pale); transform: translateY(-1px); box-shadow: var(--sh-sm); }
+.ctype-option.selected {
+    border-color: var(--teal); background: var(--teal-pale);
+    box-shadow: 0 0 0 3px rgba(14,168,116,0.18), var(--sh-sm);
+    transform: translateY(-1px);
+}
+.ctype-icon {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    background: var(--teal-pale); color: var(--teal-dk);
+    display: flex; align-items: center; justify-content: center; font-size: 1.15rem;
+    transition: all 0.18s;
+}
+.ctype-option.selected .ctype-icon { background: var(--teal); color: var(--white); }
+.ctype-info { min-width: 0; flex: 1; padding-right: 18px; }
+.ctype-name { font-weight: 700; font-size: 0.95rem; color: var(--ink); line-height: 1.3; }
+.ctype-price { font-size: 0.85rem; color: var(--gray-400); font-weight: 600; margin-top: 2px; }
+.ctype-price strong { font-size: 1.15rem; color: var(--teal-dk); font-weight: 800; }
+.ctype-check {
+    position: absolute; top: 10px; right: 10px;
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid var(--gray-300); background: var(--white);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem; color: transparent; transition: all 0.18s;
+}
+.ctype-option.selected .ctype-check { background: var(--teal); border-color: var(--teal); color: var(--white); }
 
 /* ── Saat dilimleri ── */
 .slot-list { display: flex; flex-direction: column; gap: 9px; }
@@ -520,7 +564,7 @@ input[type="date"].form-control {
     <div class="step-panel active" id="panel1">
         <div class="panel-head">
             <h2>Tarih &amp; Saha Seçimi</h2>
-            <p>Rezervasyon yapmak istediğiniz tarihi ve sahayı seçin</p>
+            <p>Tarihi, sahayı ve müşteri tipinizi seçin</p>
         </div>
 
                 
@@ -550,12 +594,42 @@ input[type="date"].form-control {
                      role="radio" aria-checked="false" tabindex="0"
                      data-pitch-id="{{ pitch.id }}"
                      data-pitch-name="{{ pitch.name }}"
-                     data-pitch-price="{{ pitch.price }}"
+                     data-prices='{{ pitch.price_map|tojson }}'
                      data-action="selectPitch">
                     <div class="pitch-option-name">{{ pitch.name }}</div>
-                    <div class="pitch-option-price">{{ pitch.price }} ₺/sa</div>
+                    {% set pr = pitch.price_range %}
+                    <div class="pitch-option-price">
+                        {%- if pr[0] == pr[1] %}{{ pr[0] }} ₺/sa{% else %}{{ pr[0] }} – {{ pr[1] }} ₺/sa{% endif -%}
+                    </div>
                 </div>
                 {% endfor %}
+            </div>
+
+            <!-- Müşteri tipi — saha seçildikten sonra açılır; fiyat tipe göre gelir -->
+            <div class="ctype-section" id="ctypeSection">
+                <div class="date-label ctype-label">
+                    <i class="fas fa-id-badge"></i> Müşteri Tipiniz
+                </div>
+                <p class="ctype-hint">Ücret, seçtiğiniz müşteri tipine göre belirlenir.</p>
+                <div class="ctype-list" role="radiogroup" aria-label="Müşteri tipi seçimi">
+                    {% for ct in customer_types %}
+                    {% set lname = ct.name|lower %}
+                    <div class="ctype-option" hidden
+                         role="radio" aria-checked="false" tabindex="0"
+                         data-ctype-id="{{ ct.id }}" data-ctype-name="{{ ct.name }}">
+                        <div class="ctype-icon">
+                            <i class="fas {{ 'fa-user-graduate' if 'öğrenci' in lname
+                                        else 'fa-user-tie' if ('personel' in lname or 'akademisyen' in lname)
+                                        else 'fa-user' }}"></i>
+                        </div>
+                        <div class="ctype-info">
+                            <div class="ctype-name">{{ ct.name }}</div>
+                            <div class="ctype-price"><strong class="ctype-price-val">—</strong> ₺ / saat</div>
+                        </div>
+                        <span class="ctype-check"><i class="fas fa-check"></i></span>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
         <div class="panel-footer">
@@ -575,6 +649,8 @@ input[type="date"].form-control {
             <div class="summary-box">
                 <div class="summary-item"><span class="s-label">Tarih:</span><span class="s-val" id="sumDate">—</span></div>
                 <div class="summary-item"><span class="s-label">Saha:</span><span class="s-val" id="sumPitch">—</span></div>
+                <div class="summary-item"><span class="s-label">Müşteri Tipi:</span><span class="s-val" id="sumCtype">—</span></div>
+                <div class="summary-item"><span class="s-label">Ücret:</span><span class="s-val" id="sumPrice">—</span></div>
             </div>
             <div class="date-label"><i class="fas fa-clock"></i> Müsait Saat Dilimleri</div>
             <div class="slot-list" id="slotList" role="radiogroup" aria-label="Saat seçimi"></div>
@@ -614,6 +690,10 @@ input[type="date"].form-control {
                         <span class="rs-val" id="sumSlot3">—</span>
                     </div>
                     <div class="rs-field">
+                        <span class="rs-lbl">Müşteri Tipi</span>
+                        <span class="rs-val" id="sumCtype3">—</span>
+                    </div>
+                    <div class="rs-field">
                         <span class="rs-lbl">Ücret</span>
                         <span class="rs-val" id="sumPrice3">—</span>
                     </div>
@@ -624,6 +704,7 @@ input[type="date"].form-control {
                   enctype="multipart/form-data" novalidate>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="pitch_id"  id="hPitchId">
+                <input type="hidden" name="customer_type_id" id="hCtypeId">
                 <input type="hidden" name="date"       id="hDate">
                 <input type="hidden" name="time_slot"  id="hSlot">
                 <input type="hidden" name="g-recaptcha-response" id="gRecaptchaReserve">
@@ -719,7 +800,8 @@ input[type="date"].form-control {
                 <div class="guide-step-content">
                     <strong>Tarih ve Saha Seçin</strong><br>
                     Rezervasyon yapmak istediğiniz tarihi takvimden seçin. Yalnızca hafta içi günler
-                    ve en fazla 1 ay ilerisine rezervasyon yapılabilir. Ardından uygun sahayı seçin.
+                    ve en fazla 1 ay ilerisine rezervasyon yapılabilir. Ardından uygun sahayı ve
+                    müşteri tipinizi (Öğrenci, Personel vb.) seçin — ücret tipinize göre belirlenir.
                 </div>
             </div>
             <div class="guide-step">
@@ -735,7 +817,6 @@ input[type="date"].form-control {
                 <div class="guide-step-content">
                     <strong>Bilgilerinizi Girin</strong><br>
                     Ad-soyad, telefon numarası (05XX XXX XX XX) ve e-posta adresinizi girin.
-                    Onay bildirimi e-posta adresinize gönderilecektir.
                 </div>
             </div>
             <div class="guide-step">
@@ -849,7 +930,7 @@ function setButtonLoading(btn, loadingText) {
     return oldHTML;
 }
 
-var state = { step:1, pitchId:null, pitchName:null, pitchPrice:null, date:null, slot:null };
+var state = { step:1, pitchId:null, pitchName:null, pitchPrices:{}, ctypeId:null, ctypeName:null, price:null, date:null, slot:null, busyKey:null };
 var busySlots = {};
 var blockedSlots = {};
 var SLOTS = []; // Sahaya özel slotlar — fetchBusy ile DB'den yüklenir
@@ -872,9 +953,43 @@ function goStep(n) {
 function selectPitch(el) {
     document.querySelectorAll('.pitch-option').forEach(function(p){ p.classList.remove('selected'); p.setAttribute('aria-checked','false'); });
     el.classList.add('selected'); el.setAttribute('aria-checked','true');
-    state.pitchId    = el.dataset.pitchId;
-    state.pitchName  = el.dataset.pitchName;
-    state.pitchPrice = el.dataset.pitchPrice;
+    state.pitchId     = el.dataset.pitchId;
+    state.pitchName   = el.dataset.pitchName;
+    state.pitchPrices = JSON.parse(el.dataset.prices || '{}');
+    renderCtypes();
+    checkStep1();
+}
+
+/* Seçili sahada fiyatı tanımlı müşteri tiplerini göster, fiyatlarını yaz.
+   Önceki tip yeni sahada da sunuluyorsa seçim korunur. */
+function renderCtypes() {
+    var keepSelection = false;
+    document.querySelectorAll('.ctype-option').forEach(function(opt) {
+        var price = state.pitchPrices[opt.dataset.ctypeId];
+        var offered = price !== undefined;
+        opt.hidden = !offered;
+        if (offered) {
+            opt.querySelector('.ctype-price-val').textContent = price;
+            if (opt.dataset.ctypeId === state.ctypeId) { keepSelection = true; state.price = price; }
+        }
+    });
+    if (!keepSelection) {
+        state.ctypeId = null; state.ctypeName = null; state.price = null;
+        document.querySelectorAll('.ctype-option').forEach(function(o) {
+            o.classList.remove('selected'); o.setAttribute('aria-checked', 'false');
+        });
+    }
+    document.getElementById('ctypeSection').classList.add('visible');
+}
+
+function selectCtype(el) {
+    document.querySelectorAll('.ctype-option').forEach(function(o) {
+        o.classList.remove('selected'); o.setAttribute('aria-checked', 'false');
+    });
+    el.classList.add('selected'); el.setAttribute('aria-checked', 'true');
+    state.ctypeId   = el.dataset.ctypeId;
+    state.ctypeName = el.dataset.ctypeName;
+    state.price     = state.pitchPrices[state.ctypeId];
     checkStep1();
 }
 
@@ -916,9 +1031,14 @@ function checkStep1() {
         warnBox.classList.remove('visible');
     }
 
-    var ok = dateValid && state.pitchId;
+    var ok = dateValid && state.pitchId && state.ctypeId;
     document.getElementById('btn1Next').disabled = !ok;
-    if (ok) { state.date = date; fetchBusy(); }
+    if (ok) {
+        state.date = date;
+        /* Slotlar müşteri tipinden bağımsızdır: yalnızca saha/tarih değişince yeniden çek */
+        var key = state.pitchId + '|' + date;
+        if (state.busyKey !== key) { state.busyKey = key; fetchBusy(); }
+    }
 }
 
 function fetchBusy() {
@@ -935,6 +1055,8 @@ function fetchBusy() {
 function renderSlots() {
     document.getElementById('sumDate').textContent=formatDate(state.date);
     document.getElementById('sumPitch').textContent=state.pitchName;
+    document.getElementById('sumCtype').textContent=state.ctypeName || '—';
+    document.getElementById('sumPrice').textContent=state.price !== null ? state.price + ' ₺/sa' : '—';
     var list=document.getElementById('slotList');
     list.innerHTML=''; state.slot=null;
     document.getElementById('btn2Next').disabled=true;
@@ -1023,9 +1145,7 @@ function selectSlot(el,slot) {
 
 function fillSummary3() {
     /* hidden inputs */
-    document.getElementById('hPitchId').value = state.pitchId  || '';
-    document.getElementById('hDate').value    = state.date     || '';
-    document.getElementById('hSlot').value    = state.slot     || '';
+    fillHidden();
 
     /* özet kartı */
     var p3pitch = document.getElementById('sumPitch3');
@@ -1035,12 +1155,15 @@ function fillSummary3() {
     if(p3pitch) p3pitch.textContent = state.pitchName  || '—';
     if(p3date)  p3date.textContent  = formatDate(state.date) || '—';
     if(p3slot)  p3slot.textContent  = state.slot       || '—';
-    if(p3price) p3price.textContent = state.pitchPrice ? state.pitchPrice + ' ₺/sa' : '—';
+    if(p3price) p3price.textContent = state.price !== null ? state.price + ' ₺/sa' : '—';
+    var p3ctype = document.getElementById('sumCtype3');
+    if(p3ctype) p3ctype.textContent = state.ctypeName || '—';
 }
 
 /* fillHidden — form submit öncesi de çağrılır */
 function fillHidden() {
     document.getElementById('hPitchId').value = state.pitchId  || '';
+    document.getElementById('hCtypeId').value = state.ctypeId  || '';
     document.getElementById('hDate').value    = state.date     || '';
     document.getElementById('hSlot').value    = state.slot     || '';
 }
@@ -1114,6 +1237,12 @@ document.addEventListener('DOMContentLoaded',function(){
     document.querySelectorAll('[data-action="selectPitch"]').forEach(function(el){
         el.addEventListener('click',   function(){ selectPitch(el); });
         el.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' ') selectPitch(el); });
+    });
+
+    /* Müşteri tipi seçimi */
+    document.querySelectorAll('.ctype-option').forEach(function(el){
+        el.addEventListener('click',   function(){ selectCtype(el); });
+        el.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); selectCtype(el); } });
     });
 
     /* Wizard butonları */

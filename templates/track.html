@@ -328,6 +328,15 @@
                     <div class="result-row-value">{{ reservation.time_slot }}</div>
                 </div>
             </div>
+            {% if reservation.customer_type %}
+            <div class="result-row">
+                <div class="result-row-icon"><i class="fas fa-id-badge"></i></div>
+                <div>
+                    <div class="result-row-label">Müşteri Tipi / Ücret</div>
+                    <div class="result-row-value">{{ reservation.customer_type.name }}{% if reservation.price is not none %} · {{ reservation.price }} ₺{% endif %}</div>
+                </div>
+            </div>
+            {% endif %}
             <div class="result-row">
                 <div class="result-row-icon"><i class="fas fa-calendar-plus"></i></div>
                 <div>
