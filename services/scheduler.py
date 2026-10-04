@@ -13,13 +13,14 @@ Not: auto_expire_reservations ve auto_cleanup_blocked_slots
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from extensions import db
 from models import Reservation, BlockedSlot, LoginAttempt, AuditLog
 from services.email import send_customer_expiry_email
+from utils.timeutil import now_tr, today_tr
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +37,12 @@ def monthly_cleanup():
     30 günden eski login denemelerini ve 2 yıldan eski audit kayıtlarını siler.
     """
     with _app.app_context():
-        login_cutoff  = datetime.now(timezone.utc) - timedelta(days=30)
+        login_cutoff  = now_tr() - timedelta(days=30)
         deleted_login = LoginAttempt.query.filter(
             LoginAttempt.attempted_at < login_cutoff
         ).delete()
 
-        audit_cutoff  = datetime.now(timezone.utc) - timedelta(days=730)
+        audit_cutoff  = now_tr() - timedelta(days=730)
         deleted_audit = AuditLog.query.filter(
             AuditLog.created_at < audit_cutoff
         ).delete()
@@ -65,7 +66,7 @@ def auto_expire_reservations():
     from flask import has_app_context
 
     def _run():
-        now   = datetime.now()
+        now   = now_tr()
         today = now.date()
         current_time = now.time()
 
@@ -130,7 +131,7 @@ def auto_cleanup_blocked_slots():
     from flask import has_app_context
 
     def _run():
-        today = datetime.now().date()
+        today = today_tr()
         expired_blocks = BlockedSlot.query.filter(BlockedSlot.date < today).all()
         count = len(expired_blocks)
 

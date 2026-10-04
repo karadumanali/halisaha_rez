@@ -15,6 +15,23 @@ function switchTab(name) {
     if (activeBtn) activeBtn.classList.add('active');
 }
 
+/* ══ Türkiye saati (Europe/Istanbul) — cihazın saat diliminden bağımsız ══
+   Dönen Date'in yerel alanları (getHours, getDate…) Türkiye duvar saatini verir. */
+function trNow() {
+    var p = {};
+    new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Istanbul', hourCycle: 'h23',
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: 'numeric', second: 'numeric'
+    }).formatToParts(new Date()).forEach(function(x) { p[x.type] = x.value; });
+    return new Date(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+}
+function trToday() { var d = trNow(); d.setHours(0, 0, 0, 0); return d; }
+/* Date → 'YYYY-MM-DD' (toISOString UTC'ye çevirip bir gün kaydırabildiği için kullanılmaz) */
+function ymd(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 /* ══════════════════════════════════════════════════════════════════
    ÖZEL MODAL SİSTEMİ — tarayıcı confirm/alert yerine
    ──────────────────────────────────────────────────────────────
@@ -298,7 +315,7 @@ var MONTHS_TR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağ
 var DAYS_TR   = ['Pt','Sa','Ca','Pe','Cu','Ct','Pz'];
 
 function initCal() {
-    var now = new Date();
+    var now = trNow();
     calYear = now.getFullYear(); calMonth = now.getMonth();
     renderCal();
     document.getElementById('calPrev').addEventListener('click', function(){
@@ -319,7 +336,7 @@ function renderCal() {
     var firstDay   = new Date(calYear, calMonth, 1);
     var startOffset = (firstDay.getDay() + 6) % 7;
     var daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
-    var today = new Date(); today.setHours(0,0,0,0);
+    var today = trToday();
     for (var i = 0; i < startOffset; i++) {
         var emp = document.createElement('div'); emp.className = 'cal-day cal-empty'; grid.appendChild(emp);
     }
@@ -615,9 +632,9 @@ function bindReportForm() {
     if (!dateInput || !pitchInput || !submitBtn) return;
 
     /* Tarih limiti: maks 1 ay ilerisi */
-    var maxDate = new Date();
+    var maxDate = trToday();
     maxDate.setMonth(maxDate.getMonth() + 1);
-    dateInput.max = maxDate.toISOString().split('T')[0];
+    dateInput.max = ymd(maxDate);
 
     function checkReportForm() {
         var dateOk = false;

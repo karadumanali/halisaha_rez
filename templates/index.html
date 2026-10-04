@@ -930,6 +930,23 @@ function setButtonLoading(btn, loadingText) {
     return oldHTML;
 }
 
+/* ══ Türkiye saati (Europe/Istanbul) — cihazın saat diliminden bağımsız ══
+   Dönen Date'in yerel alanları (getHours, getDate…) Türkiye duvar saatini verir. */
+function trNow() {
+    var p = {};
+    new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Istanbul', hourCycle: 'h23',
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: 'numeric', second: 'numeric'
+    }).formatToParts(new Date()).forEach(function(x) { p[x.type] = x.value; });
+    return new Date(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+}
+function trToday() { var d = trNow(); d.setHours(0, 0, 0, 0); return d; }
+/* Date → 'YYYY-MM-DD' (toISOString UTC'ye çevirip bir gün kaydırabildiği için kullanılmaz) */
+function ymd(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 var state = { step:1, pitchId:null, pitchName:null, pitchPrices:{}, ctypeId:null, ctypeName:null, price:null, date:null, slot:null, busyKey:null };
 var busySlots = {};
 var blockedSlots = {};
@@ -1000,11 +1017,11 @@ function checkStep1() {
     var date = dateInput.value;
 
     /* 1 aylık üst sınır hesapla */
-    var today   = new Date(); today.setHours(0,0,0,0);
+    var today   = trToday();
     var maxDate = new Date(today);
     maxDate.setMonth(maxDate.getMonth() + 1);
     /* max attribute'u JS ile set et (Jinja template render edildiğinde statik olur) */
-    dateInput.max = maxDate.toISOString().split('T')[0];
+    dateInput.max = ymd(maxDate);
 
     var dateValid = false;
     if (date) {
@@ -1060,7 +1077,7 @@ function renderSlots() {
     var list=document.getElementById('slotList');
     list.innerHTML=''; state.slot=null;
     document.getElementById('btn2Next').disabled=true;
-    var now=new Date(), selDate=new Date(state.date+'T00:00:00');
+    var now=trNow(), selDate=new Date(state.date+'T00:00:00');
     var isToday=selDate.toDateString()===now.toDateString();
 
     if(SLOTS.length===0){
@@ -1225,9 +1242,9 @@ document.addEventListener('DOMContentLoaded',function(){
 
     /* Tarih max sınırını sayfa yüklenirken hemen ayarla */
     (function() {
-        var maxDate = new Date();
+        var maxDate = trToday();
         maxDate.setMonth(maxDate.getMonth() + 1);
-        document.getElementById('selDate').max = maxDate.toISOString().split('T')[0];
+        document.getElementById('selDate').max = ymd(maxDate);
     })();
 
     /* Tarih değişimi */

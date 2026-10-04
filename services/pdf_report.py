@@ -24,6 +24,7 @@ from models import db, Pitch, Reservation, BlockedSlot
 from extensions import limiter
 from models import PitchTimeSlot
 from utils.helpers import audit
+from utils.timeutil import now_tr
 
 
 # ── Renk tanımları ──────────────────────────────────────────────────
@@ -298,7 +299,7 @@ def generate_report(pitch: Pitch, report_date, reservations: list,
 
     # Footer
     story.append(Spacer(1, 10*mm))
-    now_str = datetime.now().strftime('%d.%m.%Y %H:%M')
+    now_str = now_tr().strftime('%d.%m.%Y %H:%M')
     story.append(Paragraph(
         f'Rapor oluşturma: {now_str} | Oluşturan: {current_user.username} | '
         f'Bu belge AYBU SKS Spor Tesisleri yonetim sistemi tarafından üretilmiştir.',

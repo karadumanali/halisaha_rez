@@ -21,6 +21,7 @@ from flask import (
 from extensions import db, limiter
 from models import Pitch, Reservation, BlockedSlot, PitchTimeSlot, CustomerType
 from utils.helpers import get_real_ip
+from utils.timeutil import now_tr, today_tr
 from services.security import verify_recaptcha
 from services.file_handler import save_secure_receipt
 from services.email import send_admin_notification
@@ -58,7 +59,7 @@ def index():
     """Ana sayfa: fiyatı tanımlı sahaları listele, rezervasyon formu göster."""
     pitches = [p for p in Pitch.query.order_by(Pitch.id).all() if p.pricing]
     customer_types = CustomerType.query.order_by(CustomerType.id).all()
-    today_date = datetime.now().date().isoformat()
+    today_date = today_tr().isoformat()
     recaptcha_site_key = os.getenv('RECAPTCHA_SITE_KEY', '')
     return render_template(
         'index.html',
@@ -182,7 +183,7 @@ def reserve():
     # Tarih doğrulama
     try:
         date_obj     = datetime.strptime(date_str, '%Y-%m-%d').date()
-        _now         = datetime.now()
+        _now         = now_tr()
         current_date = _now.date()
         current_time = _now.time()
         max_date     = (_now + timedelta(days=31)).date()

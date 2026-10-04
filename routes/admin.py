@@ -8,7 +8,7 @@ URL prefix: /admin (Blueprint kayıt sırasında verilir)
 import os
 import re
 import logging
-from datetime import datetime, timedelta, date as date_type
+from datetime import datetime, timedelta
 
 from flask import (
     Blueprint, render_template, request, redirect,
@@ -26,6 +26,7 @@ from models import (
 )
 from utils.constants import SLOT_GROUPS, SLOT_START_HOURS
 from utils.helpers import audit, get_real_ip
+from utils.timeutil import now_tr, today_tr
 from services.security import detect_mime
 from services.file_handler import allowed_file, save_secure_pitch_image
 from services.email import send_customer_approval_email
@@ -61,7 +62,7 @@ def admin_dashboard():
     query = Reservation.query
 
     # Tarih filtresi
-    today = date_type.today()
+    today = today_tr()
     if date_range == 'today':
         query = query.filter(Reservation.date == today)
     elif date_range == 'week':
@@ -123,7 +124,7 @@ def admin_dashboard():
         blocked_slots=blocked_slots,
         audit_logs=audit_logs,
         slot_groups=SLOT_GROUPS,
-        now=datetime.now()
+        now=now_tr()
     )
 
 
@@ -618,7 +619,7 @@ def generate_report_pdf():
         flash('Gecersiz tarih!', 'danger')
         return redirect(url_for('admin.admin_dashboard'))
 
-    max_date = (datetime.now() + timedelta(days=31)).date()
+    max_date = today_tr() + timedelta(days=31)
     if report_date > max_date:
         flash('En fazla 1 ay ilerisine rapor olusturulabilir!', 'danger')
         return redirect(url_for('admin.admin_dashboard'))

@@ -11,10 +11,11 @@ import logging
 
 import requests as http_requests
 from flask import request, g, render_template
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from models import db, LoginAttempt
 from utils.constants import LOCKOUT_ATTEMPTS, LOCKOUT_MINUTES, ERROR_PAGES
+from utils.timeutil import now_tr
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def is_account_locked(username: str, ip: str) -> bool:
     """IP veya kullanıcı adı bazlı hesap kilidi kontrolü."""
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=LOCKOUT_MINUTES)
+    cutoff = now_tr() - timedelta(minutes=LOCKOUT_MINUTES)
 
     fails_by_username = LoginAttempt.query.filter(
         LoginAttempt.username     == username,
@@ -44,7 +45,7 @@ def record_attempt(username: str, ip: str, success: bool):
     """Giriş denemesini kaydet."""
     db.session.add(LoginAttempt(
         ip_address=ip, username=username,
-        attempted_at=datetime.now(timezone.utc), success=success
+        attempted_at=now_tr(), success=success
     ))
     db.session.commit()
 

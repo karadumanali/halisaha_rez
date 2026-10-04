@@ -9,12 +9,12 @@ models.py — Veritabanı modelleri.
 """
 
 from flask_login import UserMixin
-from datetime import datetime, timezone
 import uuid
 import secrets
 import string
 
 from extensions import db
+from utils.timeutil import now_tr
 
 
 def generate_tracking_code():
@@ -25,9 +25,7 @@ def generate_tracking_code():
     return f"REZ-{part1}-{part2}"
 
 
-# Timezone-aware UTC yardımcı fonksiyon
-def utcnow():
-    return datetime.now(timezone.utc)
+# Kayıt zamanları Türkiye saatiyle tutulur (bkz. utils/timeutil.py)
 
 
 # ── 1. ADMIN TABLOSU ──────────────────────────────────────────────
@@ -100,7 +98,7 @@ class PitchImage(db.Model):
     id             = db.Column(db.Integer,     primary_key=True)
     pitch_id       = db.Column(db.Integer,     db.ForeignKey('pitches.id'), nullable=False)
     image_filename = db.Column(db.String(255), nullable=False)
-    created_at     = db.Column(db.DateTime,    default=utcnow)
+    created_at     = db.Column(db.DateTime,    default=now_tr)
 
 
 # ── 4. REZERVASYON TABLOSU ────────────────────────────────────────
@@ -126,7 +124,7 @@ class Reservation(db.Model):
     customer_type_id = db.Column(db.Integer,     db.ForeignKey('customer_types.id'), nullable=True)
     price            = db.Column(db.Integer,     nullable=True)  # rezervasyon anındaki ücret (TL)
     status           = db.Column(db.String(20),  default='Pending', nullable=False)
-    created_at       = db.Column(db.DateTime,    default=utcnow)
+    created_at       = db.Column(db.DateTime,    default=now_tr)
 
     def __repr__(self):
         return f'<Reservation {self.date} {self.time_slot} - {self.status}>'
@@ -143,7 +141,7 @@ class BlockedSlot(db.Model):
     time_slot = db.Column(db.String(20),  nullable=False)
     reason    = db.Column(db.String(200), nullable=False,
                           default='Bahar Şenlikleri Sebebiyle Sahamız kullanılamamaktadır.')
-    created_at = db.Column(db.DateTime,   default=utcnow)
+    created_at = db.Column(db.DateTime,   default=now_tr)
 
     def __repr__(self):
         return f'<BlockedSlot {self.date} {self.time_slot} pitch={self.pitch_id}>'
@@ -157,7 +155,7 @@ class LoginAttempt(db.Model):
     id           = db.Column(db.Integer,    primary_key=True)
     ip_address   = db.Column(db.String(45), nullable=False)
     username     = db.Column(db.String(50))
-    attempted_at = db.Column(db.DateTime,   default=utcnow)
+    attempted_at = db.Column(db.DateTime,   default=now_tr)
     success      = db.Column(db.Boolean,    default=False)
 
     def __repr__(self):
@@ -174,7 +172,7 @@ class AuditLog(db.Model):
     ip_address = db.Column(db.String(45),  nullable=False)           # hangi IP'den
     action     = db.Column(db.String(100), nullable=False)           # ne yaptı
     detail     = db.Column(db.String(500), nullable=True)            # detay
-    created_at = db.Column(db.DateTime,    default=utcnow, nullable=False)  # ne zaman
+    created_at = db.Column(db.DateTime,    default=now_tr, nullable=False)  # ne zaman
 
     def __repr__(self):
         return f'<AuditLog {self.admin} | {self.action} | {self.created_at}>'
@@ -229,7 +227,7 @@ class CustomerType(db.Model):
 
     id         = db.Column(db.Integer,    primary_key=True)
     name       = db.Column(db.String(60), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime,   default=utcnow)
+    created_at = db.Column(db.DateTime,   default=now_tr)
 
     pricing      = db.relationship('PitchPricing', backref='customer_type', lazy=True,
                                    cascade='all, delete-orphan')
