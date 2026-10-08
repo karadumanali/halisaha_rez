@@ -74,7 +74,7 @@ def index():
 # ── Dolu slot sorgulama (AJAX) ────────────────────────────────────
 
 @public_bp.route('/busy_slots')
-@limiter.limit("5 per minute")
+@limiter.limit("60 per minute")
 def busy_slots():
     """Belirtilen tarih ve saha için dolu/kilitli slotları döndür."""
     date_str = request.args.get('date')

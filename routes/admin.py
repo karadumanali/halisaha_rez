@@ -37,6 +37,9 @@ logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__)
 
+# Admin paneli: giriş yapmış kullanıcılar için yüksek limit
+limiter.limit('1000 per hour')(admin_bp)
+
 
 # ── Dashboard ──────────────────────────────────────────────────────
 
@@ -599,7 +602,6 @@ def view_receipt(filename):
 
 @admin_bp.route('/report/pdf', methods=['POST'])
 @login_required
-@limiter.limit("10 per minute")
 def generate_report_pdf():
     """Seçili tarih ve saha için günlük PDF rapor üret."""
     date_str = request.form.get('report_date', '').strip()
