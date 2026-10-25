@@ -414,6 +414,12 @@ function submitBlock() {
         sysAlert({ title: 'Eksik Seçim', body: 'En az 1 saat dilimi seçin!', icon: 'warning', iconClass: 'fa-exclamation-circle' });
         return;
     }
+    var reasonEl = document.getElementById('bReason');
+    if (!reasonEl || reasonEl.value.trim() === '') {
+        sysAlert({ title: 'Kilit Sebebi Gerekli', body: 'Slotu kilitlemek için kilitleme sebebini yazmalısınız!', icon: 'warning', iconClass: 'fa-exclamation-circle' });
+        if (reasonEl) reasonEl.focus();
+        return;
+    }
     var total = selPitches.length * selDates.length * selSlots.length;
     sysConfirm({
         title: 'Slot Kilitleme',

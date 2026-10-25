@@ -140,11 +140,16 @@ def block_slot():
     pitch_ids  = request.form.getlist('pitch_ids')
     dates      = request.form.getlist('dates')
     time_slots = request.form.getlist('time_slots')
-    reason     = request.form.get('reason', 'Bakim / Rezerve').strip()[:200]
+    # Kilit sebebi zorunlu — boş veya sadece boşluktan oluşan sebep kabul edilmez
+    reason     = ' '.join(request.form.get('reason', '').split())[:200]
 
     if not pitch_ids or not dates or not time_slots:
         flash('Saha, tarih ve saat dilimi secmelisiniz!', 'danger')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.admin_dashboard', tab='kilitler'))
+
+    if not reason:
+        flash('Kilitleme sebebi yazmak zorunludur! Lutfen slotu neden kilitlediginizi belirtin.', 'danger')
+        return redirect(url_for('admin.admin_dashboard', tab='kilitler'))
 
     added = 0
     skipped = 0
