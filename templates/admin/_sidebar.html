@@ -9,7 +9,7 @@
             <i class="fas fa-shield-alt"></i>
             <span class="session-timer-val" id="sessionTimerVal">30:00</span>
             <div class="session-progress">
-                <div class="session-progress-fill" id="sessionProgressFill" style="width:100%"></div>
+                <div class="session-progress-fill" id="sessionProgressFill"></div>
             </div>
             <span id="sessionWarnMsg"><i class="fas fa-exclamation-triangle"></i> Sürüyor!</span>
         </div>
@@ -43,17 +43,20 @@
                 <span>PDF Rapor</span>
             </div>
             <!-- Şifre Değiştir — nav item olarak, diğerleriyle aynı stilde -->
-            <div class="sidebar-nav-item" id="btnChangePw" role="button" tabindex="0"
-                 style="border-top:1.5px solid var(--gray-200); margin-top:4px;">
+            <div class="sidebar-nav-item nav-item-separated" id="btnChangePw" role="button" tabindex="0">
                 <div class="nav-icon"><i class="fas fa-key"></i></div>
                 <span>Şifre Değiştir</span>
             </div>
         </nav>
 
         <div class="sidebar-footer">
-            <a href="/logout" class="btn-logout" id="logoutBtn">
-                <i class="fas fa-sign-out-alt"></i> Çıkış Yap
-            </a>
+            <!-- Çıkış sadece POST + CSRF ile -->
+            <form action="{{ url_for('auth.logout') }}" method="POST" id="logoutForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn-logout" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+                </button>
+            </form>
         </div>
 
     </aside>

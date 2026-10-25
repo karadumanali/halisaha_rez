@@ -19,6 +19,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from extensions import db
 from models import Reservation, BlockedSlot, LoginAttempt, AuditLog
+from utils.constants import PENDING_TIMEOUT_HOURS
 from utils.timeutil import now_tr, today_tr
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,9 @@ def monthly_cleanup():
 def auto_expire_reservations():
     """
     Her saat başı (:05) çalışır + admin paneli her açıldığında tetiklenir.
-    Tarihi geçmiş 'Pending' rezervasyonları 'Expired' olarak işaretler.
+    'Pending' rezervasyonları 'Expired' olarak işaretler:
+      - tarihi/saati geçmiş olanlar
+      - PENDING_TIMEOUT_HOURS saat içinde onaylanmamış olanlar (slot boşalsın)
 
     Dashboard'dan çağrıldığında zaten request context içinde olduğundan
     doğrudan çalışır. Cron'dan çağrıldığında _app.app_context() kullanır.
@@ -91,7 +94,16 @@ def auto_expire_reservations():
             except (IndexError, ValueError):
                 continue
 
-        all_expired = expired_past_date + expired_past_time
+        # Uzun süredir onay bekleyenler (ödeme yapılmamış talepler slotu tutmasın)
+        timeout_cutoff = now - timedelta(hours=PENDING_TIMEOUT_HOURS)
+        timed_out = Reservation.query.filter(
+            Reservation.status == 'Pending',
+            Reservation.created_at < timeout_cutoff
+        ).all()
+
+        past_ids = {r.id for r in expired_past_date + expired_past_time}
+        timed_out = [r for r in timed_out if r.id not in past_ids]
+        all_expired = expired_past_date + expired_past_time + timed_out
         count = 0
 
         # Müşteriye mail gönderilmez; durum sorgulama sayfasından takip edilir.
@@ -104,7 +116,8 @@ def auto_expire_reservations():
                 admin='sistem',
                 ip_address='127.0.0.1',
                 action='otomatik_suresi_doldu',
-                detail=f'{count} adet bekleyen rezervasyonun suresi doldu — otomatik kapatildi.'
+                detail=(f'{count} adet bekleyen rezervasyonun suresi doldu — otomatik kapatildi '
+                        f'({len(timed_out)} tanesi {PENDING_TIMEOUT_HOURS} saat icinde onaylanmadigi icin).')
             ))
             db.session.commit()
             logger.info(f"Otomatik sure dolumu: {count} rezervasyon 'Expired' olarak isaretlendi.")

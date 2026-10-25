@@ -1,0 +1,5 @@
+# Geliştirme / test bağımlılıkları
+#   pip install -r requirements-dev.txt
+#   python -m pytest
+-r requirements.txt
+pytest==8.3.4

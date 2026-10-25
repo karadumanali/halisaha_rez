@@ -131,6 +131,11 @@
     margin: 22px 0 10px; display: flex; align-items: center; gap: 7px;
 }
 .date-label i { color: var(--teal); font-size: 0.8rem; }
+.date-label.date-label-spaced { margin-top: 22px; }
+.guide-note-icon { margin-right: 4px; }
+.slots-empty { text-align: center; padding: 30px 16px; color: #94a3b8; font-size: 0.9rem; }
+.slots-empty-icon { font-size: 1.8rem; margin-bottom: 10px; display: block; color: #cbd5e1; }
+.slots-empty-sub { font-size: 0.78rem; }
 
 input[type="date"].form-control {
     font-size: 1rem !important;
@@ -585,7 +590,7 @@ input[type="date"].form-control {
                 <i class="fas fa-exclamation-triangle"></i>
                 <span id="dateWarnText"></span>
             </div>
-            <div class="date-label" style="margin-top:22px;">
+            <div class="date-label date-label-spaced">
                 <i class="fas fa-futbol"></i> Saha Seçin
             </div>
             <div class="pitch-list" role="radiogroup" aria-label="Saha seçimi">
@@ -837,7 +842,7 @@ input[type="date"].form-control {
                 </div>
             </div>
             <div class="guide-note">
-                <i class="fas fa-info-circle" style="margin-right:4px;"></i>
+                <i class="fas fa-info-circle guide-note-icon"></i>
                 <strong>Not:</strong> Takip kodunuzu kaybetmemeniz önemlidir.
                 Kod olmadan rezervasyon durumunuzu sorgulayamazsınız.
             </div>
@@ -1082,8 +1087,8 @@ function renderSlots() {
 
     if(SLOTS.length===0){
         var emptyDiv=document.createElement('div');
-        emptyDiv.style.cssText='text-align:center;padding:30px 16px;color:#94a3b8;font-size:0.9rem;';
-        emptyDiv.innerHTML='<i class="fas fa-clock" style="font-size:1.8rem;margin-bottom:10px;display:block;color:#cbd5e1;"></i>Bu saha için henüz saat dilimi tanımlanmamış.<br><span style="font-size:0.78rem;">Lütfen yöneticiyle iletişime geçin.</span>';
+        emptyDiv.className='slots-empty';
+        emptyDiv.innerHTML='<i class="fas fa-clock slots-empty-icon"></i>Bu saha için henüz saat dilimi tanımlanmamış.<br><span class="slots-empty-sub">Lütfen yöneticiyle iletişime geçin.</span>';
         list.appendChild(emptyDiv);
         return;
     }

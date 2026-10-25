@@ -24,7 +24,10 @@ from models import (
     Pitch, PitchImage, Reservation, BlockedSlot,
     AuditLog, PitchTimeSlot, CustomerType, PitchPricing
 )
-from utils.constants import SLOT_GROUPS, SLOT_START_HOURS
+from utils.constants import (
+    SLOT_GROUPS, SLOT_START_HOURS, ACTIVE_STATUSES,
+    PENDING_TIMEOUT_HOURS, PENDING_WARN_HOURS
+)
 from utils.helpers import audit, get_real_ip
 from utils.timeutil import now_tr, today_tr
 from services.security import detect_mime
@@ -122,6 +125,12 @@ def admin_dashboard():
     ).all()
     audit_logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(200).all()
 
+    # Uzun süredir onay bekleyen talepler (PENDING_TIMEOUT_HOURS dolunca otomatik düşer)
+    stale_pending_count = Reservation.query.filter(
+        Reservation.status == 'Pending',
+        Reservation.created_at < now_tr() - timedelta(hours=PENDING_WARN_HOURS)
+    ).count()
+
     return render_template(
         'admin.html',
         pitches=pitches,
@@ -134,11 +143,46 @@ def admin_dashboard():
         blocked_slots=blocked_slots,
         audit_logs=audit_logs,
         slot_groups=SLOT_GROUPS,
+        stale_pending_count=stale_pending_count,
+        pending_warn_hours=PENDING_WARN_HOURS,
+        pending_timeout_hours=PENDING_TIMEOUT_HOURS,
         now=now_tr()
     )
 
 
 # ── Slot kilitleme / kilit kaldırma ───────────────────────────────
+
+def _find_block_conflicts(pitch_ids, dates, time_slots):
+    """Kilitlenmek istenen saatlerdeki bekleyen/onaylı rezervasyonları döndür."""
+    try:
+        pids = [int(p) for p in pitch_ids]
+        date_objs = [datetime.strptime(d, '%Y-%m-%d').date() for d in dates]
+    except (ValueError, TypeError):
+        return []
+    if not pids or not date_objs or not time_slots:
+        return []
+    return Reservation.query.filter(
+        Reservation.pitch_id.in_(pids),
+        Reservation.date.in_(date_objs),
+        Reservation.time_slot.in_(time_slots),
+        Reservation.status.in_(ACTIVE_STATUSES)
+    ).order_by(Reservation.date, Reservation.time_slot).all()
+
+
+def _conflict_label(r):
+    durum = 'Onayli' if r.status == 'Approved' else 'Bekliyor'
+    return f'{r.pitch.name} {r.date.strftime("%d.%m.%Y")} {r.time_slot} ({durum}, {r.customer_name})'
+
+
+@admin_bp.route('/api/block_conflicts')
+@login_required
+def block_conflicts():
+    """Kilit formu için: seçilen saatlerde aktif rezervasyon var mı? (JSON)"""
+    conflicts = _find_block_conflicts(request.args.getlist('pitch_ids'),
+                                      request.args.getlist('dates'),
+                                      request.args.getlist('time_slots'))
+    return jsonify({'conflicts': [_conflict_label(r) for r in conflicts]})
+
 
 @admin_bp.route('/block_slot', methods=['POST'])
 @login_required
@@ -183,12 +227,22 @@ def block_slot():
     msg = f'{added} slot basariyla kilitlendi.'
     if skipped > 0:
         msg += f' ({skipped} slot zaten kilitliydi, atlandi.)'
+
+    # Kilitlenen saatlerde aktif rezervasyon varsa admini uyar (rezervasyonlar
+    # otomatik değişmez; admin müşteriyle iletişime geçip karar verir)
+    conflicts = _find_block_conflicts(pitch_ids, dates, time_slots) if added > 0 else []
     if added > 0:
         audit('slot_kilitle',
               f'{added} slot kilitlendi | saha_ids={pitch_ids} '
-              f'| tarihler={dates} | saatler={time_slots} | sebep={reason}')
+              f'| tarihler={dates} | saatler={time_slots} | sebep={reason}'
+              + (f' | cakisan aktif rezervasyon={len(conflicts)}' if conflicts else ''))
     flash(msg, 'success' if added > 0 else 'warning')
-    return redirect(url_for('admin.admin_dashboard'))
+    if conflicts:
+        ornek = '; '.join(_conflict_label(r) for r in conflicts[:5])
+        flash(f'DIKKAT: Kilitlenen saatlerde {len(conflicts)} aktif rezervasyon var: {ornek}'
+              + (f' ... ve {len(conflicts) - 5} tane daha' if len(conflicts) > 5 else '')
+              + '. Bu musterilerle iletisime gecin.', 'warning')
+    return redirect(url_for('admin.admin_dashboard', tab='kilitler'))
 
 
 @admin_bp.route('/unblock_slot/<int:block_id>', methods=['POST'])
@@ -482,17 +536,49 @@ def delete_customer_type(ctype_id):
 @admin_bp.route('/delete_pitch/<int:pitch_id>', methods=['POST'])
 @login_required
 def delete_pitch(pitch_id):
-    """Sahayı sil (cascade ile rezervasyonları da siler)."""
+    """Rezervasyonu hiç olmayan saha (ör. yanlış eklenen) tamamen silinir.
+    Rezervasyon geçmişi olan saha silinmez, pasife alınır: sitede görünmez,
+    rezervasyon almaz; geçmiş kayıtlar ve raporlar korunur."""
     pitch      = db.get_or_404(Pitch, pitch_id)
     pitch_name = pitch.name
-    try:
-        db.session.delete(pitch)
-        db.session.commit()
+    res_count  = len(pitch.reservations)
+
+    if res_count == 0:
+        try:
+            db.session.delete(pitch)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            flash(f'"{pitch_name}" silinemedi.', 'danger')
+            return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
         audit('saha_sil', f'saha={pitch_name}')
         flash(f'"{pitch_name}" silindi.', 'success')
-    except Exception:
-        db.session.rollback()
-        flash('Bu sahaya ait rezervasyonlar var! Once onlari silin.', 'danger')
+        return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
+
+    pitch.is_active = False
+    db.session.commit()
+    active = sum(1 for r in pitch.reservations
+                 if r.status in ACTIVE_STATUSES and r.date >= today_tr())
+    audit('saha_pasif', f'saha={pitch_name} | rezervasyon gecmisi={res_count} '
+                        f'| ileri tarihli aktif rezervasyon={active}')
+    flash(f'"{pitch_name}" rezervasyon geçmişi olduğu için silinmedi, pasife alındı. '
+          f'Sitede görünmez ve yeni rezervasyon almaz; geçmiş kayıtlar korunur.', 'success')
+    if active:
+        flash(f'DIKKAT: Bu sahada ileri tarihli {active} bekleyen/onaylı rezervasyon var. '
+              f'Bu rezervasyonlar geçerli kalır; müşterilerle iletişime geçin.', 'warning')
+    return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
+
+
+@admin_bp.route('/activate_pitch/<int:pitch_id>', methods=['POST'])
+@login_required
+def activate_pitch(pitch_id):
+    """Pasif sahayı tekrar aktif yap."""
+    pitch = db.get_or_404(Pitch, pitch_id)
+    if not pitch.is_active:
+        pitch.is_active = True
+        db.session.commit()
+        audit('saha_aktif', f'saha={pitch.name}')
+    flash(f'"{pitch.name}" tekrar aktif.', 'success')
     return redirect(url_for('admin.admin_dashboard', tab='sahalar'))
 
 
@@ -600,10 +686,13 @@ def view_receipt(filename):
     if not re.match(r'^[a-f0-9]{32}\.(pdf|jpg|jpeg|png)$', safe_name):
         logger.warning("Gecersiz receipt istegi: %s — IP: %s", safe_name, get_real_ip())
         return ("Gecersiz dosya adi.", 400)
+    # Resimler yüklenirken yeniden işlendiği için tarayıcıda açılabilir.
+    # PDF'ler kullanıcıdan geldiği gibi saklanır → tarayıcıda açmak yerine indirilir.
+    is_pdf = safe_name.endswith('.pdf')
     return send_from_directory(
         current_app.config['UPLOAD_FOLDER'],
         safe_name,
-        as_attachment=False
+        as_attachment=is_pdf
     )
 
 

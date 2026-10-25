@@ -9,13 +9,13 @@
                 </div>
             </div>
 
-            <div class="card" style="overflow:hidden;">
+            <div class="card card-clip">
                 <div class="section-head-inline">
-                    <i class="fas fa-shield-alt" style="color:var(--teal)"></i>
+                    <i class="fas fa-shield-alt icon-teal"></i>
                     <h3>İşlem Geçmişi</h3>
                     <span class="head-count">{{ audit_logs|length }} kayıt</span>
                 </div>
-                <div style="padding:16px;">
+                <div class="card-pad">
                     <!-- Arama -->
                     <div class="audit-filter-row">
                         <input type="text" id="auditSearch" class="audit-search"
@@ -29,11 +29,11 @@
                     </div>
 
                     <!-- Başlık -->
-                    <div class="audit-item" style="background:var(--gray-50);border-color:var(--gray-300);margin-bottom:4px;">
-                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">Tarih / Saat</span>
-                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">Kullanıcı</span>
-                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">İşlem</span>
-                        <span style="font-size:0.68rem;font-weight:800;color:var(--gray-400);text-transform:uppercase;letter-spacing:0.06em;">Detay</span>
+                    <div class="audit-item audit-head-row">
+                        <span class="audit-head-cell">Tarih / Saat</span>
+                        <span class="audit-head-cell">Kullanıcı</span>
+                        <span class="audit-head-cell">İşlem</span>
+                        <span class="audit-head-cell">Detay</span>
                     </div>
 
                     <div class="audit-list" id="auditList">
@@ -51,7 +51,10 @@
                         'musteri_tipi_guncelle': ('action-saha',   'fas fa-id-badge',     'Tip Güncelle'),
                         'musteri_tipi_sil':      ('action-reddet', 'fas fa-id-badge',     'Tip Sil'),
                         'saha_sil':              ('action-reddet', 'fas fa-trash',        'Saha Sil'),
+                        'saha_pasif':            ('action-reddet', 'fas fa-eye-slash',    'Saha Pasife Alındı'),
+                        'saha_aktif':            ('action-saha',   'fas fa-eye',          'Saha Aktif Yapıldı'),
                         'slot_kilitle':          ('action-slot',   'fas fa-lock',         'Slot Kilitle'),
+                        'kullanici_iptal':       ('action-expired','fas fa-ban',          'Müşteri İptali'),
                         'slot_kilit_kaldir':     ('action-slot',   'fas fa-unlock',       'Kilit Kaldır'),
                         'toplu_kilit_kaldir':    ('action-slot',   'fas fa-unlock',       'Toplu Kilit Kaldır'),
                         'sifre_degistir':        ('action-sifre',  'fas fa-key',          'Şifre Değiştir'),
@@ -66,7 +69,7 @@
                             {{ log.created_at.strftime('%d.%m.%Y %H:%M') }}
                         </span>
                         <span class="audit-admin">
-                            <i class="fas fa-user" style="font-size:0.7rem;opacity:0.6;"></i>
+                            <i class="fas fa-user audit-user-icon"></i>
                             {{ log.admin }}
                         </span>
                         <span class="audit-action {{ meta[0] }}">

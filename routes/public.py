@@ -18,17 +18,25 @@ from flask import (
     url_for, flash, jsonify, current_app, Response, session
 )
 
+from sqlalchemy import func, or_
+
 from extensions import db, limiter
-from models import Pitch, Reservation, BlockedSlot, PitchTimeSlot, CustomerType
+from models import Pitch, Reservation, BlockedSlot, PitchTimeSlot, CustomerType, AuditLog
+from utils.constants import ACTIVE_STATUSES, MAX_RESERVATIONS_PER_PERSON_PER_DAY
 from utils.helpers import get_real_ip
 from utils.timeutil import now_tr, today_tr
 from services.security import verify_recaptcha
-from services.file_handler import save_secure_receipt
+from services.file_handler import save_secure_receipt, delete_receipt
 from services.email import send_admin_notification, send_customer_received_email
 
 logger = logging.getLogger(__name__)
 
 public_bp = Blueprint('public', __name__)
+
+# Kampüs ağında tüm öğrenciler tek IP ile göründüğü için (NAT) herkese açık
+# sayfaların IP başına limitleri yüksek tutulur; aksi halde öğrenciler birbirinin
+# limitini tüketip 429 alır. Bot/spam koruması reCAPTCHA + kişi başı kural ile.
+PUBLIC_PAGE_LIMIT = "300 per minute"
 
 
 # ── CSP raporu ─────────────────────────────────────────────────────
@@ -55,9 +63,10 @@ def csp_report():
 # ── Ana sayfa ──────────────────────────────────────────────────────
 
 @public_bp.route('/')
+@limiter.limit(PUBLIC_PAGE_LIMIT)
 def index():
     """Ana sayfa: fiyatı tanımlı sahaları listele, rezervasyon formu göster."""
-    pitches = [p for p in Pitch.query.order_by(Pitch.id).all() if p.pricing]
+    pitches = [p for p in Pitch.query.filter_by(is_active=True).order_by(Pitch.id).all() if p.pricing]
     customer_types = CustomerType.query.order_by(CustomerType.id).all()
     today_date = today_tr().isoformat()
     recaptcha_site_key = os.getenv('RECAPTCHA_SITE_KEY', '')
@@ -74,7 +83,7 @@ def index():
 # ── Dolu slot sorgulama (AJAX) ────────────────────────────────────
 
 @public_bp.route('/busy_slots')
-@limiter.limit("60 per minute")
+@limiter.limit("600 per minute")
 def busy_slots():
     """Belirtilen tarih ve saha için dolu/kilitli slotları döndür."""
     date_str = request.args.get('date')
@@ -90,7 +99,7 @@ def busy_slots():
 
     busy_records = Reservation.query.filter_by(
         pitch_id=pitch_id, date=date_obj
-    ).filter(Reservation.status.in_(['Pending', 'Approved'])).all()
+    ).filter(Reservation.status.in_(ACTIVE_STATUSES)).all()
     busy_dict = {r.time_slot: r.status for r in busy_records}
 
     blocked = BlockedSlot.query.filter_by(pitch_id=pitch_id, date=date_obj).all()
@@ -111,8 +120,7 @@ def busy_slots():
 # ── Rezervasyon oluşturma ──────────────────────────────────────────
 
 @public_bp.route('/reserve', methods=['POST'])
-@limiter.limit("3 per minute")
-@limiter.limit("10 per day")
+@limiter.limit("20 per minute; 300 per day")   # IP (kampüs) tavanı; kişi başı kural aşağıda
 def reserve():
     """Yeni rezervasyon talebi oluştur."""
 
@@ -142,6 +150,9 @@ def reserve():
 
     # Müşteri tipi + ücret doğrulama — ücret istemciden değil, DB'den alınır
     pitch = db.session.get(Pitch, pitch_id)
+    if pitch is None or not pitch.is_active:
+        flash('Gecersiz saha!', 'danger')
+        return redirect(url_for('public.index'))
     try:
         ctype_id = int(ctype_id)
     except (ValueError, TypeError):
@@ -218,10 +229,25 @@ def reserve():
         flash(f'Bu saat dilimi kilitli: {blocked.reason}', 'danger')
         return redirect(url_for('public.index'))
 
+    # Kişi başı kural: aynı telefon VEYA e-posta ile bugün oluşturulmuş en fazla
+    # MAX_RESERVATIONS_PER_PERSON_PER_DAY aktif (bekleyen + onaylı) talep
+    day_start = datetime.combine(current_date, datetime.min.time())
+    person_today = Reservation.query.filter(
+        Reservation.created_at >= day_start,
+        Reservation.created_at < day_start + timedelta(days=1),
+        Reservation.status.in_(ACTIVE_STATUSES),
+        or_(Reservation.customer_phone == clean_phone,
+            func.lower(Reservation.customer_email) == customer_email.lower())
+    ).count()
+    if person_today >= MAX_RESERVATIONS_PER_PERSON_PER_DAY:
+        flash(f'Bir gunde en fazla {MAX_RESERVATIONS_PER_PERSON_PER_DAY} rezervasyon talebi '
+              f'olusturabilirsiniz. Bugun zaten {person_today} aktif talebiniz var.', 'danger')
+        return redirect(url_for('public.index'))
+
     # Race condition önlemi — FOR UPDATE ile satır kilitle
     existing = Reservation.query.filter_by(
         pitch_id=pitch_id, date=date_obj, time_slot=time_slot
-    ).filter(Reservation.status.in_(['Pending', 'Approved'])).with_for_update().first()
+    ).filter(Reservation.status.in_(ACTIVE_STATUSES)).with_for_update().first()
     if existing:
         flash('Bu saat dilimi dolu veya onay bekliyor!', 'danger')
         return redirect(url_for('public.index'))
@@ -246,6 +272,7 @@ def reserve():
         db.session.commit()
     except Exception:
         db.session.rollback()
+        delete_receipt(saved_filename)   # kayıt oluşmadı → yüklenen dekont diskte kalmasın
         flash('Bu saat dilimi dolu veya onay bekliyor!', 'danger')
         return redirect(url_for('public.index'))
 
@@ -277,6 +304,7 @@ def reserve():
 # ── Rezervasyon basarili sayfasi ───────────────────────────────────
 
 @public_bp.route('/rezervasyon-basarili')
+@limiter.limit(PUBLIC_PAGE_LIMIT)
 def reservation_success():
     """Rezervasyon basarili — takip kodunu goster."""
     tracking_code  = session.pop('tracking_code', None)
@@ -303,24 +331,75 @@ def reservation_success():
 
 # ── Rezervasyon takip/sorgulama ───────────────────────────────────
 
+def _can_cancel(reservation) -> bool:
+    """Kullanıcı iptal edebilir mi? Bekleyen/onaylı ve saati henüz başlamamış olmalı."""
+    if reservation is None or reservation.status not in ACTIVE_STATUSES:
+        return False
+    try:
+        start_str = reservation.time_slot.split(' - ')[0].strip()
+        start = datetime.combine(reservation.date, datetime.strptime(start_str, '%H:%M').time())
+    except (ValueError, IndexError, AttributeError):
+        return False
+    return start > now_tr()
+
+
+def _render_track(reservation=None, searched=False, code=''):
+    return render_template('track.html', reservation=reservation, searched=searched,
+                           code=code, can_cancel=_can_cancel(reservation), hide_fab=True)
+
+
 @public_bp.route('/rezervasyon-sorgula')
+@limiter.limit(PUBLIC_PAGE_LIMIT)
 def track_reservation_page():
     """Rezervasyon takip sayfasi — form goster."""
-    return render_template('track.html', reservation=None, searched=False, hide_fab=True)
+    return _render_track()
 
 
 @public_bp.route('/rezervasyon-sorgula', methods=['POST'])
-@limiter.limit("10 per minute")
+@limiter.limit("60 per minute")
 def track_reservation():
     """Takip koduna gore rezervasyon durumunu sorgula."""
     code = request.form.get('tracking_code', '').strip().upper()
 
     if not code:
         flash('Lutfen takip kodunuzu girin.', 'warning')
-        return render_template('track.html', reservation=None, searched=False, hide_fab=True)
+        return _render_track()
 
     reservation = Reservation.query.filter_by(tracking_code=code).first()
-    return render_template('track.html', reservation=reservation, searched=True, code=code, hide_fab=True)
+    return _render_track(reservation, searched=True, code=code)
+
+
+@public_bp.route('/rezervasyon-iptal', methods=['POST'])
+@limiter.limit("30 per minute")
+def cancel_reservation():
+    """Kullanıcı kendi rezervasyonunu iptal eder: takip kodu + kayıtlı telefon gerekir."""
+    code  = request.form.get('tracking_code', '').strip().upper()
+    phone = request.form.get('customer_phone', '').replace(' ', '').strip()
+
+    reservation = Reservation.query.filter_by(tracking_code=code).with_for_update().first() if code else None
+    if reservation is None:
+        flash('Rezervasyon bulunamadi.', 'danger')
+        return _render_track(searched=bool(code), code=code)
+
+    if not phone or phone != reservation.customer_phone:
+        flash('Telefon numarasi bu rezervasyondaki numarayla eslesmiyor.', 'danger')
+        return _render_track(reservation, searched=True, code=code)
+
+    if not _can_cancel(reservation):
+        flash('Bu rezervasyon iptal edilemez (islem gormus veya saati gecmis).', 'warning')
+        return _render_track(reservation, searched=True, code=code)
+
+    old_status = reservation.status
+    reservation.status = 'Cancelled'
+    db.session.add(AuditLog(
+        admin='musteri', ip_address=get_real_ip(), action='kullanici_iptal',
+        detail=(f'kod={reservation.tracking_code} | musteri={reservation.customer_name} '
+                f'| saha={reservation.pitch.name} | tarih={reservation.date} '
+                f'| saat={reservation.time_slot} | onceki durum={old_status}')
+    ))
+    db.session.commit()
+    flash('Rezervasyonunuz iptal edildi. Saat diger kullanicilara acildi.', 'success')
+    return _render_track(reservation, searched=True, code=code)
 
 
 # ── security.txt ───────────────────────────────────────────────────

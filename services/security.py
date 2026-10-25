@@ -194,3 +194,19 @@ def register_error_handlers(app):
     @app.errorhandler(403)
     def forbidden(e):
         return _render_error(403, e)
+
+    # CSRF token'ı geçersiz/eksik (çoğunlukla sayfa uzun süre açık kalıp oturum
+    # düştüğünde): ham 400 sayfası yerine açıklayıcı mesajla uygun sayfaya dön.
+    from flask_wtf.csrf import CSRFError
+    from flask import flash, redirect, url_for
+
+    @app.errorhandler(CSRFError)
+    def csrf_error(e):
+        path = request.path or ''
+        if path.startswith('/admin') or path in ('/logout', '/login'):
+            flash('Oturumunuzun suresi doldu. Lutfen tekrar giris yapin.', 'warning')
+            return redirect(url_for('auth.admin_login'))
+        flash('Sayfanin suresi doldu. Lutfen tekrar deneyin.', 'warning')
+        if path.startswith('/rezervasyon'):
+            return redirect(url_for('public.track_reservation_page'))
+        return redirect(url_for('public.index'))

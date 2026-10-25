@@ -13,6 +13,7 @@ Gönderim threading ile async yapılır, SMTP blocking DoS'u önlenir.
 """
 
 import os
+import re
 import smtplib
 import logging
 import threading
@@ -22,6 +23,9 @@ from email.headerregistry import Address
 logger = logging.getLogger(__name__)
 
 SENDER_NAME = 'AYBÜ SKS Spor Tesisleri'
+
+# MAIL_USERNAME basit bir e-posta adresi olmalı (boşluk, parantez vb. içermemeli)
+_EMAIL_RE = re.compile(r'^[^@\s()<>,;:"\[\]]+@[^@\s()<>,;:"\[\]]+\.[^@\s()<>,;:"\[\]]+$')
 
 
 def _smtp_settings():
@@ -53,9 +57,21 @@ def _send_mail_async(msg: EmailMessage):
         logger.warning("Mail hatasi (%s:%s): %s", server, port, e)
 
 
+def _sender_address():
+    """MAIL_USERNAME geçerli bir e-posta adresiyse onu, değilse None döndür."""
+    addr = (os.getenv('MAIL_USERNAME') or '').strip()
+    return addr if _EMAIL_RE.match(addr) else None
+
+
 def _is_mail_configured() -> bool:
-    """Mail ayarlarının yapılıp yapılmadığını kontrol et."""
-    return bool(os.getenv('MAIL_USERNAME')) and bool(os.getenv('MAIL_PASSWORD'))
+    """Mail ayarları yapılmış ve geçerli mi? Hatalı ayar rezervasyonu bozmamalı."""
+    if not (os.getenv('MAIL_USERNAME') or '').strip() or not (os.getenv('MAIL_PASSWORD') or '').strip():
+        return False
+    if _sender_address() is None:
+        logger.warning("MAIL_USERNAME gecerli bir e-posta adresi degil; mail gonderilmedi. "
+                       ".env dosyasindaki MAIL_ ayarlarini kontrol edin.")
+        return False
+    return True
 
 
 def _sanitize_header(value: str) -> str:
@@ -66,14 +82,23 @@ def _sanitize_header(value: str) -> str:
 def _new_message(to: str, subject: str, body: str) -> EmailMessage:
     msg = EmailMessage()
     msg['Subject'] = _sanitize_header(subject)
-    msg['From']    = Address(display_name=SENDER_NAME,
-                             addr_spec=os.getenv('MAIL_USERNAME', ''))
+    msg['From']    = Address(display_name=SENDER_NAME, addr_spec=_sender_address())
     msg['To']      = _sanitize_header(to)
     msg.set_content(body)
     return msg
 
 
-def _send(msg: EmailMessage):
+def _send(to: str, subject: str, body: str):
+    """Maili hazırlayıp arka planda gönder. Hazırlarken bir hata olursa (ör. hatalı
+    adres) yalnızca log'a yazılır; rezervasyon işlemi asla mail yüzünden bozulmaz."""
+    if not _EMAIL_RE.match((to or '').strip()):
+        logger.warning("Gecersiz alici adresi, mail gonderilmedi: %r", to)
+        return
+    try:
+        msg = _new_message(to, subject, body)
+    except Exception as e:
+        logger.warning("Mail hazirlanamadi (alici=%s): %s", to, e)
+        return
     threading.Thread(target=_send_mail_async, args=(msg,), daemon=True).start()
 
 
@@ -85,11 +110,11 @@ def send_admin_notification(customer_name: str, date, time_slot: str):
     if not _is_mail_configured() or not admin_email:
         return
     customer_name = _sanitize_header(customer_name)
-    _send(_new_message(
+    _send(
         admin_email,
         'Yeni Rezervasyon Talebi!',
         f"Yeni rezervasyon:\n{customer_name}\n{date}\n{time_slot}"
-    ))
+    )
 
 
 # ── Müşteri "talep alındı" maili ───────────────────────────────────
@@ -119,8 +144,8 @@ def send_customer_received_email(customer_email: str, customer_name: str,
         f"Bu e-posta otomatik olarak gönderilmiştir, lütfen yanıtlamayınız.\n\n"
         f"{SENDER_NAME}"
     )
-    _send(_new_message(
+    _send(
         customer_email,
         f'Rezervasyon Talebiniz Alındı - {tracking_code}',
         body
-    ))
+    )

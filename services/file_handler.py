@@ -73,6 +73,18 @@ def save_secure_receipt(file) -> str | None:
     return safe_filename
 
 
+def delete_receipt(filename: str) -> None:
+    """Kaydı oluşmayan rezervasyonun dekontunu sil (diskte sahipsiz dosya kalmasın)."""
+    if not filename:
+        return
+    path = os.path.join(current_app.config['UPLOAD_FOLDER'], os.path.basename(filename))
+    try:
+        if os.path.isfile(path):
+            os.remove(path)
+    except OSError as e:
+        logger.warning(f"Dekont silinemedi ({filename}): {e}")
+
+
 def save_secure_pitch_image(file) -> str | None:
     """
     Saha resmini güvenli şekilde kaydet.

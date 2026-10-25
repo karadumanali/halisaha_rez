@@ -40,6 +40,22 @@ LOCKOUT_MINUTES     = 15
 # böylece bir adminin yanlış şifreleri diğer adminleri kilitlemez.
 IP_LOCKOUT_ATTEMPTS = 15
 
+# ── Rezervasyon kuralları ───────────────────────────────────────────
+
+# Rezervasyon durumları — sadece bu ikisi slotu "dolu" yapar
+ACTIVE_STATUSES = ('Pending', 'Approved')
+
+# Bir kişi (aynı telefon VEYA aynı e-posta) bir gün içinde en fazla kaç rezervasyon
+# talebi oluşturabilir. Sayılan: o gün oluşturulmuş ve hâlâ aktif (bekleyen/onaylı)
+# talepler — iptal edilen/reddedilen talepler hakkı geri verir.
+# (IP bazlı değil: kampüs ağında tüm öğrenciler tek IP ile görünür.)
+MAX_RESERVATIONS_PER_PERSON_PER_DAY = 2
+
+# Bu kadar saat içinde onaylanmayan talep otomatik "Süresi Doldu" olur ve slot boşalır
+PENDING_TIMEOUT_HOURS = 48
+# Admin panelinde "uzun süredir bekliyor" uyarısı bu saatten sonra gösterilir
+PENDING_WARN_HOURS = 24
+
 # ── Hata sayfası tanımları ──────────────────────────────────────────
 
 ERROR_PAGES = {

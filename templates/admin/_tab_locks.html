@@ -12,7 +12,7 @@
             <div class="block-form-card">
                 <h3>
                     <i class="fas fa-lock"></i> Yeni Slot Kilitle
-                    <span style="font-size:0.75rem;font-weight:600;color:var(--gray-400);margin-left:6px;">— Birden fazla seçim yapabilirsiniz</span>
+                    <span class="hint-inline">— Birden fazla seçim yapabilirsiniz</span>
                 </h3>
 
                 <form id="blockForm" action="/admin/block_slot" method="POST">
@@ -25,14 +25,14 @@
                         <div>
                             <label class="form-label"><i class="fas fa-futbol"></i> Saha <span class="multi-hint">(çoklu)</span></label>
                             <div class="multi-pick-list" id="pitchPicker">
-                                {% for pitch in pitches %}
+                                {% for pitch in pitches if pitch.is_active %}
                                 <div class="multi-pick-item" data-val="{{ pitch.id }}" data-pick-type="pitch">
                                     <i class="fas fa-futbol"></i> {{ pitch.name }}
                                     <i class="fas fa-check pick-check"></i>
                                 </div>
                                 {% endfor %}
-                                {% if not pitches %}
-                                <div style="padding:12px;color:var(--gray-400);font-size:0.85rem;">Henüz saha yok.</div>
+                                {% if not pitches|selectattr('is_active')|list %}
+                                <div class="pick-empty">Henüz saha yok.</div>
                                 {% endif %}
                             </div>
                         </div>
@@ -55,7 +55,7 @@
                         <div>
                             <label class="form-label"><i class="fas fa-clock"></i> Saat Dilimi <span class="multi-hint">(çoklu)</span></label>
                             <div class="multi-pick-list" id="slotPicker">
-                                <div id="slotPickerEmpty" style="padding:12px;color:var(--gray-400);font-size:0.85rem;">
+                                <div id="slotPickerEmpty" class="pick-empty">
                                     Önce bir saha seçin.
                                 </div>
                             </div>
@@ -64,14 +64,13 @@
                         <!-- 4. SEBEP + ÖZET + BUTON -->
                         <div class="block-action-col">
                             <label class="form-label" for="bReason"><i class="fas fa-comment"></i> Kilitleme Sebebi <span class="text-danger" title="Zorunlu alan">*</span></label>
-                            <textarea id="bReason" name="reason" class="form-control"
+                            <textarea id="bReason" name="reason" class="form-control reason-textarea"
                                       maxlength="150" rows="5" required
-                                      placeholder="Örn: Bahar Şenlikleri sebebiyle sahamız kullanılamamaktadır."
-                                      style="resize:vertical;min-height:110px;line-height:1.5;"></textarea>
-                            <div style="text-align:right;font-size:0.72rem;color:var(--gray-400);margin-top:3px;">
+                                      placeholder="Örn: Bahar Şenlikleri sebebiyle sahamız kullanılamamaktadır."></textarea>
+                            <div class="char-counter">
                                 <span id="charCount">0</span>/150 karakter
                             </div>
-                            <div class="block-summary" id="blockSummary" style="display:none;">
+                            <div class="block-summary is-hidden" id="blockSummary">
                                 <i class="fas fa-info-circle"></i>
                                 <span id="blockSummaryText"></span>
                             </div>
@@ -85,13 +84,13 @@
             </div>
 
             <!-- Aktif kilitler -->
-            <div class="card" style="overflow:hidden;">
+            <div class="card card-clip">
                 <div class="section-head-inline">
-                    <i class="fas fa-lock" style="color:#7c3aed"></i>
+                    <i class="fas fa-lock icon-purple"></i>
                     <h3>Aktif Slot Kilitleri</h3>
                     <span class="head-count">{{ blocked_slots|length }} kilit</span>
                 </div>
-                <div style="padding:18px;">
+                <div class="card-pad-lg">
                     {% if blocked_slots %}
                     <form action="/admin/bulk_unblock_slots" method="POST" id="bulkUnblockForm">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

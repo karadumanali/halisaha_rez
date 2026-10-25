@@ -89,6 +89,9 @@ def admin_login():
 
             login_user(admin, remember=False)
             session['session_token'] = new_token
+            # 30 dk hareketsizlikte oturum düşsün (PERMANENT_SESSION_LIFETIME);
+            # her istekte süre yenilenir.
+            session.permanent = True
 
             # Audit log
             db.session.add(AuditLog(
@@ -106,10 +109,11 @@ def admin_login():
 
 # ── Çıkış ──────────────────────────────────────────────────────────
 
-@auth_bp.route('/logout')
+@auth_bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
-    """Güvenli çıkış — session token invalidate."""
+    """Güvenli çıkış — session token invalidate.
+    Sadece POST + CSRF: başka bir site admini habersizce çıkış yaptıramaz."""
     audit('admin_cikis', 'Guvenli cikis yapildi')
     if current_user.is_authenticated:
         current_user.session_token = None

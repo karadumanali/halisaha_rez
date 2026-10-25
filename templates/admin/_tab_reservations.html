@@ -27,10 +27,24 @@
                     <div><div class="stat-num">{{ expired_count }}</div><div class="stat-lbl">Süresi Doldu</div></div>
                 </div>
                 <div class="stat-chip">
+                    <div class="stat-icon cancelled"><i class="fas fa-ban"></i></div>
+                    <div><div class="stat-num">{{ cancelled_count }}</div><div class="stat-lbl">İptal</div></div>
+                </div>
+                <div class="stat-chip">
                     <div class="stat-icon blocked"><i class="fas fa-lock"></i></div>
                     <div><div class="stat-num">{{ blocked_count }}</div><div class="stat-lbl">Kilitli Slot</div></div>
                 </div>
             </div>
+
+            {% if stale_pending_count %}
+            <div class="stale-pending-banner">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>
+                    <strong>{{ stale_pending_count }}</strong> talep {{ pending_warn_hours }} saatten uzun süredir onay bekliyor.
+                    {{ pending_timeout_hours }} saat içinde onaylanmayan talepler otomatik olarak "Süresi Doldu" olur ve saat boşalır.
+                </span>
+            </div>
+            {% endif %}
 
             <!-- ═══ Filtre Paneli ═══ -->
             <div class="adv-filter-panel">
@@ -56,7 +70,7 @@
                            class="filter-chip {{ 'active' if request.args.get('pitch','all') == 'all' else '' }}">Tümü</a>
                         {% for p in pitches %}
                         <a href="{{ url_for('admin.admin_dashboard', date_range=request.args.get('date_range',''), pitch=p.id, ctype=request.args.get('ctype','all')) }}"
-                           class="filter-chip {{ 'active' if request.args.get('pitch','all')|string == p.id|string else '' }}">{{ p.name }}</a>
+                           class="filter-chip {{ 'active' if request.args.get('pitch','all')|string == p.id|string else '' }}">{{ p.name }}{% if not p.is_active %} (pasif){% endif %}</a>
                         {% endfor %}
                     </div>
                 </div>
@@ -94,13 +108,14 @@
                 <button class="filter-btn" data-filter="Approved">Onaylandı ({{ approved_count }})</button>
                 <button class="filter-btn" data-filter="Rejected">Reddedildi ({{ rejected_count }})</button>
                 <button class="filter-btn" data-filter="Expired">Süresi Doldu ({{ expired_count }})</button>
+                <button class="filter-btn" data-filter="Cancelled">İptal ({{ cancelled_count }})</button>
             </div>
 
             <div class="res-list">
             {% for res in reservations %}
             <div class="res-card" data-status="{{ res.status }}">
                 <div class="res-card-head">
-                    <i class="fas fa-user" style="color:var(--teal); font-size:0.85rem;"></i>
+                    <i class="fas fa-user res-user-icon"></i>
                     <span class="res-customer-name">{{ res.customer_name }}</span>
                     {% if res.status == 'Pending' %}
                         <span class="status-pill status-pending"><i class="fas fa-hourglass-half"></i> Bekliyor</span>
@@ -108,6 +123,8 @@
                         <span class="status-pill status-approved"><i class="fas fa-check-circle"></i> Onaylandı</span>
                     {% elif res.status == 'Expired' %}
                         <span class="status-pill status-expired"><i class="fas fa-clock"></i> Süresi Doldu</span>
+                    {% elif res.status == 'Cancelled' %}
+                        <span class="status-pill status-cancelled"><i class="fas fa-ban"></i> İptal Edildi</span>
                     {% else %}
                         <span class="status-pill status-rejected"><i class="fas fa-times-circle"></i> Reddedildi</span>
                     {% endif %}
@@ -139,7 +156,7 @@
                     </div>
                     <div class="res-field">
                         <span class="rf-label">E-posta</span>
-                        <span class="rf-val" style="font-size:0.82rem;">{{ res.customer_email }}</span>
+                        <span class="rf-val rf-val-sm">{{ res.customer_email }}</span>
                     </div>
                 </div>
                 <div class="res-card-foot">
@@ -148,10 +165,10 @@
                         <i class="fas fa-file-alt"></i> Dekontu Görüntüle
                     </a>
                     {% if res.status == 'Pending' %}
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <div class="res-actions">
                         <!-- Onay formu — confirm JS'de addEventListener ile tetiklenir, onclick YOK -->
                         <form action="/admin/status/{{ res.id }}/approve" method="POST" class="d-inline confirm-form"
-                              data-msg="Bu rezervasyonu ONAYLAMAK istiyor musunuz?&#10;&#10;Müşteriye onay e-postası gönderilecektir.">
+                              data-msg="Bu rezervasyonu ONAYLAMAK istiyor musunuz?&#10;&#10;Müşteri durumu sorgulama sayfasından görecektir.">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn-approve" data-loading-text="Onaylanıyor...">
                                 <i class="fas fa-check"></i> Onayla
@@ -167,8 +184,12 @@
                         </form>
                     </div>
                     {% elif res.status == 'Expired' %}
-                    <span class="done-label" style="color:#6b7280;">
+                    <span class="done-label done-label-muted">
                         <i class="fas fa-clock"></i> Süre doldu — otomatik kapatıldı
+                    </span>
+                    {% elif res.status == 'Cancelled' %}
+                    <span class="done-label done-label-muted">
+                        <i class="fas fa-ban"></i> Müşteri tarafından iptal edildi
                     </span>
                     {% else %}
                     <span class="done-label"><i class="fas fa-check"></i> İşlem tamamlandı</span>
@@ -185,13 +206,10 @@
 
             <!-- Sayfalama -->
             {% if pagination.pages > 1 %}
-            <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:20px; flex-wrap:wrap;">
+            <div class="pager">
                 {% if pagination.has_prev %}
                 <a href="{{ url_for('admin.admin_dashboard', page=pagination.prev_num, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all'), ctype=request.args.get('ctype','all')) }}"
-                   style="display:inline-flex; align-items:center; gap:5px; padding:8px 16px;
-                          background:var(--white); border:1.5px solid var(--gray-300);
-                          border-radius:var(--r-xs); color:var(--gray-600); font-size:0.85rem;
-                          font-weight:700; text-decoration:none; transition:all 0.15s; font-family:var(--font);">
+                   class="pager-nav">
                     <i class="fas fa-chevron-left"></i> Onceki
                 </a>
                 {% endif %}
@@ -199,37 +217,24 @@
                 {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
                     {% if p %}
                         {% if p == pagination.page %}
-                        <span style="display:inline-flex; align-items:center; justify-content:center;
-                                     width:36px; height:36px; background:var(--teal); color:var(--white);
-                                     border-radius:var(--r-xs); font-size:0.85rem; font-weight:800;">
-                            {{ p }}
-                        </span>
+                        <span class="pager-num pager-current">{{ p }}</span>
                         {% else %}
                         <a href="{{ url_for('admin.admin_dashboard', page=p, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all'), ctype=request.args.get('ctype','all')) }}"
-                           style="display:inline-flex; align-items:center; justify-content:center;
-                                  width:36px; height:36px; background:var(--white);
-                                  border:1.5px solid var(--gray-300); border-radius:var(--r-xs);
-                                  color:var(--gray-600); font-size:0.85rem; font-weight:700;
-                                  text-decoration:none; transition:all 0.15s;">
-                            {{ p }}
-                        </a>
+                           class="pager-num">{{ p }}</a>
                         {% endif %}
                     {% else %}
-                        <span style="color:var(--gray-400); font-size:0.85rem;">...</span>
+                        <span class="pager-gap">...</span>
                     {% endif %}
                 {% endfor %}
 
                 {% if pagination.has_next %}
                 <a href="{{ url_for('admin.admin_dashboard', page=pagination.next_num, date_range=request.args.get('date_range',''), pitch=request.args.get('pitch','all'), ctype=request.args.get('ctype','all')) }}"
-                   style="display:inline-flex; align-items:center; gap:5px; padding:8px 16px;
-                          background:var(--white); border:1.5px solid var(--gray-300);
-                          border-radius:var(--r-xs); color:var(--gray-600); font-size:0.85rem;
-                          font-weight:700; text-decoration:none; transition:all 0.15s; font-family:var(--font);">
+                   class="pager-nav">
                     Sonraki <i class="fas fa-chevron-right"></i>
                 </a>
                 {% endif %}
 
-                <span style="font-size:0.78rem; color:var(--gray-400); margin-left:12px;">
+                <span class="pager-info">
                     Sayfa {{ pagination.page }} / {{ pagination.pages }}
                     ({{ total_count }} kayit)
                 </span>

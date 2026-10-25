@@ -42,7 +42,7 @@
                                     class="form-control form-select" required>
                                 <option value="">— Saha seçin —</option>
                                 {% for pitch in pitches %}
-                                <option value="{{ pitch.id }}">{{ pitch.name }}</option>
+                                <option value="{{ pitch.id }}">{{ pitch.name }}{% if not pitch.is_active %} (pasif){% endif %}</option>
                                 {% endfor %}
                             </select>
                         </div>

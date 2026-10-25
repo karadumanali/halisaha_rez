@@ -54,7 +54,7 @@
 .sidebar-session i { color: var(--teal-lt); font-size: 0.7rem; }
 .session-timer-val { font-weight: 800; color: var(--teal-lt); font-size: 0.88rem; min-width: 38px; }
 .session-progress { flex: 1; height: 3px; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; }
-.session-progress-fill { height: 100%; background: var(--teal-lt); border-radius: 2px; transition: width 1s linear; }
+.session-progress-fill { width: 100%; height: 100%; background: var(--teal-lt); border-radius: 2px; transition: width 1s linear; }
 #sessionWarnMsg { color: #f87171; font-weight: 700; font-size: 0.7rem; display: none; white-space: nowrap; }
 
 /* İstatistik kartları */
@@ -66,7 +66,7 @@
 }
 .stat-cards-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 10px;
     margin-bottom: 18px;
 }
@@ -75,6 +75,7 @@
 .stat-icon.approved { background: var(--teal-pale); color: var(--teal-dk); border: 1.5px solid var(--mint-mid); }
 .stat-icon.rejected { background: var(--danger-bg); color: var(--danger); border: 1.5px solid #fca5a5; }
 .stat-icon.expired  { background: #f3f4f6; color: #6b7280; border: 1.5px solid #d1d5db; }
+.stat-icon.cancelled { background: #f1f5f9; color: #475569; border: 1.5px solid #cbd5e1; }
 .stat-icon.blocked  { background: #f3e8ff; color: #6b21a8; border: 1.5px solid #d8b4fe; }
 .stat-num { font-size: 1.2rem; font-weight: 800; color: var(--ink); line-height: 1; }
 .stat-lbl { font-size: 0.6rem; color: var(--gray-400); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
@@ -191,6 +192,7 @@
 .status-approved { background: var(--teal-pale); color: var(--teal-dk); border: 1px solid var(--mint-mid); }
 .status-rejected { background: var(--danger-bg); color: var(--danger-tx); border: 1px solid #fca5a5; }
 .status-expired  { background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; }
+.status-cancelled { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
 .receipt-btn {
     display: inline-flex; align-items: center; gap: 5px;
@@ -1490,3 +1492,74 @@
     .ct-item .pitch-actions { width: 100%; justify-content: flex-start; padding-left: 58px; }
     .type-price-input { width: 130px; }
 }
+
+
+/* ══════════════════════════════════════════
+   CSP UYUMU — eskiden HTML içinde style="..." ile verilen stiller
+   (CSP inline stilleri engellediği için sınıflara taşındı)
+══════════════════════════════════════════ */
+.is-hidden { display: none; }
+.card-clip { overflow: hidden; }
+.card-pad { padding: 16px; }
+.card-pad-lg { padding: 18px; }
+.icon-teal { color: var(--teal); }
+.icon-purple { color: #7c3aed; }
+.hint-inline { font-size: 0.75rem; font-weight: 600; color: var(--gray-400); margin-left: 6px; }
+.pick-empty { padding: 12px; color: var(--gray-400); font-size: 0.85rem; }
+.pick-empty.pick-error { color: #ef4444; }
+.reason-textarea { resize: vertical; min-height: 110px; line-height: 1.5; }
+.char-counter { text-align: right; font-size: 0.72rem; color: var(--gray-400); margin-top: 3px; }
+.audit-head-row { background: var(--gray-50); border-color: var(--gray-300); margin-bottom: 4px; }
+.audit-head-cell { font-size: 0.68rem; font-weight: 800; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.06em; }
+.audit-user-icon { font-size: 0.7rem; opacity: 0.6; }
+.res-user-icon { color: var(--teal); font-size: 0.85rem; }
+.rf-val-sm { font-size: 0.82rem; }
+.res-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.done-label-muted { color: #6b7280; }
+.nav-item-separated { border-top: 1.5px solid var(--gray-200); margin-top: 4px; }
+
+/* Sayfalama */
+.pager { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+.pager-nav {
+    display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px;
+    background: var(--white); border: 1.5px solid var(--gray-300);
+    border-radius: var(--r-xs); color: var(--gray-600); font-size: 0.85rem;
+    font-weight: 700; text-decoration: none; transition: all 0.15s; font-family: var(--font);
+}
+.pager-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; background: var(--white);
+    border: 1.5px solid var(--gray-300); border-radius: var(--r-xs);
+    color: var(--gray-600); font-size: 0.85rem; font-weight: 700;
+    text-decoration: none; transition: all 0.15s;
+}
+.pager-num.pager-current { background: var(--teal); color: var(--white); border-color: var(--teal); font-weight: 800; }
+.pager-gap { color: var(--gray-400); font-size: 0.85rem; }
+.pager-info { font-size: 0.78rem; color: var(--gray-400); margin-left: 12px; }
+
+/* Uzun süredir bekleyen talepler uyarısı */
+.stale-pending-banner {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: #fffbeb; border: 1.5px solid #fcd34d; color: #92400e;
+    border-radius: var(--r-sm); padding: 12px 14px; margin-bottom: 14px;
+    font-size: 0.85rem; line-height: 1.5;
+}
+.stale-pending-banner i { margin-top: 3px; }
+
+/* Çıkış butonu artık form içinde */
+#logoutForm { margin: 0; }
+
+/* 6 istatistik kartı orta genişlikte 3'erli dizilsin */
+@media (min-width: 601px) and (max-width: 1100px) {
+    .stat-cards-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Pasif sahalar */
+.passive-pitches { border-top: 1.5px solid var(--gray-200); padding: 12px 18px 16px; }
+.passive-pitches summary { cursor: pointer; font-weight: 700; color: var(--gray-600); font-size: 0.88rem; }
+.passive-hint { font-size: 0.78rem; color: var(--gray-400); margin: 8px 0 4px; }
+.passive-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--gray-100);
+}
+.passive-row:last-child { border-bottom: none; }

@@ -12,11 +12,18 @@ Ankara Yıldırım Beyazıt Üniversitesi Sağlık Kültür ve Spor Daire Başka
 - Ödeme dekontu yükleme (PDF/JPG/PNG)
 - Rezervasyon sonrası sorgulama kodunu içeren "talebiniz alındı" e-postası alma
 - Rezervasyon durumunu sorgulama koduyla takip etme
+- Rezervasyonu iptal etme (sorgulama kodu + kayıtlı telefon numarasıyla, saat başlamadan önce)
+
+### Rezervasyon Kuralları
+- Bir kişi (aynı telefon veya e-posta) bir gün içinde en fazla **2** rezervasyon talebi oluşturabilir (iptal edilen/reddedilen talepler hakkı geri verir). Kural IP bazlı değildir; kampüs ağındaki öğrenciler birbirini etkilemez
+- **48 saat** içinde onaylanmayan talepler otomatik "Süresi Doldu" olur ve saat boşalır
+- Reddedilen, süresi dolan ve iptal edilen rezervasyonların saati tekrar kiralanabilir
+- Kurallar `utils/constants.py` içinden değiştirilebilir
 
 ### Yönetici (Admin) Tarafı
 - Rezervasyon onaylama / reddetme
-- Saha ekleme, fiyat güncelleme, silme
-- Slot kilitleme (bakım, turnuva vb.)
+- Saha ekleme, fiyat güncelleme, silme (rezervasyon geçmişi olan saha silinmez, pasife alınır)
+- Slot kilitleme (bakım, turnuva vb.) — sebep zorunlu; aktif rezervasyonla çakışırsa uyarı
 - Günlük PDF rapor indirme
 - Denetim kayıtları (audit log)
 - Şifre değiştirme (güçlü şifre politikası)
@@ -35,7 +42,8 @@ Bu proje güvenlik odaklı geliştirilmiştir. Uygulanan önlemler:
 | **Brute-Force Kilitleme** | Aynı hesaba 5 başarısız deneme → 15 dk o hesap kilitli; aynı IP'den toplam 15 başarısız deneme → 15 dk IP kilitli |
 | **Timing-Safe Login** | DUMMY_HASH ile kullanıcı adı tespiti engellenir |
 | **Session Token** | Her girişte yeni token — çoklu cihaz oturumu engeli |
-| **Rate Limiting** | Rezervasyon: 3/dk, Login denemesi: hesap+IP başına 5/dk (sayfayı açmak sayılmaz), PDF: 10/dk, Admin paneli: her admine ayrı 1000/saat |
+| **Oturum Zaman Aşımı** | Admin oturumu 30 dk hareketsizlikte düşer; çıkış yalnızca POST + CSRF ile |
+| **Rate Limiting** | Login denemesi: hesap+IP başına 5/dk (sayfayı açmak sayılmaz), Admin paneli: her admine ayrı 1000/saat, Herkese açık sayfalar: IP başına 300/dk (kampüs ağı tek IP göründüğü için yüksek), Rezervasyon: IP başına 20/dk + kişi başı günlük kural. Sayaçlar `REDIS_URL` ile Redis'te tutulabilir |
 | **IP Whitelist** | Admin paneline sadece belirli IP'lerden erişim |
 | **reCAPTCHA v3** | Google bot koruması (opsiyonel) |
 | **Honeypot** | Gizli form alanı ile bot tespiti |
@@ -43,7 +51,7 @@ Bu proje güvenlik odaklı geliştirilmiştir. Uygulanan önlemler:
 | **CORS Kısıtlama** | Cross-origin veri okuma engeli |
 | **Güvenlik Header'ları** | X-Frame-Options, HSTS, nosniff, Referrer-Policy |
 | **MIME Doğrulama** | Magic bytes ile gerçek dosya tipi kontrolü |
-| **Dosya Adı Güvenliği** | UUID ile rastgele dosya adı + regex whitelist |
+| **Dosya Adı Güvenliği** | UUID ile rastgele dosya adı + regex whitelist; PDF dekontlar tarayıcıda açılmaz, indirilir |
 | **Audit Log** | Tüm admin işlemleri denetim kaydında |
 | **Otomatik Temizlik** | Süresi dolan rezervasyonlar ve kilitler otomatik kapatılır |
 
@@ -215,13 +223,60 @@ sudo certbot --nginx -d halisaha.aybu.edu.tr
 
 ---
 
+## 🔄 Sunucuyu Güncelleme
+
+Her yeni sürümde, proje klasöründe ve sanal ortam açıkken:
+
+```bash
+git pull                          # veya yeni dosyaları kopyalayın
+pip install -r requirements.txt   # yeni/değişen paketler
+flask db upgrade                  # bekleyen veritabanı değişiklikleri
+# ardından uygulamayı yeniden başlatın (gunicorn / systemd servisi)
+```
+
+### Ekim 2026 sürümü — bir kereye mahsus yapılacaklar
+
+**1. Güncelleme adımları.** Yukarıdaki üç komutun hepsi gereklidir: bu sürümde iki yeni migration
+(`d5e6f7a8b9c0`, `e6f7a8b9c0d1`) ve yeni bir paket (`redis`) var.
+
+**2. Yönetici hesaplarını ayırma.** Ortak `yonetici` hesabı yerine her yöneticiye ayrı hesap:
+
+```bash
+flask rename-admin yonetici yonetici1   # mevcut hesap, şifresi değişmez
+flask create-admin yonetici2            # rastgele şifre terminalde bir kez gösterilir
+flask create-admin yonetici3
+```
+
+Yeni hesapların şifreleri ilgili kişilere iletilir; kişiler ilk girişte şifrelerini panelden değiştirir.
+
+**3. `.env` ayarları.**
+
+| Ayar | Değer |
+|------|-------|
+| `MAIL_SERVER` | Kurumun SMTP sunucusu (Microsoft 365: `smtp.office365.com`). Boşsa Gmail kullanılır |
+| `MAIL_PORT` | `587` (STARTTLS) veya `465` (SSL) |
+| `MAIL_USERNAME` | Kurumsal gönderim hesabı, ör. `halisaha@aybu.edu.tr` |
+| `MAIL_PASSWORD` | Gönderim hesabının şifresi / uygulama şifresi |
+| `ADMIN_EMAIL` | Yeni rezervasyon bildirimlerinin gideceği adres |
+| `PROXY_COUNT` | Uygulama Nginx arkasındaysa `1`. `0` kalırsa tüm ziyaretçiler tek IP gibi görünür ve 429 hataları oluşur |
+| `REDIS_URL` | Opsiyonel. Sunucuda Redis varsa `redis://localhost:6379/0`; yoksa `memory://` |
+
+- Değerler satıra yalnızca değer olarak yazılmalıdır; açıklama metni eklenirse mail gönderimi devre dışı kalır (site çalışmaya devam eder, log'a uyarı düşer).
+- Mail ayarları boş bırakılırsa site çalışır, yalnızca mail gönderilmez.
+- Microsoft 365 kullanılıyorsa: Microsoft, kullanıcı adı/şifre ile SMTP gönderimini (SMTP AUTH) Aralık 2026 sonunda varsayılan olarak kapatıyor; gönderim hesabı için SMTP AUTH'un açık olması gerekir.
+
+**4. Kontrol.** Uygulama yeniden başladıktan sonra sitede bir deneme rezervasyonu yapılır;
+girilen adrese sorgulama kodunu içeren "Rezervasyon Talebiniz Alındı" maili gelmelidir.
+
+---
+
 ## 📊 Veritabanı Şeması
 
 ```
 admins              → Yönetici hesapları
-pitches             → Halı sahalar (ad, fiyat)
+pitches             → Halı sahalar (ad, aktif/pasif)
 pitch_images        → Saha resimleri
-reservations        → Rezervasyon talepleri (Pending/Approved/Rejected/Expired)
+reservations        → Rezervasyon talepleri (Pending/Approved/Rejected/Expired/Cancelled)
 blocked_slots       → Kilitli saat dilimleri
 login_attempts      → Giriş denemeleri (brute-force koruması)
 audit_logs          → Denetim kayıtları (tüm admin işlemleri)
@@ -256,7 +311,7 @@ Sistem arka planda şu işlemleri otomatik yapar:
 
 | İşlem | Zamanlama | Açıklama |
 |-------|-----------|----------|
-| Rezervasyon süre dolumu | Her saat başı + admin panel açılışı | Tarihi geçmiş bekleyen rezervasyonları "Expired" yapar |
+| Rezervasyon süre dolumu | Her saat başı + admin panel açılışı | Tarihi geçmiş veya 48 saattir onay bekleyen rezervasyonları "Expired" yapar |
 | Slot kilidi temizleme | Her saat başı + admin panel açılışı | Tarihi geçmiş slot kilitlerini otomatik kaldırır |
 | Login kaydı temizleme | Ayın 1'i, saat 03:00 | 30 günden eski giriş denemelerini siler |
 | Audit log temizleme | Ayın 1'i, saat 03:00 | 1 yıldan eski denetim kayıtlarını siler |
@@ -288,6 +343,18 @@ flask create-admin yonetici2            # yeni hesap, rastgele şifre terminalde
 flask create-admin yonetici3
 flask list-admins                       # hesapları listele
 flask reset-admin-password yonetici2    # şifresini unutan yöneticiye yeni şifre
+```
+
+---
+
+## 🧪 Testler
+
+Otomatik testler geçici bir SQLite veritabanında tüm migration'ları çalıştırıp temel akışları dener
+(slot kilitleme, giriş/429, rezervasyon kuralları, iptal, mail, CSP uyumu).
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
 ```
 
 ---

@@ -36,6 +36,9 @@ python-magic==0.4.27
 # Linux sunucuda bunun yerine: sudo apt install libmagic1
 python-magic-bin==0.4.14; sys_platform == "win32"
 
+# ── Rate limit sayaçları için Redis istemcisi (REDIS_URL redis://... ise kullanılır) ──
+redis==5.2.1
+
 # ── Ortam Değişkenleri ──
 python-dotenv==1.2.1
 

@@ -125,6 +125,7 @@
 .result-header.approved { background: linear-gradient(135deg, #d0f5e8, #a7f3d0); }
 .result-header.rejected { background: linear-gradient(135deg, #fee2e2, #fecaca); }
 .result-header.expired  { background: linear-gradient(135deg, var(--gray-100), var(--gray-200)); }
+.result-header.cancelled { background: linear-gradient(135deg, var(--gray-100), var(--gray-200)); }
 
 .result-status-icon {
     width: 44px; height: 44px; border-radius: 50%;
@@ -135,6 +136,7 @@
 .result-header.approved .result-status-icon { background: #10b981; color: #fff; }
 .result-header.rejected .result-status-icon { background: #ef4444; color: #fff; }
 .result-header.expired  .result-status-icon { background: var(--gray-400); color: #fff; }
+.result-header.cancelled .result-status-icon { background: var(--gray-600); color: #fff; }
 
 .result-status-text { font-size: 0.82rem; color: var(--gray-600); font-weight: 500; }
 .result-status-label { font-size: 1.1rem; font-weight: 800; }
@@ -142,6 +144,25 @@
 .result-header.approved .result-status-label { color: #065f3e; }
 .result-header.rejected .result-status-label { color: #9b2c2c; }
 .result-header.expired  .result-status-label { color: var(--gray-600); }
+.result-header.cancelled .result-status-label { color: var(--gray-600); }
+.result-desc { padding: 12px 20px 0; font-size: 0.88rem; color: var(--gray-600); }
+
+/* ── Kullanıcı iptali ── */
+.cancel-box {
+    border-top: 1.5px dashed var(--gray-200);
+    padding: 16px 20px 20px;
+}
+.cancel-box summary {
+    cursor: pointer; font-weight: 700; color: #b91c1c; font-size: 0.9rem;
+}
+.cancel-box p { font-size: 0.82rem; color: var(--gray-600); margin: 10px 0; }
+.cancel-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.cancel-row .track-input { flex: 1; min-width: 180px; padding-left: 14px; }
+.btn-cancel-res {
+    background: #ef4444; color: #fff; border: none; border-radius: 10px;
+    padding: 10px 18px; font-weight: 700; cursor: pointer;
+}
+.btn-cancel-res:hover { background: #dc2626; }
 
 .result-body { padding: 20px; }
 
@@ -278,7 +299,8 @@
         'Pending':  {'class': 'pending',  'icon': 'fas fa-hourglass-half', 'label': 'Onay Bekliyor',  'desc': 'Rezervasyonunuz yonetici onayini bekliyor.'},
         'Approved': {'class': 'approved', 'icon': 'fas fa-check-circle',   'label': 'Onaylandi',      'desc': 'Rezervasyonunuz onaylandi! Iyi oyunlar.'},
         'Rejected': {'class': 'rejected', 'icon': 'fas fa-times-circle',   'label': 'Reddedildi',     'desc': 'Rezervasyonunuz yonetici tarafindan reddedildi.'},
-        'Expired':  {'class': 'expired',  'icon': 'fas fa-clock',          'label': 'Suresi Doldu',   'desc': 'Rezervasyonunuzun suresi dolmustur.'}
+        'Expired':  {'class': 'expired',  'icon': 'fas fa-clock',          'label': 'Suresi Doldu',   'desc': 'Talebiniz suresi icinde onaylanmadigi icin otomatik olarak kapatildi.'},
+        'Cancelled':{'class': 'cancelled','icon': 'fas fa-ban',            'label': 'Iptal Edildi',   'desc': 'Bu rezervasyon tarafinizdan iptal edildi.'}
     } %}
     {% set s = status_map.get(reservation.status, status_map['Pending']) %}
 
@@ -292,6 +314,7 @@
                 <div class="result-status-label">{{ s['label'] }}</div>
             </div>
         </div>
+        <div class="result-desc">{{ s['desc'] }}</div>
         <div class="result-body">
             <div class="result-row">
                 <div class="result-row-icon"><i class="fas fa-ticket-alt"></i></div>
@@ -345,6 +368,25 @@
                 </div>
             </div>
         </div>
+        {% if can_cancel %}
+        <details class="cancel-box">
+            <summary><i class="fas fa-ban"></i> Rezervasyonu iptal et</summary>
+            <p>
+                Gelemeyecekseniz iptal ederek saati diğer kullanıcılara açabilirsiniz.
+                Doğrulama için rezervasyonda kullandığınız telefon numarasını girin.
+                {% if reservation.status == 'Approved' %}
+                <br><strong>Ödeme iadesi için SKS ile iletişime geçiniz.</strong>
+                {% endif %}
+            </p>
+            <form action="{{ url_for('public.cancel_reservation') }}" method="POST" class="cancel-row">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="tracking_code" value="{{ reservation.tracking_code }}">
+                <input type="tel" name="customer_phone" class="track-input" placeholder="05XX XXX XX XX"
+                       maxlength="14" inputmode="tel" autocomplete="tel" required>
+                <button type="submit" class="btn-cancel-res">İptal Et</button>
+            </form>
+        </details>
+        {% endif %}
     </div>
     {% endif %}
 

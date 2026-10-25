@@ -35,8 +35,10 @@ class BaseConfig:
     }
 
     # ── Oturum ──────────────────────────────────────────────────────
-    SESSION_PERMANENT          = True
+    # Admin oturumu 30 dk hareketsizlikte düşer: girişte session.permanent=True
+    # yapılır (routes/auth.py), her istekte süre yenilenir.
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
+    SESSION_REFRESH_EACH_REQUEST = True
     SESSION_COOKIE_HTTPONLY    = True
     SESSION_COOKIE_SAMESITE    = 'Lax'
     SESSION_COOKIE_NAME        = 'sks_sid'
@@ -51,8 +53,11 @@ class BaseConfig:
     LOGO_FOLDER         = os.path.join(base_dir, 'static', 'uploads')
 
     # ── Rate Limiter ────────────────────────────────────────────────
-    REDIS_URL      = os.getenv('REDIS_URL', 'memory://')
-    RATELIMIT_DEFAULT = ["500 per day", "100 per hour"]
+    # Sayaçların tutulduğu yer. memory:// → uygulama yeniden başlayınca sıfırlanır.
+    # Redis verilirse (redis://localhost:6379/0) sayaçlar yeniden başlatmada korunur.
+    # Varsayılan limitler extensions.py'deki Limiter(default_limits=...) içinde.
+    REDIS_URL              = (os.getenv('REDIS_URL') or '').strip() or 'memory://'
+    RATELIMIT_STORAGE_URI  = REDIS_URL
 
     # ── Proxy ───────────────────────────────────────────────────────
     PROXY_COUNT = int(os.getenv('PROXY_COUNT', '0'))

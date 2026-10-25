@@ -53,6 +53,10 @@ class Pitch(db.Model):
     name  = db.Column(db.String(100), nullable=False)
     # Fiyat sahada değil, müşteri tipine göre pitch_pricing tablosunda tutulur
 
+    # Pasif saha: sitede görünmez, rezervasyon alınmaz; geçmiş rezervasyonlar ve
+    # raporlar korunur. Rezervasyon geçmişi olan saha silinmek yerine pasife alınır.
+    is_active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+
     reservations  = db.relationship('Reservation',  backref='pitch', lazy=True, cascade='all, delete-orphan')
     images        = db.relationship('PitchImage',   backref='pitch', lazy=True, cascade='all, delete-orphan')
     blocked_slots = db.relationship('BlockedSlot',  backref='pitch', lazy=True, cascade='all, delete-orphan')
@@ -106,10 +110,14 @@ class PitchImage(db.Model):
 class Reservation(db.Model):
     __tablename__ = 'reservations'
 
-    # V-06: UNIQUE constraint — aynı saha + tarih + saat için çift rezervasyon engeli
+    # V-06: Kısmi UNIQUE index — aynı saha + tarih + saat için yalnızca BİR AKTİF
+    # (Pending/Approved) rezervasyon olabilir. Reddedilen / süresi dolan / iptal edilen
+    # kayıtlar slotu kilitlemez; aynı saat tekrar kiralanabilir.
     __table_args__ = (
-        db.UniqueConstraint('pitch_id', 'date', 'time_slot',
-                            name='uq_reservation_active_slot'),
+        db.Index('uq_reservation_active_slot', 'pitch_id', 'date', 'time_slot',
+                 unique=True,
+                 postgresql_where=db.text("status IN ('Pending', 'Approved')"),
+                 sqlite_where=db.text("status IN ('Pending', 'Approved')")),
     )
 
     id               = db.Column(db.String(36),  primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -123,6 +131,7 @@ class Reservation(db.Model):
     receipt_filename = db.Column(db.String(255), nullable=False)
     customer_type_id = db.Column(db.Integer,     db.ForeignKey('customer_types.id'), nullable=True)
     price            = db.Column(db.Integer,     nullable=True)  # rezervasyon anındaki ücret (TL)
+    # Pending | Approved | Rejected | Expired | Cancelled (kullanıcı iptali)
     status           = db.Column(db.String(20),  default='Pending', nullable=False)
     created_at       = db.Column(db.DateTime,    default=now_tr)
 

@@ -74,7 +74,9 @@
             display: flex; align-items: center;
             justify-content: space-between;
             height: 70px;
+            padding: 0 24px;
         }
+        .fab-bubble.is-hidden { display: none; }
         .nav-home-link {
             display: flex; align-items: center; gap: 15px;
             text-decoration: none; color: inherit;
@@ -293,13 +295,12 @@
 <body>
 
 <nav class="site-nav">
-    <div class="nav-inner" style="padding: 0 24px;">
+    <div class="nav-inner">
         <a href="{% if current_user.is_authenticated %}{{ url_for('admin.admin_dashboard') }}{% else %}/{% endif %}"
            class="nav-home-link"
            title="{% if current_user.is_authenticated %}Yönetim Paneli{% else %}Ana Sayfaya Dön{% endif %}">
             <div class="nav-logo">
-                <img src="{{ url_for('static', filename='uploads/site_logo.png') }}" alt="Logo"
-                     onerror="this.style.display='none'; this.parentElement.querySelector('.nav-logo-fb').style.display='flex';">
+                <img src="{{ url_for('static', filename='uploads/site_logo.png') }}" alt="Logo" id="navLogoImg">
                 <div class="nav-logo-fb"><i class="fas fa-futbol"></i></div>
             </div>
             <div class="nav-brand">
@@ -370,6 +371,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     });
 
+    /* ── Logo yüklenemezse yedek ikon (CSP inline onerror'a izin vermez) ── */
+    var logoImg = document.getElementById('navLogoImg');
+    if (logoImg) {
+        var showLogoFallback = function() {
+            logoImg.style.display = 'none';
+            var fb = logoImg.parentElement.querySelector('.nav-logo-fb');
+            if (fb) fb.style.display = 'flex';
+        };
+        if (logoImg.complete && logoImg.naturalWidth === 0) showLogoFallback();
+        else logoImg.addEventListener('error', showLogoFallback);
+    }
+
     /* ── FAB Bilgi Baloncuğu — localStorage 30 gün ── */
     var bubble = document.getElementById('fabBubble');
     var bubbleClose = document.getElementById('fabBubbleClose');
@@ -382,11 +395,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (stored && Date.now() < parseInt(stored, 10)) { show = false; }
         } catch(e) {}
         if (show) {
-            bubble.style.display = '';
+            bubble.classList.remove('is-hidden');
         }
         if (bubbleClose) {
             bubbleClose.addEventListener('click', function() {
-                bubble.style.display = 'none';
+                bubble.classList.add('is-hidden');
                 try {
                     localStorage.setItem(BUBBLE_KEY, String(Date.now() + BUBBLE_DAYS * 86400000));
                 } catch(e) {}
@@ -399,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- Floating Rezervasyon Sorgula Butonu + Bilgi Baloncuğu -->
 {% if not hide_fab %}
 <div class="fab-wrap">
-    <div class="fab-bubble" id="fabBubble" style="display:none;">
+    <div class="fab-bubble is-hidden" id="fabBubble">
         Rezervasyon durumunuzu buradan sorgulayabilirsiniz
         <button type="button" class="fab-bubble-close" id="fabBubbleClose" aria-label="Kapat"><i class="fas fa-times"></i></button>
     </div>

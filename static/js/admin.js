@@ -218,7 +218,9 @@ function initSessionTimer() {
                 iconClass: 'fa-clock',
                 confirmText: 'Tamam'
             }).then(function() {
-                window.location.href = '/logout';
+                // Sunucudaki oturum da 30 dk hareketsizlikte düştü; panel yeniden
+                // açılınca giriş sayfasına yönlendirilir.
+                window.location.href = '/admin/';
             });
             return;
         }
@@ -262,12 +264,12 @@ function loadSlotsForSelectedPitches() {
     selSlots = []; // seçili slotları sıfırla
 
     if (selPitches.length === 0) {
-        picker.innerHTML = '<div id="slotPickerEmpty" style="padding:12px;color:var(--gray-400);font-size:0.85rem;">Önce bir saha seçin.</div>';
+        picker.innerHTML = '<div id="slotPickerEmpty" class="pick-empty">Önce bir saha seçin.</div>';
         updateSummary();
         return;
     }
 
-    picker.innerHTML = '<div style="padding:12px;color:var(--gray-400);font-size:0.85rem;">Yükleniyor...</div>';
+    picker.innerHTML = '<div class="pick-empty">Yükleniyor...</div>';
 
     // Tüm seçili sahaların slotlarını çek, sonra ortak olanları göster
     var promises = selPitches.map(function(pid) {
@@ -289,7 +291,7 @@ function loadSlotsForSelectedPitches() {
 
         picker.innerHTML = '';
         if (commonSlots.length === 0) {
-            picker.innerHTML = '<div style="padding:12px;color:var(--gray-400);font-size:0.85rem;">Seçili sahalar için ortak saat dilimi bulunamadı.</div>';
+            picker.innerHTML = '<div class="pick-empty">Seçili sahalar için ortak saat dilimi bulunamadı.</div>';
             updateSummary();
             return;
         }
@@ -305,7 +307,7 @@ function loadSlotsForSelectedPitches() {
         });
         updateSummary();
     }).catch(function() {
-        picker.innerHTML = '<div style="padding:12px;color:#ef4444;font-size:0.85rem;">Slotlar yüklenirken hata oluştu.</div>';
+        picker.innerHTML = '<div class="pick-empty pick-error">Slotlar yüklenirken hata oluştu.</div>';
     });
 }
 
@@ -421,14 +423,34 @@ function submitBlock() {
         return;
     }
     var total = selPitches.length * selDates.length * selSlots.length;
-    sysConfirm({
-        title: 'Slot Kilitleme',
-        body: total + ' slot kilitlenecek.\nDevam etmek istiyor musunuz?',
-        icon: 'warning',
-        iconClass: 'fa-lock',
-        confirmText: 'Kilitle',
-        confirmStyle: 'btn-warning'
-    }).then(function(ok) {
+
+    /* Seçilen saatlerde bekleyen/onaylı rezervasyon var mı? Varsa onay penceresinde göster. */
+    var params = new URLSearchParams();
+    selPitches.forEach(function(p){ params.append('pitch_ids', p); });
+    selDates.forEach(function(d){   params.append('dates', d); });
+    selSlots.forEach(function(t){   params.append('time_slots', t); });
+    fetch('/admin/api/block_conflicts?' + params.toString())
+        .then(function(r) { return r.ok ? r.json() : { conflicts: [] }; })
+        .catch(function() { return { conflicts: [] }; })
+        .then(function(data) {
+            var conflicts = (data && data.conflicts) || [];
+            var body = total + ' slot kilitlenecek.';
+            if (conflicts.length) {
+                body += '\n\nDİKKAT: Bu saatlerde ' + conflicts.length + ' aktif rezervasyon var:\n- '
+                     + conflicts.slice(0, 5).join('\n- ')
+                     + (conflicts.length > 5 ? '\n... ve ' + (conflicts.length - 5) + ' tane daha' : '')
+                     + '\n\nKilit bu rezervasyonları otomatik iptal etmez; müşterilerle iletişime geçmeniz gerekir.';
+            }
+            body += '\n\nDevam etmek istiyor musunuz?';
+            return sysConfirm({
+                title: conflicts.length ? 'Dikkat: Aktif Rezervasyon Var' : 'Slot Kilitleme',
+                body: body,
+                icon: 'warning',
+                iconClass: 'fa-lock',
+                confirmText: 'Kilitle',
+                confirmStyle: 'btn-warning'
+            });
+        }).then(function(ok) {
         if (!ok) return;
         var container = document.getElementById('blockHiddenInputs');
         container.innerHTML = '';
@@ -468,7 +490,7 @@ function bindLogout() {
                 confirmText: 'Çıkış Yap',
                 confirmStyle: 'btn-danger'
             }).then(function(ok) {
-                if (ok) window.location.href = btn.href || '/logout';
+                if (ok) document.getElementById('logoutForm').submit();
             });
         });
     }
