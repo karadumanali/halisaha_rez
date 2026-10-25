@@ -24,7 +24,7 @@ from utils.helpers import get_real_ip
 from utils.timeutil import now_tr, today_tr
 from services.security import verify_recaptcha
 from services.file_handler import save_secure_receipt
-from services.email import send_admin_notification
+from services.email import send_admin_notification, send_customer_received_email
 
 logger = logging.getLogger(__name__)
 
@@ -250,6 +250,18 @@ def reserve():
         return redirect(url_for('public.index'))
 
     send_admin_notification(customer_name, date_obj, time_slot)
+
+    # Müşteriye "talebiniz alındı" maili — sorgulama kodu ve takip linkiyle
+    send_customer_received_email(
+        customer_email, customer_name,
+        tracking_code=new_res.tracking_code,
+        pitch_name=new_res.pitch.name,
+        date_str=date_obj.strftime('%d.%m.%Y'),
+        time_slot=time_slot,
+        ctype_name=new_res.customer_type.name,
+        price=price,
+        track_url=url_for('public.track_reservation_page', _external=True),
+    )
 
     # Takip kodunu session'a kaydet — redirect sonrasi success sayfasinda gosterilecek
     session['tracking_code'] = new_res.tracking_code

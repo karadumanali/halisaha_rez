@@ -29,7 +29,6 @@ from utils.helpers import audit, get_real_ip
 from utils.timeutil import now_tr, today_tr
 from services.security import detect_mime
 from services.file_handler import allowed_file, save_secure_pitch_image
-from services.email import send_customer_approval_email
 from services.pdf_report import generate_report
 from services.scheduler import auto_expire_reservations, auto_cleanup_blocked_slots
 
@@ -520,10 +519,7 @@ def change_status(res_id, action):
 
     if action == 'approve':
         reservation.status = 'Approved'
-        send_customer_approval_email(
-            reservation.customer_email, reservation.customer_name,
-            reservation.pitch.name, reservation.date, reservation.time_slot
-        )
+        # Müşteriye mail gönderilmez; durum sorgulama sayfasından takip edilir.
         audit('rezervasyon_onayla',
               f'res_id={res_id} | musteri={reservation.customer_name} '
               f'| saha={reservation.pitch.name} | tarih={reservation.date} '

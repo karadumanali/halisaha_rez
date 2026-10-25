@@ -1,8 +1,15 @@
 """
 email.py — E-posta gönderim servisi.
 
-Tüm mail fonksiyonları burada. Gönderim threading ile async yapılır,
-SMTP blocking DoS'u önlenir.
+Gönderilen mailler:
+  - Müşteriye: "Rezervasyon talebiniz alındı" (sorgulama koduyla) — rezervasyon anında.
+    Onay / red / süre dolumu için müşteriye mail GÖNDERİLMEZ; kullanıcı durumu
+    /rezervasyon-sorgula sayfasından sorgulama koduyla takip eder.
+  - Yöneticiye: yeni rezervasyon talebi bildirimi (ADMIN_EMAIL).
+
+SMTP sunucusu .env'den okunur (MAIL_SERVER, MAIL_PORT); boş bırakılırsa Gmail kullanılır.
+MAIL_USERNAME / MAIL_PASSWORD boşsa mail gönderimi devre dışıdır, sistem çalışmaya devam eder.
+Gönderim threading ile async yapılır, SMTP blocking DoS'u önlenir.
 """
 
 import os
@@ -10,21 +17,40 @@ import smtplib
 import logging
 import threading
 from email.message import EmailMessage
+from email.headerregistry import Address
 
 logger = logging.getLogger(__name__)
+
+SENDER_NAME = 'AYBÜ SKS Spor Tesisleri'
+
+
+def _smtp_settings():
+    """(sunucu, port) — .env'de yoksa Gmail varsayılanı."""
+    server = (os.getenv('MAIL_SERVER') or '').strip() or 'smtp.gmail.com'
+    try:
+        port = int((os.getenv('MAIL_PORT') or '').strip() or 587)
+    except ValueError:
+        port = 587
+    return server, port
 
 
 def _send_mail_async(msg: EmailMessage):
     """Mail gönderimini background thread'de çalıştır."""
+    server, port    = _smtp_settings()
     sender_email    = os.getenv('MAIL_USERNAME')
     sender_password = os.getenv('MAIL_PASSWORD')
     try:
-        with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as s:
-            s.starttls()
-            s.login(sender_email, sender_password)
-            s.send_message(msg)
+        if port == 465:   # doğrudan SSL kullanan sunucular
+            with smtplib.SMTP_SSL(server, port, timeout=10) as s:
+                s.login(sender_email, sender_password)
+                s.send_message(msg)
+        else:             # 587: STARTTLS
+            with smtplib.SMTP(server, port, timeout=10) as s:
+                s.starttls()
+                s.login(sender_email, sender_password)
+                s.send_message(msg)
     except Exception as e:
-        logger.warning(f"Mail hatasi: {e}")
+        logger.warning("Mail hatasi (%s:%s): %s", server, port, e)
 
 
 def _is_mail_configured() -> bool:
@@ -34,79 +60,67 @@ def _is_mail_configured() -> bool:
 
 def _sanitize_header(value: str) -> str:
     """Header injection önlemi — newline karakterlerini temizle."""
-    return value.replace('\n', '').replace('\r', '')
+    return str(value).replace('\n', '').replace('\r', '')
+
+
+def _new_message(to: str, subject: str, body: str) -> EmailMessage:
+    msg = EmailMessage()
+    msg['Subject'] = _sanitize_header(subject)
+    msg['From']    = Address(display_name=SENDER_NAME,
+                             addr_spec=os.getenv('MAIL_USERNAME', ''))
+    msg['To']      = _sanitize_header(to)
+    msg.set_content(body)
+    return msg
+
+
+def _send(msg: EmailMessage):
+    threading.Thread(target=_send_mail_async, args=(msg,), daemon=True).start()
 
 
 # ── Admin bildirim maili ────────────────────────────────────────────
 
 def send_admin_notification(customer_name: str, date, time_slot: str):
     """Yeni rezervasyon geldiğinde admin'e bildirim maili gönder."""
-    if not _is_mail_configured():
+    admin_email = os.getenv('ADMIN_EMAIL')
+    if not _is_mail_configured() or not admin_email:
         return
-    sender_email = os.getenv('MAIL_USERNAME')
-    admin_email  = os.getenv('ADMIN_EMAIL')
-
     customer_name = _sanitize_header(customer_name)
-    msg = EmailMessage()
-    msg['Subject'] = 'Yeni Rezervasyon Talebi!'
-    msg['From']    = sender_email
-    msg['To']      = admin_email
-    msg.set_content(f"Yeni rezervasyon:\n{customer_name}\n{date}\n{time_slot}")
-
-    threading.Thread(target=_send_mail_async, args=(msg,), daemon=True).start()
+    _send(_new_message(
+        admin_email,
+        'Yeni Rezervasyon Talebi!',
+        f"Yeni rezervasyon:\n{customer_name}\n{date}\n{time_slot}"
+    ))
 
 
-# ── Müşteri onay maili ─────────────────────────────────────────────
+# ── Müşteri "talep alındı" maili ───────────────────────────────────
 
-def send_customer_approval_email(customer_email: str, customer_name: str,
-                                  pitch_name: str, date, time_slot: str):
-    """Rezervasyon onaylandığında müşteriye bilgilendirme maili gönder."""
+def send_customer_received_email(customer_email: str, customer_name: str,
+                                  tracking_code: str, pitch_name: str, date_str: str,
+                                  time_slot: str, ctype_name: str, price, track_url: str):
+    """Rezervasyon talebi kaydedilince müşteriye sorgulama kodunu içeren mail gönder."""
     if not _is_mail_configured():
         return
-    sender_email   = os.getenv('MAIL_USERNAME')
-    customer_email = _sanitize_header(customer_email)
-    customer_name  = _sanitize_header(customer_name)
+    customer_name = _sanitize_header(customer_name)
+    price_line    = f"Ücret        : {price} TL\n" if price is not None else ''
 
-    msg = EmailMessage()
-    msg['Subject'] = 'Rezervasyonunuz Onaylandi!'
-    msg['From']    = sender_email
-    msg['To']      = customer_email
-    msg.set_content(
+    body = (
         f"Merhaba {customer_name},\n\n"
-        f"Rezervasyon onaylandi.\n"
-        f"Saha: {pitch_name}\n"
-        f"Tarih: {date.strftime('%d.%m.%Y')}\n"
-        f"Saat: {time_slot}"
+        f"Rezervasyon talebiniz alınmıştır. "
+        f"Talebiniz yönetici onayından sonra kesinleşecektir.\n\n"
+        f"Rezervasyon Sorgulama Kodunuz: {tracking_code}\n\n"
+        f"Saha         : {pitch_name}\n"
+        f"Tarih        : {date_str}\n"
+        f"Saat         : {time_slot}\n"
+        f"Müşteri tipi : {ctype_name}\n"
+        f"{price_line}\n"
+        f"Rezervasyonunuzun durumunu (onaylandı / reddedildi) sorgulama kodunuzla "
+        f"aşağıdaki sayfadan takip edebilirsiniz:\n"
+        f"{track_url}\n\n"
+        f"Bu e-posta otomatik olarak gönderilmiştir, lütfen yanıtlamayınız.\n\n"
+        f"{SENDER_NAME}"
     )
-
-    threading.Thread(target=_send_mail_async, args=(msg,), daemon=True).start()
-
-
-# ── Müşteri süre dolum maili ───────────────────────────────────────
-
-def send_customer_expiry_email(customer_email: str, customer_name: str,
-                                pitch_name: str, date, time_slot: str):
-    """Süresi dolan rezervasyon için müşteriye bilgilendirme maili gönder."""
-    if not _is_mail_configured():
-        return
-    sender_email   = os.getenv('MAIL_USERNAME')
-    customer_email = _sanitize_header(customer_email)
-    customer_name  = _sanitize_header(customer_name)
-
-    msg = EmailMessage()
-    msg['Subject'] = 'Rezervasyon Talebiniz Zaman Asimina Ugradi'
-    msg['From']    = sender_email
-    msg['To']      = customer_email
-    msg.set_content(
-        f"Merhaba {customer_name},\n\n"
-        f"Asagidaki rezervasyon talebiniz belirtilen tarihte onaylanmadigi icin "
-        f"otomatik olarak kapatilmistir.\n\n"
-        f"Saha: {pitch_name}\n"
-        f"Tarih: {date.strftime('%d.%m.%Y')}\n"
-        f"Saat: {time_slot}\n\n"
-        f"Yeni bir rezervasyon talebi olusturabilirsiniz.\n\n"
-        f"Iyi gunler dileriz.\n"
-        f"AYBU SKS Spor Tesisleri"
-    )
-
-    threading.Thread(target=_send_mail_async, args=(msg,), daemon=True).start()
+    _send(_new_message(
+        customer_email,
+        f'Rezervasyon Talebiniz Alındı - {tracking_code}',
+        body
+    ))

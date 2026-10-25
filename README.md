@@ -10,7 +10,8 @@ Ankara Yıldırım Beyazıt Üniversitesi Sağlık Kültür ve Spor Daire Başka
 - Tarih ve saha seçerek müsait saatleri görme
 - 3 adımlı rezervasyon sihirbazı (tarih → saat → ödeme)
 - Ödeme dekontu yükleme (PDF/JPG/PNG)
-- E-posta ile onay bildirimi alma
+- Rezervasyon sonrası sorgulama kodunu içeren "talebiniz alındı" e-postası alma
+- Rezervasyon durumunu sorgulama koduyla takip etme
 
 ### Yönetici (Admin) Tarafı
 - Rezervasyon onaylama / reddetme
@@ -255,7 +256,7 @@ Sistem arka planda şu işlemleri otomatik yapar:
 
 | İşlem | Zamanlama | Açıklama |
 |-------|-----------|----------|
-| Rezervasyon süre dolumu | Her saat başı + admin panel açılışı | Tarihi geçmiş bekleyen rezervasyonları "Expired" yapar, müşteriye mail gönderir |
+| Rezervasyon süre dolumu | Her saat başı + admin panel açılışı | Tarihi geçmiş bekleyen rezervasyonları "Expired" yapar |
 | Slot kilidi temizleme | Her saat başı + admin panel açılışı | Tarihi geçmiş slot kilitlerini otomatik kaldırır |
 | Login kaydı temizleme | Ayın 1'i, saat 03:00 | 30 günden eski giriş denemelerini siler |
 | Audit log temizleme | Ayın 1'i, saat 03:00 | 1 yıldan eski denetim kayıtlarını siler |
@@ -301,7 +302,7 @@ flask reset-admin-password yonetici2    # şifresini unutan yöneticiye yeni şi
 | Güvenlik | Argon2id, Flask-WTF (CSRF), Flask-Limiter, CSP Nonce |
 | PDF | ReportLab |
 | Zamanlama | APScheduler |
-| E-posta | smtplib (Gmail SMTP) |
+| E-posta | smtplib (SMTP sunucusu `.env`'den: kurumsal hesap veya Gmail) |
 
 ---
 

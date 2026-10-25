@@ -19,7 +19,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from extensions import db
 from models import Reservation, BlockedSlot, LoginAttempt, AuditLog
-from services.email import send_customer_expiry_email
 from utils.timeutil import now_tr, today_tr
 
 logger = logging.getLogger(__name__)
@@ -95,16 +94,10 @@ def auto_expire_reservations():
         all_expired = expired_past_date + expired_past_time
         count = 0
 
+        # Müşteriye mail gönderilmez; durum sorgulama sayfasından takip edilir.
         for res in all_expired:
             res.status = 'Expired'
             count += 1
-            send_customer_expiry_email(
-                res.customer_email,
-                res.customer_name,
-                res.pitch.name if res.pitch else 'Bilinmeyen Saha',
-                res.date,
-                res.time_slot
-            )
 
         if count > 0:
             db.session.add(AuditLog(
