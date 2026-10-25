@@ -14,7 +14,7 @@ from flask import request, g, render_template
 from datetime import datetime, timedelta
 
 from models import db, LoginAttempt
-from utils.constants import LOCKOUT_ATTEMPTS, LOCKOUT_MINUTES, ERROR_PAGES
+from utils.constants import LOCKOUT_ATTEMPTS, IP_LOCKOUT_ATTEMPTS, LOCKOUT_MINUTES, ERROR_PAGES
 from utils.timeutil import now_tr
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,12 @@ logger = logging.getLogger(__name__)
 # ── Brute-force koruması ────────────────────────────────────────────
 
 def is_account_locked(username: str, ip: str) -> bool:
-    """IP veya kullanıcı adı bazlı hesap kilidi kontrolü."""
+    """Hesap kilidi kontrolü.
+
+    - Kullanıcı adı: LOCKOUT_ATTEMPTS başarısız deneme → sadece o hesap kilitlenir.
+    - IP: IP_LOCKOUT_ATTEMPTS (daha yüksek) → aynı ağdaki diğer adminler,
+      bir adminin şifre hataları yüzünden kilitlenmez; toplu deneme yine durdurulur.
+    """
     cutoff = now_tr() - timedelta(minutes=LOCKOUT_MINUTES)
 
     fails_by_username = LoginAttempt.query.filter(
@@ -38,7 +43,7 @@ def is_account_locked(username: str, ip: str) -> bool:
         LoginAttempt.success      == False  # noqa: E712
     ).count()
 
-    return fails_by_username >= LOCKOUT_ATTEMPTS or fails_by_ip >= LOCKOUT_ATTEMPTS
+    return fails_by_username >= LOCKOUT_ATTEMPTS or fails_by_ip >= IP_LOCKOUT_ATTEMPTS
 
 
 def record_attempt(username: str, ip: str, success: bool):

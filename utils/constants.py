@@ -33,8 +33,12 @@ ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
 
 # ── Brute-force parametreleri ───────────────────────────────────────
 
-LOCKOUT_ATTEMPTS = 5
-LOCKOUT_MINUTES  = 15
+LOCKOUT_ATTEMPTS    = 5    # aynı kullanıcı adına başarısız deneme → o hesap kilitlenir
+LOCKOUT_MINUTES     = 15
+# Aynı IP'den (tüm kullanıcı adları toplamı) başarısız deneme sınırı.
+# Üniversite ağında herkes tek IP ile göründüğü için hesap sınırından yüksek tutulur;
+# böylece bir adminin yanlış şifreleri diğer adminleri kilitlemez.
+IP_LOCKOUT_ATTEMPTS = 15
 
 # ── Hata sayfası tanımları ──────────────────────────────────────────
 

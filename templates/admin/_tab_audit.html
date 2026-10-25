@@ -20,6 +20,12 @@
                     <div class="audit-filter-row">
                         <input type="text" id="auditSearch" class="audit-search"
                                placeholder="İşlem, kullanıcı veya detay ara...">
+                        <select id="auditAdminFilter" class="audit-search audit-admin-select" aria-label="Kullanıcıya göre filtrele">
+                            <option value="">Tüm kullanıcılar</option>
+                            {% for name in audit_logs|map(attribute='admin')|unique|sort %}
+                            <option value="{{ name }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
 
                     <!-- Başlık -->
@@ -54,7 +60,7 @@
                         'rapor_indir':          ('action-logo',   'fas fa-file-pdf',     'PDF Rapor İndir'),
                     } %}
                     {% set meta = action_map.get(log.action, ('action-diger', 'fas fa-circle', log.action)) %}
-                    <div class="audit-item" data-search="{{ log.admin }} {{ log.action }} {{ log.detail }} {{ log.ip_address }}">
+                    <div class="audit-item" data-admin="{{ log.admin }}" data-search="{{ log.admin }} {{ log.action }} {{ log.detail }} {{ log.ip_address }}">
                         <span class="audit-time">
                             {{ log.created_at.strftime('%d.%m.%Y %H:%M') }}
                         </span>

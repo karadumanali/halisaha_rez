@@ -37,8 +37,16 @@ logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__)
 
-# Admin paneli: giriş yapmış kullanıcılar için yüksek limit
-limiter.limit('1000 per hour')(admin_bp)
+def _admin_rate_key():
+    """Giriş yapmış admin için hesap bazlı, diğerleri için IP bazlı anahtar.
+    Böylece aynı ağdaki 3 admin 1000/saat limitini ortak tüketmez; her birinin kendi limiti olur."""
+    if current_user.is_authenticated:
+        return f'admin:{current_user.id}'
+    return get_real_ip()
+
+
+# Admin paneli: giriş yapmış kullanıcılar için yüksek limit (her admine ayrı)
+limiter.limit('1000 per hour', key_func=_admin_rate_key)(admin_bp)
 
 
 # ── Dashboard ──────────────────────────────────────────────────────

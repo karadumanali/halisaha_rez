@@ -613,15 +613,21 @@ function bindPasswordModal() {
    DENETİM KAYITLARI ARAMA
 ══════════════════════════════════════════ */
 function bindAuditSearch() {
-    var input = document.getElementById('auditSearch');
+    var input  = document.getElementById('auditSearch');
+    var select = document.getElementById('auditAdminFilter');
     if (!input) return;
-    input.addEventListener('input', function() {
-        var q = input.value.toLowerCase().trim();
+    function applyFilter() {
+        var q     = input.value.toLowerCase().trim();
+        var admin = select ? select.value : '';
         document.querySelectorAll('#auditList .audit-item').forEach(function(row) {
-            var text = (row.dataset.search || '').toLowerCase();
-            row.style.display = (!q || text.includes(q)) ? '' : 'none';
+            var text      = (row.dataset.search || '').toLowerCase();
+            var matchText = !q || text.includes(q);
+            var matchUser = !admin || row.dataset.admin === admin;
+            row.style.display = (matchText && matchUser) ? '' : 'none';
         });
-    });
+    }
+    input.addEventListener('input', applyFilter);
+    if (select) select.addEventListener('change', applyFilter);
 }
 
 /* ══════════════════════════════════════════

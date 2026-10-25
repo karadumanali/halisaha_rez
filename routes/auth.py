@@ -15,6 +15,7 @@ from flask import (
     url_for, flash, session
 )
 from flask_login import login_user, logout_user, login_required, current_user
+from flask_limiter.util import get_remote_address
 
 from extensions import db, limiter
 from models import Admin, AuditLog
@@ -31,8 +32,21 @@ auth_bp = Blueprint('auth', __name__)
 
 # ── Giriş ──────────────────────────────────────────────────────────
 
+def _login_rate_key():
+    """IP + kullanıcı adı: aynı ağdan (ör. üniversite ağı) giren farklı
+    adminler birbirinin giriş limitini tüketmez."""
+    username = (request.form.get('username') or '').strip().lower()[:50]
+    return f'{get_remote_address()}|{username}'
+
+
+# Limitler yalnızca giriş DENEMELERİNE (POST) uygulanır; giriş sayfasını
+# açmak (GET) bu limitleri tüketmez. Eskiden sayfayı 4. kez açan admin 429 alıyordu.
 @auth_bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("3 per minute, 10 per hour, 20 per day")
+@limiter.limit("5 per minute; 20 per hour; 50 per day",
+               key_func=_login_rate_key, methods=['POST'])   # hesap + IP başına
+@limiter.limit("20 per minute; 100 per hour",
+               methods=['POST'])                             # IP başına genel tavan
+@limiter.limit("60 per minute", methods=['GET'])             # sayfa açma (cömert)
 def admin_login():
     """Admin giriş sayfası ve işlemi."""
     recaptcha_site_key = os.getenv('RECAPTCHA_SITE_KEY', '')

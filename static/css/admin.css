@@ -957,6 +957,7 @@
     color: var(--ink);
 }
 .audit-search:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(14,168,116,0.15); }
+.audit-admin-select { flex: 0 0 auto; min-width: 180px; background: #fff; cursor: pointer; }
 
 /* ── ŞİFRE DEĞİŞTİR MODAL CSS ── */
 .pw-modal-overlay {

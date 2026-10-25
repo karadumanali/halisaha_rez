@@ -31,10 +31,10 @@ Bu proje güvenlik odaklı geliştirilmiştir. Uygulanan önlemler:
 | **Argon2id Hash** | Şifreler en güçlü hash algoritması ile saklanır |
 | **CSRF Koruması** | Tüm POST formlarında Flask-WTF token kontrolü |
 | **CSP Nonce** | Her istekte benzersiz nonce ile XSS engellenir |
-| **Brute-Force Kilitleme** | 5 başarısız deneme → 15 dk hesap kilidi (IP + kullanıcı bazlı) |
+| **Brute-Force Kilitleme** | Aynı hesaba 5 başarısız deneme → 15 dk o hesap kilitli; aynı IP'den toplam 15 başarısız deneme → 15 dk IP kilitli |
 | **Timing-Safe Login** | DUMMY_HASH ile kullanıcı adı tespiti engellenir |
 | **Session Token** | Her girişte yeni token — çoklu cihaz oturumu engeli |
-| **Rate Limiting** | Rezervasyon: 3/dk, Login: 3/dk, PDF: 10/dk |
+| **Rate Limiting** | Rezervasyon: 3/dk, Login denemesi: hesap+IP başına 5/dk (sayfayı açmak sayılmaz), PDF: 10/dk, Admin paneli: her admine ayrı 1000/saat |
 | **IP Whitelist** | Admin paneline sadece belirli IP'lerden erişim |
 | **reCAPTCHA v3** | Google bot koruması (opsiyonel) |
 | **Honeypot** | Gizli form alanı ile bot tespiti |
@@ -276,6 +276,18 @@ Sistem arka planda şu işlemleri otomatik yapar:
 ```
 
 > ⚠️ İlk girişten sonra şifreyi hemen değiştirin. Şifre politikası: en az 10 karakter, büyük harf, küçük harf, rakam ve özel karakter zorunlu.
+
+### Birden Fazla Yönetici
+
+Her yöneticinin kendi hesabı olmalıdır. Aynı hesabı paylaşmayın: her girişte oturum anahtarı yenilendiği için ortak hesapta bir yöneticinin girişi diğerlerinin oturumunu kapatır ve denetim kayıtlarında işlemi kimin yaptığı ayırt edilemez.
+
+```bash
+flask rename-admin yonetici yonetici1   # mevcut hesabın adını değiştir (şifresi aynı kalır)
+flask create-admin yonetici2            # yeni hesap, rastgele şifre terminalde gösterilir
+flask create-admin yonetici3
+flask list-admins                       # hesapları listele
+flask reset-admin-password yonetici2    # şifresini unutan yöneticiye yeni şifre
+```
 
 ---
 
