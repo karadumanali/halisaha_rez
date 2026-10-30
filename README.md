@@ -12,12 +12,11 @@ Ankara Yıldırım Beyazıt Üniversitesi Sağlık Kültür ve Spor Daire Başka
 - Ödeme dekontu yükleme (PDF/JPG/PNG)
 - Rezervasyon sonrası sorgulama kodunu içeren "talebiniz alındı" e-postası alma
 - Rezervasyon durumunu sorgulama koduyla takip etme
-- Rezervasyonu iptal etme (sorgulama kodu + kayıtlı telefon numarasıyla, saat başlamadan önce)
 
 ### Rezervasyon Kuralları
-- Bir kişi (aynı telefon veya e-posta) bir gün içinde en fazla **2** rezervasyon talebi oluşturabilir (iptal edilen/reddedilen talepler hakkı geri verir). Kural IP bazlı değildir; kampüs ağındaki öğrenciler birbirini etkilemez
+- Bir kişi (aynı telefon veya e-posta) bir gün içinde en fazla **2** rezervasyon talebi oluşturabilir (reddedilen / süresi dolan talepler hakkı geri verir). Kural IP bazlı değildir; kampüs ağındaki öğrenciler birbirini etkilemez
 - **48 saat** içinde onaylanmayan talepler otomatik "Süresi Doldu" olur ve saat boşalır
-- Reddedilen, süresi dolan ve iptal edilen rezervasyonların saati tekrar kiralanabilir
+- Reddedilen ve süresi dolan rezervasyonların saati tekrar kiralanabilir
 - Kurallar `utils/constants.py` içinden değiştirilebilir
 
 ### Yönetici (Admin) Tarafı
@@ -276,7 +275,7 @@ girilen adrese sorgulama kodunu içeren "Rezervasyon Talebiniz Alındı" maili g
 admins              → Yönetici hesapları
 pitches             → Halı sahalar (ad, aktif/pasif)
 pitch_images        → Saha resimleri
-reservations        → Rezervasyon talepleri (Pending/Approved/Rejected/Expired/Cancelled)
+reservations        → Rezervasyon talepleri (Pending/Approved/Rejected/Expired)
 blocked_slots       → Kilitli saat dilimleri
 login_attempts      → Giriş denemeleri (brute-force koruması)
 audit_logs          → Denetim kayıtları (tüm admin işlemleri)
@@ -350,7 +349,7 @@ flask reset-admin-password yonetici2    # şifresini unutan yöneticiye yeni şi
 ## 🧪 Testler
 
 Otomatik testler geçici bir SQLite veritabanında tüm migration'ları çalıştırıp temel akışları dener
-(slot kilitleme, giriş/429, rezervasyon kuralları, iptal, mail, CSP uyumu).
+(slot kilitleme, giriş/429, rezervasyon kuralları, mail, CSP uyumu).
 
 ```bash
 pip install -r requirements-dev.txt

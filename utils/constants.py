@@ -47,7 +47,7 @@ ACTIVE_STATUSES = ('Pending', 'Approved')
 
 # Bir kişi (aynı telefon VEYA aynı e-posta) bir gün içinde en fazla kaç rezervasyon
 # talebi oluşturabilir. Sayılan: o gün oluşturulmuş ve hâlâ aktif (bekleyen/onaylı)
-# talepler — iptal edilen/reddedilen talepler hakkı geri verir.
+# talepler — reddedilen / süresi dolan talepler hakkı geri verir.
 # (IP bazlı değil: kampüs ağında tüm öğrenciler tek IP ile görünür.)
 MAX_RESERVATIONS_PER_PERSON_PER_DAY = 2
 

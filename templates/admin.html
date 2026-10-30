@@ -7,7 +7,6 @@
 {% set approved_count = status_counts.get('Approved', 0) %}
 {% set rejected_count = status_counts.get('Rejected', 0) %}
 {% set expired_count  = status_counts.get('Expired', 0) %}
-{% set cancelled_count = status_counts.get('Cancelled', 0) %}
 {% set blocked_count  = blocked_slots | length %}
 
 <div class="admin-layout">

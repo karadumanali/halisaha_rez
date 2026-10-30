@@ -21,7 +21,7 @@ from flask import (
 from sqlalchemy import func, or_
 
 from extensions import db, limiter
-from models import Pitch, Reservation, BlockedSlot, PitchTimeSlot, CustomerType, AuditLog
+from models import Pitch, Reservation, BlockedSlot, PitchTimeSlot, CustomerType
 from utils.constants import ACTIVE_STATUSES, MAX_RESERVATIONS_PER_PERSON_PER_DAY
 from utils.helpers import get_real_ip
 from utils.timeutil import now_tr, today_tr
@@ -331,21 +331,9 @@ def reservation_success():
 
 # ── Rezervasyon takip/sorgulama ───────────────────────────────────
 
-def _can_cancel(reservation) -> bool:
-    """Kullanıcı iptal edebilir mi? Bekleyen/onaylı ve saati henüz başlamamış olmalı."""
-    if reservation is None or reservation.status not in ACTIVE_STATUSES:
-        return False
-    try:
-        start_str = reservation.time_slot.split(' - ')[0].strip()
-        start = datetime.combine(reservation.date, datetime.strptime(start_str, '%H:%M').time())
-    except (ValueError, IndexError, AttributeError):
-        return False
-    return start > now_tr()
-
-
 def _render_track(reservation=None, searched=False, code=''):
     return render_template('track.html', reservation=reservation, searched=searched,
-                           code=code, can_cancel=_can_cancel(reservation), hide_fab=True)
+                           code=code, hide_fab=True)
 
 
 @public_bp.route('/rezervasyon-sorgula')
@@ -366,39 +354,6 @@ def track_reservation():
         return _render_track()
 
     reservation = Reservation.query.filter_by(tracking_code=code).first()
-    return _render_track(reservation, searched=True, code=code)
-
-
-@public_bp.route('/rezervasyon-iptal', methods=['POST'])
-@limiter.limit("30 per minute")
-def cancel_reservation():
-    """Kullanıcı kendi rezervasyonunu iptal eder: takip kodu + kayıtlı telefon gerekir."""
-    code  = request.form.get('tracking_code', '').strip().upper()
-    phone = request.form.get('customer_phone', '').replace(' ', '').strip()
-
-    reservation = Reservation.query.filter_by(tracking_code=code).with_for_update().first() if code else None
-    if reservation is None:
-        flash('Rezervasyon bulunamadi.', 'danger')
-        return _render_track(searched=bool(code), code=code)
-
-    if not phone or phone != reservation.customer_phone:
-        flash('Telefon numarasi bu rezervasyondaki numarayla eslesmiyor.', 'danger')
-        return _render_track(reservation, searched=True, code=code)
-
-    if not _can_cancel(reservation):
-        flash('Bu rezervasyon iptal edilemez (islem gormus veya saati gecmis).', 'warning')
-        return _render_track(reservation, searched=True, code=code)
-
-    old_status = reservation.status
-    reservation.status = 'Cancelled'
-    db.session.add(AuditLog(
-        admin='musteri', ip_address=get_real_ip(), action='kullanici_iptal',
-        detail=(f'kod={reservation.tracking_code} | musteri={reservation.customer_name} '
-                f'| saha={reservation.pitch.name} | tarih={reservation.date} '
-                f'| saat={reservation.time_slot} | onceki durum={old_status}')
-    ))
-    db.session.commit()
-    flash('Rezervasyonunuz iptal edildi. Saat diger kullanicilara acildi.', 'success')
     return _render_track(reservation, searched=True, code=code)
 
 

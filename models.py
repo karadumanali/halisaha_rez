@@ -111,8 +111,8 @@ class Reservation(db.Model):
     __tablename__ = 'reservations'
 
     # V-06: Kısmi UNIQUE index — aynı saha + tarih + saat için yalnızca BİR AKTİF
-    # (Pending/Approved) rezervasyon olabilir. Reddedilen / süresi dolan / iptal edilen
-    # kayıtlar slotu kilitlemez; aynı saat tekrar kiralanabilir.
+    # (Pending/Approved) rezervasyon olabilir. Reddedilen / süresi dolan kayıtlar
+    # slotu kilitlemez; aynı saat tekrar kiralanabilir.
     __table_args__ = (
         db.Index('uq_reservation_active_slot', 'pitch_id', 'date', 'time_slot',
                  unique=True,
@@ -131,7 +131,7 @@ class Reservation(db.Model):
     receipt_filename = db.Column(db.String(255), nullable=False)
     customer_type_id = db.Column(db.Integer,     db.ForeignKey('customer_types.id'), nullable=True)
     price            = db.Column(db.Integer,     nullable=True)  # rezervasyon anındaki ücret (TL)
-    # Pending | Approved | Rejected | Expired | Cancelled (kullanıcı iptali)
+    # Pending | Approved | Rejected | Expired
     status           = db.Column(db.String(20),  default='Pending', nullable=False)
     created_at       = db.Column(db.DateTime,    default=now_tr)
 

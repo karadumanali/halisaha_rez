@@ -1,4 +1,4 @@
-"""Rezervasyon kuralları: reddedilen slot, kişi başı sınır, iptal, zaman aşımı."""
+"""Rezervasyon kuralları: reddedilen slot, kişi başı sınır, zaman aşımı."""
 import os
 import datetime as dt
 
@@ -43,38 +43,21 @@ def test_person_can_make_two_reservations_per_day(app, pitch):
     assert loc == '/rezervasyon-basarili'
 
 
-def test_cancelled_request_gives_daily_right_back(app, pitch):
+def test_rejected_request_gives_daily_right_back(app, admin_client, pitch):
     reserve(app, pitch, date=future_weekday(3))
     reserve(app, pitch, date=future_weekday(3), slot='18:00 - 19:00')
-    code = _res(app).tracking_code
-    app.test_client().post('/rezervasyon-iptal', data={'tracking_code': code, 'customer_phone': '05551112233'})
+    admin_client.post(f'/admin/status/{_res(app).id}/reject')
     assert reserve(app, pitch, date=future_weekday(3), slot='18:00 - 19:00')[0] == '/rezervasyon-basarili'
 
 
-def test_user_can_cancel_with_correct_phone(app, pitch):
-    d = future_weekday()
-    reserve(app, pitch, date=d)
-    code = _res(app).tracking_code
-    c = app.test_client()
-    c.post('/rezervasyon-iptal', data={'tracking_code': code, 'customer_phone': '05000000000'})
-    assert _res(app).status == 'Pending'
-    c.post('/rezervasyon-iptal', data={'tracking_code': code, 'customer_phone': '0555 111 22 33'})
-    assert _res(app).status == 'Cancelled'
-    # iptal edilen saat tekrar kiralanabilir
-    assert reserve(app, pitch, date=d, phone='05559998877', email='v@x.com')[0] == '/rezervasyon-basarili'
-
-
-def test_cannot_cancel_past_reservation(app, pitch):
-    from extensions import db
+def test_user_cancellation_is_disabled(app, pitch):
+    """Kullanıcı iptali şimdilik kaldırıldı: uç nokta ve form yok."""
     reserve(app, pitch)
-    r = _res(app)
-    with app.app_context():
-        from models import Reservation
-        res = db.session.get(Reservation, r.id)
-        res.date = dt.date.today() - dt.timedelta(days=1)
-        db.session.commit()
-    app.test_client().post('/rezervasyon-iptal', data={
-        'tracking_code': r.tracking_code, 'customer_phone': '05551112233'})
+    c = app.test_client()
+    assert c.post('/rezervasyon-iptal', data={'tracking_code': _res(app).tracking_code,
+                                              'customer_phone': '05551112233'}).status_code == 404
+    page = c.post('/rezervasyon-sorgula', data={'tracking_code': _res(app).tracking_code}).get_data(as_text=True)
+    assert 'iptal' not in page.lower()
     assert _res(app).status == 'Pending'
 
 

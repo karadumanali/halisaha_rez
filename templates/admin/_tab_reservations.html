@@ -27,10 +27,6 @@
                     <div><div class="stat-num">{{ expired_count }}</div><div class="stat-lbl">Süresi Doldu</div></div>
                 </div>
                 <div class="stat-chip">
-                    <div class="stat-icon cancelled"><i class="fas fa-ban"></i></div>
-                    <div><div class="stat-num">{{ cancelled_count }}</div><div class="stat-lbl">İptal</div></div>
-                </div>
-                <div class="stat-chip">
                     <div class="stat-icon blocked"><i class="fas fa-lock"></i></div>
                     <div><div class="stat-num">{{ blocked_count }}</div><div class="stat-lbl">Kilitli Slot</div></div>
                 </div>
@@ -108,7 +104,6 @@
                 <button class="filter-btn" data-filter="Approved">Onaylandı ({{ approved_count }})</button>
                 <button class="filter-btn" data-filter="Rejected">Reddedildi ({{ rejected_count }})</button>
                 <button class="filter-btn" data-filter="Expired">Süresi Doldu ({{ expired_count }})</button>
-                <button class="filter-btn" data-filter="Cancelled">İptal ({{ cancelled_count }})</button>
             </div>
 
             <div class="res-list">
@@ -123,8 +118,6 @@
                         <span class="status-pill status-approved"><i class="fas fa-check-circle"></i> Onaylandı</span>
                     {% elif res.status == 'Expired' %}
                         <span class="status-pill status-expired"><i class="fas fa-clock"></i> Süresi Doldu</span>
-                    {% elif res.status == 'Cancelled' %}
-                        <span class="status-pill status-cancelled"><i class="fas fa-ban"></i> İptal Edildi</span>
                     {% else %}
                         <span class="status-pill status-rejected"><i class="fas fa-times-circle"></i> Reddedildi</span>
                     {% endif %}
@@ -186,10 +179,6 @@
                     {% elif res.status == 'Expired' %}
                     <span class="done-label done-label-muted">
                         <i class="fas fa-clock"></i> Süre doldu — otomatik kapatıldı
-                    </span>
-                    {% elif res.status == 'Cancelled' %}
-                    <span class="done-label done-label-muted">
-                        <i class="fas fa-ban"></i> Müşteri tarafından iptal edildi
                     </span>
                     {% else %}
                     <span class="done-label"><i class="fas fa-check"></i> İşlem tamamlandı</span>

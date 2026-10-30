@@ -49,7 +49,6 @@ STATUS_TR = {
     'Approved': '✓ Onaylandı',
     'Rejected': '✗ Reddedildi',
     'Expired':  '○ Süresi Doldu',
-    'Cancelled': '× İptal Edildi',
 }
 
 
@@ -172,7 +171,6 @@ def generate_report(pitch: Pitch, report_date, reservations: list,
     approved = sum(1 for r in reservations if r.status == 'Approved')
     rejected = sum(1 for r in reservations if r.status == 'Rejected')
     expired  = sum(1 for r in reservations if r.status == 'Expired')
-    cancelled = sum(1 for r in reservations if r.status == 'Cancelled')
     blocked_count = len(blocked_dict)
 
     summary_text = (
@@ -181,7 +179,6 @@ def generate_report(pitch: Pitch, report_date, reservations: list,
         f'<font color="#854d0e">Bekleyen: <b>{pending}</b></font> | '
         f'<font color="#9b2c2c">Reddedilen: <b>{rejected}</b></font> | '
         f'<font color="#6b7280">Süresi Dolmuş: <b>{expired}</b></font> | '
-        f'<font color="#475569">İptal: <b>{cancelled}</b></font> | '
         f'<font color="#6b21a8">Kilitli Slot: <b>{blocked_count}</b></font>'
     )
     story.append(Paragraph(summary_text, info_style))
